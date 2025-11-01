@@ -1,0 +1,12 @@
+{
+  "name": "Atlas",
+  "start_url": "/",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "768x768",
+      "type": "image/png"
+    }
+  ]
+}

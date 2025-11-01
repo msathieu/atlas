@@ -1,0 +1,46 @@
+syntax = "proto3";
+package agent;
+
+message HandshakeRequest {
+  uint64 magic = 1;
+  uint64 api_version = 2;
+  string arch = 3;
+  string os = 4;
+  string device_id = 5;
+  bool register_device = 6;
+  bytes pubkey = 7;
+  string hostname = 8;
+  string version = 9;
+  bytes agent_hash = 10;
+}
+message HandshakeResponse {
+  uint64 magic = 1;
+  uint64 api_version = 2;
+  string device_id = 3;
+  bytes auth_challenge = 4;
+  bool reset = 5;
+}
+message HandshakeFinish {
+  bytes auth_response = 1;
+}
+message HeartbeatRequest {
+  uint64 random = 1;
+}
+message HeartbeatResponse {
+  uint64 random = 1;
+}
+message CommandRequest {
+  string code = 1;
+}
+message CommandResponse {
+  uint32 status = 1;
+  string stdout = 2;
+  string stderr = 3;
+}
+message UpdateRequest {
+  bytes agent = 1;
+  bytes hash = 2;
+}
+message UpdateResponse {
+  bool success = 1;
+}

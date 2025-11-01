@@ -1,0 +1,32 @@
+name: Build
+on: [push]
+jobs:
+  build:
+    runs-on: debian-13
+    steps:
+      - name: Install dependencies
+        run: apt-get update && apt-get install -y sudo
+      - name: Install Nix
+        uses: https://github.com/cachix/install-nix-action@v31
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+      - name: Build
+        run: nix develop -c cargo build
+      - name: Run cargo-deny
+        run: nix develop -c cargo deny check
+      - name: Run clippy
+        run: nix develop -c cargo clippy -- -Dwarnings
+      - name: Run cargo fmt
+        run: nix develop -c -- cargo fmt --check
+      - name: Install frontend dependencies
+        run: cd frontend && nix develop -c deno install
+      - name: Build frontend
+        run: cd frontend && nix develop -c deno task build
+      - name: Run svelte-check
+        run: cd frontend && nix develop -c deno task check
+      - name: Run deno lint
+        run: cd frontend && nix develop -c -- deno lint
+      - name: Run deno fmt
+        run: cd frontend && nix develop -c -- deno fmt --check

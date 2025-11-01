@@ -1,0 +1,6 @@
+[workspace]
+resolver = "3"
+members = ["agent", "apiserver", "master", "shared-api", "shared-server", "webserver"]
+
+[profile.release]
+lto = true

@@ -1,0 +1,277 @@
+#![forbid(unsafe_code)]
+
+use ::aws_lc_rs::signature::{ED25519, UnparsedPublicKey};
+use diesel::{
+    prelude::*,
+    r2d2::{ConnectionManager, Pool},
+};
+use fred::{
+    clients::SubscriberClient,
+    prelude::{ClientLike, EventInterface, PubsubInterface},
+};
+use prost::Message;
+use rustls::{
+    ServerConfig,
+    crypto::{
+        CryptoProvider,
+        aws_lc_rs::{self, cipher_suite::TLS13_AES_256_GCM_SHA384},
+    },
+    pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
+};
+use sha2::{Digest, Sha512};
+use shared_api::{
+    API_VERSION, CommandOrigin, CommandRequest, CommandResponse, HandshakeFinish, HandshakeRequest, HandshakeResponse, HeartbeatRequest, HeartbeatResponse, MAGIC, MessageType, UpdateRequest,
+    UpdateResponse, print_startup, read_message, write_message,
+};
+use shared_server::{
+    binary::personalize_binary,
+    get_db_pool, get_sub_client,
+    models::{Command, Device, Setting},
+    notify_server,
+    schema::{commands, devices, settings},
+};
+use std::{
+    error::Error,
+    str::FromStr,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    time::timeout,
+};
+use tokio_rustls::{TlsAcceptor, rustls};
+use uuid::Uuid;
+
+#[tokio::main]
+async fn main() {
+    print_startup("apiserver", env!("CARGO_PKG_VERSION"));
+    dotenvy::dotenv().ok();
+    CryptoProvider {
+        cipher_suites: vec![TLS13_AES_256_GCM_SHA384],
+        ..aws_lc_rs::default_provider()
+    }
+    .install_default()
+    .unwrap();
+    let pool = get_db_pool().unwrap();
+    let tls_acceptor;
+    let mut agent = None;
+    let mut agent_hash = None;
+    {
+        let mut db = pool.get().unwrap();
+        let tls_key: Setting = settings::table.find("tls_key").first(&mut db).unwrap();
+        let tls_cert: Setting = settings::table.find("tls_cert").first(&mut db).unwrap();
+        let key_der = PrivateKeyDer::from_pem_slice(tls_key.value.as_bytes()).unwrap();
+        let cert_der = CertificateDer::from_pem_slice(tls_cert.value.as_bytes()).unwrap();
+        let tls_config = ServerConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
+            .with_no_client_auth()
+            .with_single_cert(vec![cert_der], key_der)
+            .unwrap();
+        tls_acceptor = TlsAcceptor::from(Arc::new(tls_config));
+        let tmp_agent = personalize_binary(&mut db).await;
+        match tmp_agent {
+            Ok(tmp_agent) => {
+                agent_hash = Some(Sha512::digest(&tmp_agent).to_vec());
+                agent = Some(tmp_agent);
+            }
+            Err(e) => {
+                println!("Failed to initialize auto-updater: {}", e);
+            }
+        };
+    }
+    let agent = Arc::new(agent);
+    let agent_hash = Arc::new(agent_hash);
+    let listener = TcpListener::bind("0.0.0.0:8612").await.unwrap();
+    loop {
+        let result = accept_connection(&listener, tls_acceptor.clone(), pool.clone(), agent.clone(), agent_hash.clone()).await;
+        if let Err(e) = result {
+            println!("Error in connection: {}", e)
+        }
+    }
+}
+
+async fn accept_connection(
+    listener: &TcpListener,
+    tls_acceptor: TlsAcceptor,
+    pool: Pool<ConnectionManager<PgConnection>>,
+    agent: Arc<Option<Vec<u8>>>,
+    agent_hash: Arc<Option<Vec<u8>>>,
+) -> Result<(), Box<dyn Error>> {
+    let (stream, addr) = listener.accept().await?;
+    let ip = addr.ip().to_string();
+    tokio::spawn(async {
+        let sub_client = match get_sub_client().await {
+            Ok(client) => client,
+            Err(e) => {
+                println!("Error connecting to Valkey: {}", e);
+                return;
+            }
+        };
+        if let Err(e) = handle_connection(stream, ip, tls_acceptor, pool, &sub_client, agent, agent_hash).await {
+            println!("Error in connection: {}", e);
+        }
+        if let Err(e) = sub_client.quit().await {
+            println!("Error closing Valkey connection: {}", e);
+        }
+    });
+    Ok(())
+}
+
+async fn handle_connection(
+    stream: TcpStream,
+    ip: String,
+    tls_acceptor: TlsAcceptor,
+    pool: Pool<ConnectionManager<PgConnection>>,
+    sub_client: &SubscriberClient,
+    agent: Arc<Option<Vec<u8>>>,
+    agent_hash: Arc<Option<Vec<u8>>>,
+) -> Result<(), Box<dyn Error>> {
+    let mut stream = tls_acceptor.accept(stream).await?;
+    let mut db = pool.get()?;
+    let (_, buf) = read_message(&mut stream, Some(MessageType::HandshakeRequest)).await?;
+    let handshake_request = HandshakeRequest::decode(&*buf)?;
+    if handshake_request.magic != MAGIC as u64 || handshake_request.api_version != API_VERSION as u64 {
+        return Err("Invalid client version".into());
+    }
+    if !handshake_request.hostname.is_ascii() || !handshake_request.hostname.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+        return Err("Invalid hostname".into());
+    }
+    if handshake_request.arch != "x86_64" && handshake_request.arch != "aarch64" {
+        return Err("Invalid architecture".into());
+    }
+    if handshake_request.os != "linux" {
+        return Err("Invalid OS".into());
+    }
+    let mut handshake_response = HandshakeResponse {
+        magic: MAGIC as u64,
+        api_version: API_VERSION as u64,
+        device_id: "".to_owned(),
+        auth_challenge: vec![],
+        reset: false,
+    };
+    if handshake_request.register_device {
+        let allowed: Setting = settings::table.find("allow_new_devices").first(&mut db)?;
+        if allowed.value != "true" {
+            return Err("No new devices are allowed".into());
+        }
+        let device: Device = diesel::insert_into(devices::table)
+            .values(Device {
+                id: None,
+                arch: handshake_request.arch,
+                os: handshake_request.os,
+                version: handshake_request.version,
+                pubkey: handshake_request.pubkey,
+                approved: false,
+                hostname: handshake_request.hostname,
+                first_connection: SystemTime::now(),
+                last_connection: SystemTime::now(),
+                ip,
+                agent_hash: handshake_request.agent_hash,
+            })
+            .get_result(&mut db)?;
+        handshake_response.device_id = device.id.ok_or("Invalid database result")?.to_string();
+        write_message(MessageType::HandshakeResponse, handshake_response, &mut stream).await?;
+        notify_server("WEB").await?;
+        return Ok(());
+    }
+    let uuid = Uuid::from_str(&handshake_request.device_id)?;
+    let device_exists = devices::table.find(uuid).first::<Device>(&mut db).optional()?.is_some();
+    if !device_exists {
+        handshake_response.reset = true;
+        write_message(MessageType::HandshakeResponse, handshake_response, &mut stream).await?;
+        return Ok(());
+    }
+    let mut device: Device = devices::table.find(uuid).first(&mut db)?;
+    if device.pubkey != handshake_request.pubkey {
+        return Err("Invalid pubkey".into());
+    }
+    if !device.approved {
+        return Err("Device isn't approved".into());
+    }
+    let challenge: [u8; 128] = rand::random();
+    handshake_response.auth_challenge = challenge.to_vec();
+    write_message(MessageType::HandshakeResponse, handshake_response, &mut stream).await?;
+    let (_, buf) = read_message(&mut stream, Some(MessageType::HandshakeFinish)).await?;
+    let handshake_finish = HandshakeFinish::decode(&*buf)?;
+    let public_key = UnparsedPublicKey::new(&ED25519, &device.pubkey);
+    public_key.verify(&challenge, &handshake_finish.auth_response)?;
+
+    device.arch = handshake_request.arch;
+    device.os = handshake_request.os;
+    device.version = handshake_request.version;
+    device.hostname = handshake_request.hostname;
+    device.last_connection = SystemTime::now();
+    device.ip = ip;
+    device.agent_hash = handshake_request.agent_hash;
+    diesel::update(devices::table.find(uuid)).set(&device).execute(&mut db)?;
+    notify_server("WEB").await?;
+
+    if let Some(hash) = &*agent_hash
+        && *hash != device.agent_hash
+    {
+        let request = UpdateRequest {
+            agent: agent.as_ref().clone().ok_or("agent was None")?,
+            hash: hash.clone(),
+        };
+        write_message(MessageType::UpdateRequest, request, &mut stream).await?;
+        let (_, buf) = read_message(&mut stream, Some(MessageType::UpdateResponse)).await?;
+        let response = UpdateResponse::decode(&*buf)?;
+        if response.success {
+            return Ok(());
+        }
+    }
+
+    sub_client.subscribe(format!("API:{}", uuid)).await?;
+    let mut receiver = sub_client.message_rx();
+    loop {
+        let device_exists = devices::table.find(uuid).first::<Device>(&mut db).optional()?.is_some();
+        if !device_exists {
+            return Err("Device no longer exists".into());
+        }
+        let command: Option<Command> = commands::table.filter(commands::device.eq(uuid).and(commands::completed.eq(false))).first(&mut db).optional()?;
+        if let Some(mut command) = command {
+            let request = CommandRequest { code: command.code.clone() };
+            write_message(MessageType::CommandRequest, request, &mut stream).await?;
+            let (mut message_type, mut buf);
+            loop {
+                (message_type, buf) = read_message(&mut stream, None).await?;
+                if message_type == MessageType::HeartbeatRequest {
+                    let request = HeartbeatRequest::decode(&*buf)?;
+                    write_message(MessageType::HeartbeatResponse, HeartbeatResponse { random: request.random }, &mut stream).await?;
+                } else if message_type == MessageType::CommandResponse {
+                    break;
+                } else {
+                    return Err("Invalid message type".into());
+                }
+            }
+            let response = CommandResponse::decode(&*buf)?;
+            command.completed = true;
+            command.status_code = Some(response.status as i32);
+            command.stdout = Some(response.stdout.replace("\0", ""));
+            command.stderr = Some(response.stderr.replace("\0", ""));
+            command.completed_timestamp = Some(SystemTime::now());
+            diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
+            diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db)?;
+            notify_server("WEB").await?;
+            if command.origin == CommandOrigin::SystemIdentification as i32 {
+                notify_server("MASTER:DEVICES").await?;
+            } else if command.origin == CommandOrigin::LLMTool as i32 {
+                notify_server(&format!("MASTER:CMD:{}", command.id.ok_or("Invalid command")?)).await?;
+            }
+        } else if timeout(Duration::from_secs(30), async {
+            receiver.recv().await.ok();
+        })
+        .await
+        .is_err()
+        {
+            let heartbeat = HeartbeatRequest { random: rand::random() };
+            write_message(MessageType::HeartbeatRequest, heartbeat, &mut stream).await?;
+            let (_, buf) = read_message(&mut stream, Some(MessageType::HeartbeatResponse)).await?;
+            let response = HeartbeatResponse::decode(&*buf)?;
+            if response.random != heartbeat.random {
+                return Err("Invalid heartbeat response".into());
+            }
+            diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db)?;
+        }
+    }
+}

@@ -1,0 +1,24 @@
+[package]
+name = "agent"
+version = "0.0.1"
+edition = "2024"
+license = "Unlicense"
+publish = false
+
+[dependencies]
+aws-lc-rs = "1.14.0"
+base64 = "0.22.1"
+diesel = {version = "2.3.1", features = ["sqlite"]}
+diesel_migrations = "2.2.0"
+dotenvy = "0.15.7"
+gethostname = "1.0.2"
+libsqlite3-sys = {version = "0.35.0", features = ["bundled"]}
+mlua = {version = "0.11.3", features = ["lua54", "vendored"]}
+prost = "0.14.1"
+rand = "0.9.2"
+self-replace = "1.5.0"
+sha2 = "0.10.9"
+shared-api = {path = "../shared-api"}
+tempfile = "3.23.0"
+tokio = {version = "1.47.1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "time"]}
+tokio-rustls = "0.26.4"

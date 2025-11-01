@@ -1,0 +1,5 @@
+[Service]
+ExecStart=/usr/local/bin/atlas-agent
+Restart=always
+[Install]
+WantedBy=multi-user.target

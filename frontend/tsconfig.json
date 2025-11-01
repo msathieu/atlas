@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "strict": true
+  },
+  "extends": "./.svelte-kit/tsconfig.json"
+}

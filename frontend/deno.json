@@ -1,0 +1,13 @@
+{
+  "tasks": {
+    "build": "svelte-kit sync && vite build",
+    "check": "svelte-check",
+    "dev": "deno run -A --unstable-no-legacy-abort npm:vite dev"
+  },
+  "unstable": [
+    "fmt-component"
+  ],
+  "fmt": {
+    "lineWidth": 200
+  }
+}

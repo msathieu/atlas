@@ -1,0 +1,20 @@
+[package]
+name = "apiserver"
+version = "0.0.1"
+edition = "2024"
+license = "Unlicense"
+publish = false
+
+[dependencies]
+aws-lc-rs = "1.14.0"
+diesel = {version = "2.2.12", features = ["postgres", "uuid"]}
+dotenvy = "0.15.7"
+fred = "10.1.0"
+prost = "0.14.1"
+rand = "0.9.2"
+sha2 = "0.10.9"
+shared-api = {path = "../shared-api"}
+shared-server = {path = "../shared-server"}
+tokio = {version = "1.47.1", features = ["fs", "macros", "net", "rt-multi-thread", "time"]}
+tokio-rustls = "0.26.4"
+uuid = "1.18.1"

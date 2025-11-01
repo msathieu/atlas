@@ -1,0 +1,10 @@
+android
+build
+node_modules
+postgres
+target
+.direnv
+.env
+.svelte-kit
+agent.db
+THIRD-PARTY.txt

@@ -1,0 +1,79 @@
+#![forbid(unsafe_code)]
+
+use crate::{
+    agent::{download_agent, download_auth},
+    auth::login,
+    chat::{chats_list, create_chat, delete_chat, get_chat, manage_tool_call_consent, send_message},
+    commands::{commands_list, create_command, delete_command},
+    devices::{approve_device, delete_device, devices_list},
+    info::server_info,
+    settings::{get_setting, update_setting},
+    stream::{stream, stream_auth},
+};
+use axum::{
+    Router,
+    http::StatusCode,
+    routing::{delete, get, post, put},
+};
+use base64::{Engine, prelude::BASE64_STANDARD};
+use diesel::{
+    PgConnection,
+    r2d2::{Pool, PooledConnection},
+};
+use diesel::{prelude::*, r2d2::ConnectionManager};
+use shared_api::print_startup;
+use shared_server::{get_db_pool, models::Setting, schema};
+use std::sync::OnceLock;
+use tokio::net::TcpListener;
+use tower_http::services::{ServeDir, ServeFile};
+
+mod agent;
+mod auth;
+mod chat;
+mod commands;
+mod devices;
+mod info;
+mod settings;
+mod stream;
+mod util;
+
+static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
+static DB_POOL: OnceLock<Pool<ConnectionManager<PgConnection>>> = OnceLock::new();
+
+fn get_db() -> Result<PooledConnection<ConnectionManager<PgConnection>>, StatusCode> {
+    DB_POOL.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?.get().or(Err(StatusCode::INTERNAL_SERVER_ERROR))
+}
+
+#[tokio::main]
+async fn main() {
+    print_startup("webserver", env!("CARGO_PKG_VERSION"));
+    dotenvy::dotenv().ok();
+    DB_POOL.set(get_db_pool().unwrap()).unwrap();
+    let jwt_secret = schema::settings::table.find("jwt_secret").first::<Setting>(&mut DB_POOL.get().unwrap().get().unwrap()).unwrap().value;
+    let jwt_secret = BASE64_STANDARD.decode(jwt_secret).unwrap();
+    JWT_KEY.set(jwt_secret).unwrap();
+    let router = Router::new()
+        .fallback_service(ServeDir::new("frontend").fallback(ServeFile::new("frontend/404.html")))
+        .route("/api/info", get(server_info))
+        .route("/api/devices", get(devices_list))
+        .route("/api/devices/{id}/approve", post(approve_device))
+        .route("/api/devices/{id}", delete(delete_device))
+        .route("/api/commands", get(commands_list))
+        .route("/api/commands", post(create_command))
+        .route("/api/commands/{id}", delete(delete_command))
+        .route("/api/chats", get(chats_list))
+        .route("/api/chats", post(create_chat))
+        .route("/api/chats/{id}", delete(delete_chat))
+        .route("/api/chats/{id}", get(get_chat))
+        .route("/api/chats/{id}", post(send_message))
+        .route("/api/chats/{id}/{seq}/{call_id}/consent", post(manage_tool_call_consent))
+        .route("/api/settings/{name}", get(get_setting))
+        .route("/api/settings/{name}", put(update_setting))
+        .route("/api/login", post(login))
+        .route("/api/stream", get(stream))
+        .route("/api/stream_auth", post(stream_auth))
+        .route("/api/download_agent", get(download_agent))
+        .route("/api/download_auth", post(download_auth));
+    let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
+    axum::serve(listener, router).await.unwrap();
+}

@@ -1,0 +1,232 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: atlas-db
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.0-standard-trixie
+  instances: 2
+  enablePDB: false
+  storage:
+    storageClass: longhorn-single
+    size: 5Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: atlas-db
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: atlas-db
+  policyTypes:
+    - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: atlas-api
+    - podSelector:
+        matchLabels:
+          app: atlas-master
+    - podSelector:
+        matchLabels:
+          app: atlas-web
+    - podSelector:
+        matchLabels:
+          cnpg.io/cluster: atlas-db
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: cnpg-system
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: atlas-valkey
+spec:
+  podSelector:
+    matchLabels:
+      app: atlas-valkey
+  policyTypes:
+    - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: atlas-api
+    - podSelector:
+        matchLabels:
+          app: atlas-master
+    - podSelector:
+        matchLabels:
+          app: atlas-web
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: atlas-valkey
+spec:
+  selector:
+    matchLabels:
+      app: atlas-valkey
+  template:
+    metadata:
+      name: atlas-valkey
+      labels:
+        app: atlas-valkey
+    spec:
+      containers:
+        - name: atlas-valkey
+          image: docker.io/valkey/valkey:9.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: atlas-api
+  template:
+    metadata:
+      name: atlas-api
+      labels:
+        app: atlas-api
+    spec:
+      hostUsers: false
+      containers:
+        - name: atlas-api
+          image: git.strypsteen.com/infra/atlas
+          command: ['/apiserver']
+          env:
+            - name: VALKEY_HOST
+              value: atlas-valkey
+            - name: DATABASE_HOST
+              value: atlas-db-rw
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-db-app
+                  key: password
+      imagePullSecrets:
+        - name: git-strypsteen-com
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: atlas-master
+spec:
+  selector:
+    matchLabels:
+      app: atlas-master
+  template:
+    metadata:
+      name: atlas-master
+      labels:
+        app: atlas-master
+    spec:
+      hostUsers: false
+      containers:
+        - name: atlas-master
+          image: git.strypsteen.com/infra/atlas
+          command: ['/master']
+          env:
+            - name: VALKEY_HOST
+              value: atlas-valkey
+            - name: DATABASE_HOST
+              value: atlas-db-rw
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-db-app
+                  key: password
+      imagePullSecrets:
+        - name: git-strypsteen-com
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: atlas-web
+  template:
+    metadata:
+      name: atlas-web
+      labels:
+        app: atlas-web
+    spec:
+      hostUsers: false
+      containers:
+        - name: atlas-web
+          image: git.strypsteen.com/infra/atlas
+          command: ['/webserver']
+          env:
+            - name: VALKEY_HOST
+              value: atlas-valkey
+            - name: DATABASE_HOST
+              value: atlas-db-rw
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-db-app
+                  key: password
+      imagePullSecrets:
+        - name: git-strypsteen-com
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas-valkey
+spec:
+  selector:
+    app: atlas-valkey
+  ports:
+    - port: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas-api
+spec:
+  selector:
+    app: atlas-api
+  ports:
+    - port: 8612
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas-web
+spec:
+  selector:
+    app: atlas-web
+  ports:
+    - port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: atlas
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/affinity: cookie
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+      - k8s.strypsteen.com
+      secretName: k8s-certificate
+  rules:
+    - host: console.strypsteen.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: atlas-web
+                port:
+                  number: 8000
