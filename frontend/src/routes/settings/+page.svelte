@@ -24,7 +24,7 @@
   async function requestDownloadLink() {
     const res = await authenticatedFetch("/api/download_auth", { method: "POST" });
     const downloadAuth = await res.json();
-    downloadLink.href = `${API_HOST}/api/download_agent?auth=${downloadAuth.jwt}`;
+    downloadLink.href = `${API_HOST}/api/atlas-agent?auth=${downloadAuth.jwt}`;
     actuallyDownload = true;
     downloadLink.click();
   }
@@ -85,7 +85,7 @@
 
 <a
   class="btn"
-  href="/api/download_agent"
+  href="/api/atlas-agent"
   bind:this={downloadLink}
   onclick={async (e) => {
     if (!actuallyDownload) {

@@ -72,7 +72,7 @@ async fn main() {
         .route("/api/login", post(login))
         .route("/api/stream", get(stream))
         .route("/api/stream_auth", post(stream_auth))
-        .route("/api/download_agent", get(download_agent))
+        .route("/api/atlas-agent", get(download_agent))
         .route("/api/download_auth", post(download_auth));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();
