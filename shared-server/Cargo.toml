@@ -8,6 +8,6 @@ publish = false
 [dependencies]
 diesel = {version = "2.2.12", features = ["postgres", "r2d2", "uuid"]}
 fred = {version = "10.1.0", features = ["subscriber-client"]}
-object = "0.37.3"
+object = "0.38.0"
 tokio = {version = "1.48.0", features = ["fs"]}
 uuid = "1.18.1"
