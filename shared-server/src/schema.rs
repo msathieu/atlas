@@ -64,6 +64,7 @@ diesel::table! {
         user_message -> Bool,
         generation_id -> Nullable<Varchar>,
         finished -> Bool,
+        reasoning -> Nullable<Varchar>,
     }
 }
 

@@ -18,7 +18,7 @@ use std::io::stdin;
 use std::process::exit;
 use std::ptr;
 use std::{env, error::Error, io::Read, sync::Arc, time::Duration};
-use tokio::fs;
+use tokio::fs::{self, DirBuilder};
 use tokio::net::TcpStream;
 use tokio::time::sleep;
 use tokio_rustls::rustls::pki_types::pem::PemObject;
@@ -40,7 +40,7 @@ static TLS_CERT: [u8; 1024] = [0; 1024];
 #[cfg(debug_assertions)]
 const DATABASE_URL: &str = "agent.db";
 #[cfg(not(debug_assertions))]
-const DATABASE_URL: &str = "/var/lib/atlas.db";
+const DATABASE_URL: &str = "/var/lib/atlas/agent.db";
 
 #[tokio::main]
 async fn main() {
@@ -62,6 +62,12 @@ async fn main() {
         }
     }
     print_startup("agent", env!("CARGO_PKG_VERSION"));
+    let mut dir_builder = DirBuilder::new();
+    dir_builder.mode(0o700).recursive(true);
+    #[cfg(not(debug_assertions))]
+    {
+        dir_builder.create("/var/lib/atlas").await.unwrap();
+    }
     let mut db = SqliteConnection::establish(DATABASE_URL).unwrap();
     db.run_pending_migrations(MIGRATIONS).unwrap();
     create_keypair(&mut db);

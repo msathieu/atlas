@@ -80,6 +80,7 @@ async fn process_chat(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, e
             user_message: false,
             generation_id: None,
             finished: true,
+            reasoning: None,
         };
         if error_count < 5 {
             reply.content = "Maximum number of consecutive LLM messages reached".into();
@@ -118,7 +119,8 @@ The servers you can access are: {}
 "#,
         device_names
     );
-    let agent = openrouter::Client::new(&api_key.value)
+    let client: openrouter::Client = openrouter::Client::new(&api_key.value)?;
+    let agent = client
         .agent(&model.value)
         .preamble(&preamble)
         .tool(DeviceInfoTool)
@@ -163,6 +165,7 @@ The servers you can access are: {}
     let completion = agent.completion(last_ai_message.clone(), other_ai_messages.to_vec()).await?.send().await?;
     let mut text = None;
     let mut calls = Vec::new();
+    let mut reasoning = None;
     let auto_approved_tools = ["device_info", "think"];
     for part in completion.choice {
         match part {
@@ -192,7 +195,13 @@ The servers you can access are: {}
                     user_consented: consent,
                 });
             }
-            AssistantContent::Reasoning(_) => {
+            AssistantContent::Reasoning(reasoning_arg) => {
+                if reasoning_arg.reasoning.len() != 1 {
+                    return Err("Invalid LLM response".into());
+                }
+                reasoning = Some(reasoning_arg.reasoning.first().ok_or("Invalid LLM response")?.to_owned())
+            }
+            AssistantContent::Image(_) => {
                 return Err("Invalid LLM response".into());
             }
         }
@@ -205,6 +214,7 @@ The servers you can access are: {}
         user_message: false,
         generation_id: Some(completion.raw_response.id),
         finished: calls.is_empty(),
+        reasoning,
     };
     db.transaction(|db| {
         insert_into(messages::table).values(reply).execute(db)?;

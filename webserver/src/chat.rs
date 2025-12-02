@@ -198,6 +198,7 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, Json(reque
         user_message: true,
         generation_id: None,
         finished: true,
+        reasoning: None,
     };
     diesel::update(chats::table.find(chat_id))
         .set((chats::end_timestamp.eq(SystemTime::now()), chats::error_count.eq(0), chats::consecutive_llm_messages.eq(0)))

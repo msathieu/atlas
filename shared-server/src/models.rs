@@ -96,6 +96,7 @@ pub struct Message {
     pub user_message: bool,
     pub generation_id: Option<String>,
     pub finished: bool,
+    pub reasoning: Option<String>,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
