@@ -48,3 +48,10 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, Json(r
     }
     Ok(())
 }
+pub async fn restart_system(headers: HeaderMap) -> Result<(), StatusCode> {
+    require_admin(headers).await?;
+    notify_server("MASTER:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("API:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    Ok(())
+}

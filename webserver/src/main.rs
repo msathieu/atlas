@@ -7,7 +7,7 @@ use crate::{
     commands::{commands_list, create_command, delete_command},
     devices::{approve_device, delete_device, devices_list},
     info::server_info,
-    settings::{get_setting, update_setting},
+    settings::{get_setting, restart_system, update_setting},
     stream::{stream, stream_auth},
 };
 use axum::{
@@ -74,7 +74,8 @@ async fn main() {
         .route("/api/stream", get(stream))
         .route("/api/stream_auth", post(stream_auth))
         .route("/api/atlas-agent", get(download_agent))
-        .route("/api/download_auth", post(download_auth));
+        .route("/api/download_auth", post(download_auth))
+        .route("/api/restart", post(restart_system));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();
 }

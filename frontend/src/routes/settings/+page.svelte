@@ -5,10 +5,10 @@
   import { toast } from "svelte-sonner";
 
   let { data } = $props();
-  let openrouterModel = $state(data.openrouterModel.value);
+  let openrouterModel = $derived(data.openrouterModel.value);
   let openrouterKey = $state("");
-  let allowNewDevices = $state(data.allowNewDevices.value === "true");
-  let apiServerHost = $state(data.apiserverHost.value);
+  let allowNewDevices = $derived(data.allowNewDevices.value === "true");
+  let apiServerHost = $derived(data.apiserverHost.value);
   let downloadLink: any = $state();
   let actuallyDownload = false;
 
@@ -27,6 +27,9 @@
     downloadLink.href = `${API_HOST}/api/atlas-agent?auth=${downloadAuth.jwt}`;
     actuallyDownload = true;
     downloadLink.click();
+  }
+  async function restart() {
+    await authenticatedFetch("/api/restart", { method: "POST" });
   }
 </script>
 
@@ -96,4 +99,13 @@
     }
   }}
   download
->Download Agent</a>
+  >Download Agent
+</a>
+<br />
+
+<button
+  class="btn"
+  onclick={async () => {
+    await restart();
+  }}>Restart System</button
+>
