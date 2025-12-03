@@ -28,9 +28,9 @@ CREATE TABLE commands(
     uid uuid REFERENCES users ON DELETE CASCADE,
     code varchar NOT NULL,
     completed boolean NOT NULL,
-    status_code integer,
-    stdout varchar,
-    stderr varchar,
+    status_code integer NOT NULL,
+    stdout varchar NOT NULL,
+    stderr varchar NOT NULL,
     requested_timestamp timestamp NOT NULL,
     completed_timestamp timestamp,
     origin integer NOT NULL,
@@ -61,6 +61,10 @@ CREATE TABLE messages(
     user_message boolean NOT NULL,
     generation_id varchar UNIQUE,
     finished boolean NOT NULL,
+    reasoning varchar,
+    input_tokens integer NOT NULL,
+    output_tokens integer NOT NULL,
+    model varchar NOT NULL,
     PRIMARY KEY(chat, sequence)
 );
 CREATE TABLE tool_calls(

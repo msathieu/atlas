@@ -246,9 +246,9 @@ async fn handle_connection(
             }
             let response = CommandResponse::decode(&*buf)?;
             command.completed = true;
-            command.status_code = Some(response.status as i32);
-            command.stdout = Some(response.stdout.replace("\0", ""));
-            command.stderr = Some(response.stderr.replace("\0", ""));
+            command.status_code = response.status as i32;
+            command.stdout = response.stdout.replace("\0", "");
+            command.stderr = response.stderr.replace("\0", "");
             command.completed_timestamp = Some(SystemTime::now());
             diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
             diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db)?;

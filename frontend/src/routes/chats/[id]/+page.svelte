@@ -1,6 +1,6 @@
 <script lang="ts">
   import { authenticatedFetch } from "$lib/auth.ts";
-  import { BadgeCheck, BadgeX, SendHorizontal } from "@lucide/svelte";
+  import { BadgeCheck, BadgeX, Bot, CircleUser, SendHorizontal } from "@lucide/svelte";
   import { marked } from "marked";
   import DOMPurify from "dompurify";
   let { data } = $props();
@@ -38,6 +38,22 @@
 
 {#each data.chat.messages as message}
   <div class="chat" class:chat-start={!message.user_message} class:chat-end={message.user_message}>
+    <div class="chat-image dropdown dropdown-hover">
+      <div>
+        {#if message.user_message}
+          <CircleUser size="48" />
+        {:else}
+          <Bot size="48" />
+        {/if}
+      </div>
+      {#if !message.user_message}
+        <div class="dropdown-content menu bg-base-200 w-50">
+          <p>Model: {message.model}</p>
+          <p>Input Tokens: {message.input_tokens}</p>
+          <p>Output Tokens: {message.output_tokens}</p>
+        </div>
+      {/if}
+    </div>
     <div class="chat-bubble whitespace-pre-wrap">
       {#if message.reasoning}
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->

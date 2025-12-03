@@ -81,6 +81,9 @@ async fn process_chat(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, e
             generation_id: None,
             finished: true,
             reasoning: None,
+            input_tokens: 0,
+            output_tokens: 0,
+            model: "".to_owned(),
         };
         if error_count < 5 {
             reply.content = "Maximum number of consecutive LLM messages reached".into();
@@ -215,6 +218,9 @@ The servers you can access are: {}
         generation_id: Some(completion.raw_response.id),
         finished: calls.is_empty(),
         reasoning,
+        input_tokens: completion.usage.input_tokens as i32,
+        output_tokens: completion.usage.output_tokens as i32,
+        model: model.value,
     };
     db.transaction(|db| {
         insert_into(messages::table).values(reply).execute(db)?;

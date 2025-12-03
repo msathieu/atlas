@@ -19,9 +19,9 @@ diesel::table! {
         uid -> Nullable<Uuid>,
         code -> Varchar,
         completed -> Bool,
-        status_code -> Nullable<Int4>,
-        stdout -> Nullable<Varchar>,
-        stderr -> Nullable<Varchar>,
+        status_code -> Int4,
+        stdout -> Varchar,
+        stderr -> Varchar,
         requested_timestamp -> Timestamp,
         completed_timestamp -> Nullable<Timestamp>,
         origin -> Int4,
@@ -65,6 +65,9 @@ diesel::table! {
         generation_id -> Nullable<Varchar>,
         finished -> Bool,
         reasoning -> Nullable<Varchar>,
+        input_tokens -> Int4,
+        output_tokens -> Int4,
+        model -> Varchar,
     }
 }
 

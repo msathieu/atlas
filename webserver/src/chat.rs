@@ -38,6 +38,9 @@ pub struct APIMessage {
     finished: bool,
     reasoning: Option<String>,
     tool_calls: Vec<APIToolCall>,
+    input_tokens: u64,
+    output_tokens: u64,
+    model: String,
 }
 #[derive(Serialize)]
 pub struct APIChatDetailed {
@@ -153,6 +156,9 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>) -> Result<Json
                 finished: message.finished,
                 reasoning: message.reasoning.clone(),
                 tool_calls,
+                input_tokens: message.input_tokens as u64,
+                output_tokens: message.output_tokens as u64,
+                model: message.model.clone(),
             })
         })
         .collect();
@@ -201,6 +207,9 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, Json(reque
         generation_id: None,
         finished: true,
         reasoning: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        model: "".to_owned(),
     };
     diesel::update(chats::table.find(chat_id))
         .set((chats::end_timestamp.eq(SystemTime::now()), chats::error_count.eq(0), chats::consecutive_llm_messages.eq(0)))

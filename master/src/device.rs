@@ -53,8 +53,8 @@ async fn process_device(device: Device, pool: Pool<ConnectionManager<PgConnectio
                 .values(DeviceInfo {
                     device: device_id,
                     info_type: i.origin_id,
-                    success: i.status_code.ok_or("Invalid command")? == 0,
-                    data: i.stdout.ok_or("Invalid command")?,
+                    success: i.status_code == 0,
+                    data: i.stdout,
                     updated_timestamp: i.completed_timestamp.ok_or("Invalid command")?,
                 })
                 .execute(db)?;
@@ -84,9 +84,9 @@ async fn process_device(device: Device, pool: Pool<ConnectionManager<PgConnectio
                 device: device_id,
                 code: i.1.to_string(),
                 completed: false,
-                status_code: None,
-                stdout: None,
-                stderr: None,
+                status_code: 0,
+                stdout: "".to_owned(),
+                stderr: "".to_owned(),
                 requested_timestamp: SystemTime::now(),
                 completed_timestamp: None,
                 origin: CommandOrigin::SystemIdentification as i32,

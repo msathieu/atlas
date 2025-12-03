@@ -13,9 +13,9 @@ pub struct Command {
     pub uid: Option<Uuid>,
     pub code: String,
     pub completed: bool,
-    pub status_code: Option<i32>,
-    pub stdout: Option<String>,
-    pub stderr: Option<String>,
+    pub status_code: i32,
+    pub stdout: String,
+    pub stderr: String,
     pub requested_timestamp: SystemTime,
     pub completed_timestamp: Option<SystemTime>,
     pub origin: i32,
@@ -97,6 +97,9 @@ pub struct Message {
     pub generation_id: Option<String>,
     pub finished: bool,
     pub reasoning: Option<String>,
+    pub input_tokens: i32,
+    pub output_tokens: i32,
+    pub model: String,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]

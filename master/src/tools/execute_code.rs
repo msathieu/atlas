@@ -40,9 +40,9 @@ impl ExecuteCodeTool {
             uid: Some(self.user),
             code: args.code,
             completed: true,
-            status_code: None,
-            stdout: None,
-            stderr: None,
+            status_code: 0,
+            stdout: "".to_owned(),
+            stderr: "".to_owned(),
             requested_timestamp: SystemTime::now(),
             completed_timestamp: None,
             origin: CommandOrigin::LLMTool as i32,
@@ -59,10 +59,10 @@ impl ExecuteCodeTool {
         sub_client.quit().await?;
         let cmd: Command = commands::table.find(cmd_id).get_result(&mut db)?;
         diesel::delete(commands::table.find(cmd_id)).execute(&mut db)?;
-        let stdout = if args.return_stdout { cmd.stdout.ok_or("Retrieving command failed")? } else { "".to_string() };
-        let stderr = if args.return_stderr { cmd.stderr.ok_or("Retrieving command failed")? } else { "".to_string() };
+        let stdout = if args.return_stdout { cmd.stdout } else { "".to_string() };
+        let stderr = if args.return_stderr { cmd.stderr } else { "".to_string() };
         Ok(ExecuteCodeOutput {
-            status_code: cmd.status_code.ok_or("Retrieving command failed")?,
+            status_code: cmd.status_code,
             stdout,
             stderr,
         })
