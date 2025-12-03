@@ -80,8 +80,8 @@ pub async fn create_command(headers: HeaderMap, Json(request): Json<CreateComman
         uid: Some(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?),
     };
     cmd = diesel::insert_into(commands::table).values(cmd).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
-    notify_server(&format!("API:{}", request.device)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server("WEB").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("API:DEVICE:{}", request.device)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(Json(CreateCommandResponse {
         id: cmd.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
     }))
@@ -99,6 +99,6 @@ pub async fn delete_command(headers: HeaderMap, Path(id): Path<String>) -> Resul
     )
     .execute(&mut db)
     .or(Err(StatusCode::NOT_FOUND))?;
-    notify_server("WEB").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }

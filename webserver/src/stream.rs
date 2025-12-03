@@ -49,7 +49,7 @@ async fn stream_wrapper(socket: WebSocket) {
     }
 }
 async fn stream_handler(mut socket: WebSocket, sub_client: &SubscriberClient) -> Result<(), Box<dyn Error>> {
-    sub_client.subscribe("WEB").await?;
+    sub_client.subscribe("WEB:REFRESH").await?;
     let mut receiver = sub_client.message_rx();
     loop {
         if timeout(Duration::from_secs(30), async { receiver.recv().await.ok() }).await.is_ok() {

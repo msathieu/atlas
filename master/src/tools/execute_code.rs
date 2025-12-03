@@ -54,7 +54,7 @@ impl ExecuteCodeTool {
         sub_client.subscribe(format!("MASTER:CMD:{}", cmd_id)).await?;
         let mut receiver = sub_client.message_rx();
         diesel::update(commands::table.find(cmd_id)).set(commands::completed.eq(false)).execute(&mut db)?;
-        notify_server(&format!("API:{}", device_uuid)).await?;
+        notify_server(&format!("API:DEVICE:{}", device_uuid)).await?;
         receiver.recv().await?;
         sub_client.quit().await?;
         let cmd: Command = commands::table.find(cmd_id).get_result(&mut db)?;

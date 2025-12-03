@@ -25,7 +25,7 @@ use shared_api::{
 };
 use shared_server::{
     binary::personalize_binary,
-    get_db_pool, get_sub_client,
+    get_db_pool, get_sub_client, listen_for_restarts,
     models::{Command, Device, Setting},
     notify_server,
     schema::{commands, devices, settings},
@@ -47,6 +47,7 @@ use uuid::Uuid;
 async fn main() {
     print_startup("apiserver", env!("CARGO_PKG_VERSION"));
     dotenvy::dotenv().ok();
+    listen_for_restarts("API".to_string()).await;
     CryptoProvider {
         cipher_suites: vec![TLS13_AES_256_GCM_SHA384],
         ..aws_lc_rs::default_provider()
@@ -171,7 +172,7 @@ async fn handle_connection(
             .get_result(&mut db)?;
         handshake_response.device_id = device.id.ok_or("Invalid database result")?.to_string();
         write_message(MessageType::HandshakeResponse, handshake_response, &mut stream).await?;
-        notify_server("WEB").await?;
+        notify_server("WEB:REFRESH").await?;
         return Ok(());
     }
     let uuid = Uuid::from_str(&handshake_request.device_id)?;
@@ -204,7 +205,7 @@ async fn handle_connection(
     device.ip = ip;
     device.agent_hash = handshake_request.agent_hash;
     diesel::update(devices::table.find(uuid)).set(&device).execute(&mut db)?;
-    notify_server("WEB").await?;
+    notify_server("WEB:REFRESH").await?;
 
     if let Some(hash) = &*agent_hash
         && *hash != device.agent_hash
@@ -221,7 +222,7 @@ async fn handle_connection(
         }
     }
 
-    sub_client.subscribe(format!("API:{}", uuid)).await?;
+    sub_client.subscribe(format!("API:DEVICE:{}", uuid)).await?;
     let mut receiver = sub_client.message_rx();
     loop {
         let device_exists = devices::table.find(uuid).first::<Device>(&mut db).optional()?.is_some();
@@ -252,7 +253,7 @@ async fn handle_connection(
             command.completed_timestamp = Some(SystemTime::now());
             diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
             diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db)?;
-            notify_server("WEB").await?;
+            notify_server("WEB:REFRESH").await?;
             if command.origin == CommandOrigin::SystemIdentification as i32 {
                 notify_server("MASTER:DEVICES").await?;
             } else if command.origin == CommandOrigin::LLMTool as i32 {

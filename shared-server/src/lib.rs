@@ -6,10 +6,10 @@ use diesel::{
 };
 use fred::{
     clients::SubscriberClient,
-    prelude::{Client, ClientLike, Config, PubsubInterface},
+    prelude::{Client, ClientLike, Config, EventInterface, PubsubInterface},
     types::Builder,
 };
-use std::{env, error::Error};
+use std::{env, error::Error, process::exit};
 
 pub mod binary;
 pub mod models;
@@ -49,4 +49,13 @@ pub async fn notify_server(component: &str) -> Result<(), Box<dyn Error>> {
     let _: () = pub_client.publish(component, "").await?;
     pub_client.quit().await?;
     Ok(())
+}
+pub async fn listen_for_restarts(component: String) {
+    tokio::spawn(async move {
+        let sub_client = get_sub_client().await.unwrap();
+        sub_client.subscribe(format!("{}:RESTART", component)).await.unwrap();
+        let mut receiver = sub_client.message_rx();
+        receiver.recv().await.unwrap();
+        exit(0);
+    });
 }

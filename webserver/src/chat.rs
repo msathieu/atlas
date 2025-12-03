@@ -95,7 +95,7 @@ pub async fn create_chat(headers: HeaderMap) -> Result<Json<CreateChatResponse>,
         consecutive_llm_messages: 0,
     };
     chat = diesel::insert_into(chats::table).values(chat).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
-    notify_server("WEB").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(Json(CreateChatResponse {
         id: chat.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
     }))
@@ -112,7 +112,7 @@ pub async fn delete_chat(headers: HeaderMap, Path(id): Path<String>) -> Result<(
     )
     .execute(&mut db)
     .or(Err(StatusCode::NOT_FOUND))?;
-    notify_server("WEB").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }
 pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>) -> Result<Json<APIChatDetailed>, StatusCode> {
@@ -216,7 +216,7 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, Json(reque
         .execute(&mut db)
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     diesel::insert_into(messages::table).values(message).execute(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
-    notify_server("WEB").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:LLM").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }
@@ -241,6 +241,6 @@ pub async fn manage_tool_call_consent(headers: HeaderMap, Path((id, seq, call_id
             .or(Err(StatusCode::NOT_FOUND))?;
         notify_server("MASTER:LLM").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     }
-    notify_server("WEB").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }

@@ -22,7 +22,7 @@ use diesel::{
 };
 use diesel::{prelude::*, r2d2::ConnectionManager};
 use shared_api::print_startup;
-use shared_server::{get_db_pool, models::Setting, schema};
+use shared_server::{get_db_pool, listen_for_restarts, models::Setting, schema};
 use std::sync::OnceLock;
 use tokio::net::TcpListener;
 use tower_http::services::{ServeDir, ServeFile};
@@ -48,6 +48,7 @@ fn get_db() -> Result<PooledConnection<ConnectionManager<PgConnection>>, StatusC
 async fn main() {
     print_startup("webserver", env!("CARGO_PKG_VERSION"));
     dotenvy::dotenv().ok();
+    listen_for_restarts("WEB".to_string()).await;
     DB_POOL.set(get_db_pool().unwrap()).unwrap();
     let jwt_secret = schema::settings::table.find("jwt_secret").first::<Setting>(&mut DB_POOL.get().unwrap().get().unwrap()).unwrap().value;
     let jwt_secret = BASE64_STANDARD.decode(jwt_secret).unwrap();

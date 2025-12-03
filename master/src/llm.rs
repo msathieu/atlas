@@ -89,7 +89,7 @@ async fn process_chat(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, e
             reply.content = "Maximum number of consecutive LLM messages reached".into();
         }
         insert_into(messages::table).values(reply).execute(&mut db)?;
-        notify_server("WEB").await?;
+        notify_server("WEB:REFRESH").await?;
         return Ok(());
     }
     let devices: Vec<Device> = devices::table.filter(devices::approved.eq(true)).get_results(&mut db)?;
@@ -236,7 +236,7 @@ The servers you can access are: {}
             .execute(db)?;
         Ok::<(), Box<dyn Error>>(())
     })?;
-    notify_server("WEB").await?;
+    notify_server("WEB:REFRESH").await?;
     if !calls.is_empty() {
         notify_server("MASTER:TOOLS").await?;
     }

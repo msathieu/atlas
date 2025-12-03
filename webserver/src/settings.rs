@@ -38,10 +38,13 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, Json(r
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);
     }
-    diesel::update(settings::table.find(name))
+    diesel::update(settings::table.find(&name))
         .set(settings::value.eq(request.value))
         .execute(&mut db)
         .or(Err(StatusCode::BAD_REQUEST))?;
-    notify_server("WEB").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    if name == "apiserver_host" {
+        notify_server("API:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    }
     Ok(())
 }

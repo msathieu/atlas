@@ -99,7 +99,7 @@ async fn process_device(device: Device, pool: Pool<ConnectionManager<PgConnectio
         Ok::<(), Box<dyn Error>>(())
     })?;
     if added_cmd {
-        notify_server(&format!("API:{}", device_id)).await?;
+        notify_server(&format!("API:DEVICE:{}", device_id)).await?;
     }
     Ok(())
 }

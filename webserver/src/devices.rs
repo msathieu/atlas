@@ -58,7 +58,7 @@ pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>) -> Resul
         .set(devices::approved.eq(true))
         .execute(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
-    notify_server("WEB").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:DEVICES").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }
@@ -68,6 +68,6 @@ pub async fn delete_device(headers: HeaderMap, Path(id): Path<String>) -> Result
     diesel::delete(devices::table.find(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?))
         .execute(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
-    notify_server("WEB").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }

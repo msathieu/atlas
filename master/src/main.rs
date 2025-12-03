@@ -18,11 +18,11 @@ use rcgen::{CertificateParams, KeyPair, PKCS_ECDSA_P521_SHA512};
 use shared_api::{CommandOrigin, print_startup};
 use shared_server::models::{Setting, User};
 use shared_server::schema::{commands, settings, users};
-use shared_server::{get_db_pool, get_sub_client, notify_server};
+use shared_server::{get_db_pool, get_sub_client, listen_for_restarts, notify_server};
 use std::error::Error;
 use std::sync::OnceLock;
 use std::time::Duration;
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 
 mod device;
 mod llm;
@@ -37,7 +37,8 @@ static DB_POOL: OnceLock<Pool<ConnectionManager<PgConnection>>> = OnceLock::new(
 async fn main() {
     print_startup("master", env!("CARGO_PKG_VERSION"));
     dotenvy::dotenv().ok();
-    notify_server("MASTER:STARTUP").await.unwrap();
+    notify_server("MASTER:RESTART").await.unwrap();
+    listen_for_restarts("MASTER".to_string()).await;
     let pool = get_db_pool().unwrap();
     {
         let mut db = pool.get().unwrap();
@@ -52,10 +53,9 @@ async fn main() {
     tokio::spawn(async { tasks_loop_wrapper(device_pool, "MASTER:DEVICES", process_devices).await });
     tokio::spawn(async { tasks_loop_wrapper(llm_pool, "MASTER:LLM", process_chats).await });
     tokio::spawn(async { tasks_loop_wrapper(tool_pool, "MASTER:TOOLS", process_tool_calls).await });
-    let sub_client = get_sub_client().await.unwrap();
-    sub_client.subscribe("MASTER:STARTUP").await.unwrap();
-    let mut receiver = sub_client.message_rx();
-    receiver.recv().await.unwrap();
+    loop {
+        sleep(Duration::from_hours(24)).await;
+    }
 }
 async fn tasks_loop_wrapper<T: Future<Output = Result<(), Box<dyn Error>>>>(pool: Pool<ConnectionManager<PgConnection>>, sub_channel: &str, func: fn(Pool<ConnectionManager<PgConnection>>) -> T) {
     loop {
