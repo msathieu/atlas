@@ -36,6 +36,7 @@ pub struct APIMessage {
     sent_on: u64,
     user_message: bool,
     finished: bool,
+    reasoning: Option<String>,
     tool_calls: Vec<APIToolCall>,
 }
 #[derive(Serialize)]
@@ -150,6 +151,7 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>) -> Result<Json
                 sent_on: convert_timestamp(message.sent_on)?,
                 user_message: message.user_message,
                 finished: message.finished,
+                reasoning: message.reasoning.clone(),
                 tool_calls,
             })
         })
