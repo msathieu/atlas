@@ -1,3 +1,11 @@
+FROM alpine:3.23 AS agent-builder
+RUN apk upgrade
+RUN apk add musl-dev protobuf gcc rustup
+RUN rustup-init -y
+ENV PATH="${PATH}:/root/.rustup/toolchains/stable-x86_64-unknown-linux-musl/bin/"
+COPY . /build
+WORKDIR /build
+RUN cargo build --release --package agent
 FROM debian:trixie AS builder
 RUN apt-get update
 RUN apt-get dist-upgrade -y
@@ -14,7 +22,7 @@ FROM debian:trixie
 RUN apt-get update
 RUN apt-get dist-upgrade -y
 RUN apt-get install -y libpq-dev tini
-COPY --from=builder /build/target/release/agent .
+COPY --from=agent-builder /build/target/release/agent .
 COPY --from=builder /build/target/release/apiserver .
 COPY --from=builder /build/target/release/master .
 COPY --from=builder /build/target/release/webserver .
