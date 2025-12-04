@@ -147,6 +147,13 @@ fn create_settings(db: &mut PgConnection) {
                     value: BASE64_STANDARD.encode(jwt_secret),
                 })
                 .execute(db)?;
+            let registration_token: [u8; 64] = rand::random();
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "registration_token".to_owned(),
+                    value: BASE64_STANDARD.encode(registration_token),
+                })
+                .execute(db)?;
             Ok::<(), Box<dyn Error>>(())
         })
         .unwrap();

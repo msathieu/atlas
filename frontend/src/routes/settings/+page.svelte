@@ -99,7 +99,7 @@
     }
   }}
   download
-  >Download Agent
+>Download Agent
 </a>
 <br />
 
@@ -107,5 +107,7 @@
   class="btn"
   onclick={async () => {
     await restart();
-  }}>Restart System</button
+  }}
 >
+  Restart System
+</button>

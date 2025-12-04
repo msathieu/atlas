@@ -6,6 +6,7 @@ license = "Unlicense"
 publish = false
 
 [dependencies]
+base64 = "0.22.1"
 diesel = {version = "2.2.12", features = ["postgres", "r2d2", "uuid"]}
 fred = {version = "10.1.0", features = ["subscriber-client"]}
 object = "0.38.0"

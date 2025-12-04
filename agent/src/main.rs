@@ -36,6 +36,8 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 static HOST: [u8; 256] = [0; 256];
 #[unsafe(link_section = "apiserver_cert")]
 static TLS_CERT: [u8; 1024] = [0; 1024];
+#[unsafe(link_section = "registration_token")]
+static REGISTRATION_TOKEN: [u8; 64] = [0; 64];
 
 #[cfg(debug_assertions)]
 const DATABASE_URL: &str = "agent.db";
@@ -108,6 +110,7 @@ async fn open_connection(host: &str, tls_connector: TlsConnector, db: &mut Sqlit
         let file = fs::read(current_exe()?).await?;
         hash = Sha512::digest(file).to_vec();
     }
+    let registration_token = unsafe { ptr::read_volatile(&REGISTRATION_TOKEN) };
     let mut handshake_request = HandshakeRequest {
         magic: MAGIC as u64,
         api_version: API_VERSION as u64,
@@ -119,11 +122,15 @@ async fn open_connection(host: &str, tls_connector: TlsConnector, db: &mut Sqlit
         hostname: gethostname().into_string().or(Err("Invalid hostname"))?,
         version: env!("CARGO_PKG_VERSION").to_string(),
         agent_hash: hash,
+        registration_token: vec![],
     };
     let device_id = settings::table.find("device_id").first::<Setting>(db).optional()?;
     match &device_id {
         Some(id) => handshake_request.device_id = id.value.to_owned(),
-        None => handshake_request.register_device = true,
+        None => {
+            handshake_request.register_device = true;
+            handshake_request.registration_token = registration_token.to_vec();
+        }
     }
     write_message(MessageType::HandshakeRequest, handshake_request, &mut stream).await?;
     let (_, buf) = read_message(&mut stream, Some(MessageType::HandshakeResponse)).await?;

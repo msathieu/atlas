@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 
-use ::aws_lc_rs::signature::{ED25519, UnparsedPublicKey};
+use ::aws_lc_rs::{
+    constant_time::verify_slices_are_equal,
+    signature::{ED25519, UnparsedPublicKey},
+};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, Pool},
@@ -154,6 +158,12 @@ async fn handle_connection(
         let allowed: Setting = settings::table.find("allow_new_devices").first(&mut db)?;
         if allowed.value != "true" {
             return Err("No new devices are allowed".into());
+        }
+        let registration_token: Setting = settings::table.find("registration_token").first(&mut db)?;
+        let registration_token = BASE64_STANDARD.decode(registration_token.value)?;
+        if verify_slices_are_equal(&registration_token, &handshake_request.registration_token).is_err() {
+            #[cfg(not(debug_assertions))]
+            return Err("Incorrect registration token".into());
         }
         let device: Device = diesel::insert_into(devices::table)
             .values(Device {

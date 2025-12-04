@@ -12,6 +12,7 @@ message HandshakeRequest {
   string hostname = 8;
   string version = 9;
   bytes agent_hash = 10;
+  bytes registration_token = 11;
 }
 message HandshakeResponse {
   uint64 magic = 1;

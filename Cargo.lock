@@ -50,6 +50,7 @@ name = "apiserver"
 version = "0.0.1"
 dependencies = [
  "aws-lc-rs",
+ "base64",
  "diesel",
  "dotenvy",
  "fred",
@@ -2345,6 +2346,7 @@ dependencies = [
 name = "shared-server"
 version = "0.0.1"
 dependencies = [
+ "base64",
  "diesel",
  "fred",
  "object",
