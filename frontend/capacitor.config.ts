@@ -15,7 +15,6 @@ const config: CapacitorConfig = {
       signingType: "apksigner",
       keystorePath: "release.keystore",
     },
-    adjustMarginsForEdgeToEdge: "auto",
   },
 };
 
