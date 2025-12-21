@@ -9,6 +9,7 @@ use crate::{
     info::server_info,
     settings::{get_setting, restart_system, update_setting},
     stream::{stream, stream_auth},
+    user::change_password,
 };
 use axum::{
     Router,
@@ -35,6 +36,7 @@ mod devices;
 mod info;
 mod settings;
 mod stream;
+mod user;
 mod util;
 
 static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
@@ -75,7 +77,8 @@ async fn main() {
         .route("/api/stream_auth", post(stream_auth))
         .route("/api/atlas-agent", get(download_agent))
         .route("/api/download_auth", post(download_auth))
-        .route("/api/restart", post(restart_system));
+        .route("/api/restart", post(restart_system))
+        .route("/api/user/update_password", post(change_password));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();
 }

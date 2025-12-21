@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Check, ShieldCheck, ShieldQuestionMark, Trash, Unplug } from "@lucide/svelte";
-  import { authenticatedFetch } from "../../lib/auth.ts";
+  import { authenticatedFetch } from "$lib/auth.ts";
   import { formatTime } from "$lib/util.ts";
   import { toast } from "svelte-sonner";
 
