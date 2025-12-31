@@ -21,9 +21,13 @@
     return last.user_message === last.finished;
   }
   async function manageToolCallConsent(seq: number, callId: string, approved: boolean) {
+    let rejection_reason = "";
+    if (!approved) {
+      rejection_reason = prompt("Reason") || "no reason supplied";
+    }
     await authenticatedFetch(`/api/chats/${data.id}/${seq}/${callId}/consent`, {
       method: "POST",
-      body: JSON.stringify({ approved }),
+      body: JSON.stringify({ approved, rejection_reason }),
     });
   }
   function isCallPendingConsent(toolCalls: any[]): boolean {

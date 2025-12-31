@@ -83,6 +83,7 @@ pub struct Chat {
     pub end_timestamp: SystemTime,
     pub error_count: i32,
     pub consecutive_llm_messages: i32,
+    pub max_consecutive_llm_messages: i32,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
@@ -113,4 +114,5 @@ pub struct ToolCall {
     pub request: String,
     pub response: Option<String>,
     pub user_consented: Option<bool>,
+    pub error_count: i32,
 }

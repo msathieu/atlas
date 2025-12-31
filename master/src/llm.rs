@@ -1,4 +1,4 @@
-use crate::tools::{device_info::DeviceInfoTool, execute_code::ExecuteCodeTool};
+use crate::tools::{device_info::DeviceInfoTool, execute_code::ExecuteCodeTool, sleep::SleepTool};
 use diesel::{
     PgConnection,
     dsl::insert_into,
@@ -71,7 +71,7 @@ async fn process_chat(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, e
     if api_key.value.is_empty() || model.value.is_empty() {
         return Ok(());
     }
-    if error_count >= 5 || chat.consecutive_llm_messages > 20 {
+    if error_count >= 5 || chat.consecutive_llm_messages > chat.max_consecutive_llm_messages {
         let mut reply = Message {
             chat: chat_id,
             sequence: last_sequence + 1,
@@ -129,6 +129,7 @@ The servers you can access are: {}
         .tool(DeviceInfoTool)
         .tool(ExecuteCodeTool { user: chat.uid })
         .tool(ThinkTool)
+        .tool(SleepTool)
         .build();
     let mut ai_messages = Vec::new();
     for msg in messages {
@@ -169,7 +170,7 @@ The servers you can access are: {}
     let mut text = None;
     let mut calls = Vec::new();
     let mut reasoning = None;
-    let auto_approved_tools = ["device_info", "think"];
+    let auto_approved_tools = ["device_info", "think", "sleep"];
     for part in completion.choice {
         match part {
             AssistantContent::Text(text_part) => {
@@ -196,6 +197,7 @@ The servers you can access are: {}
                     request,
                     response: None,
                     user_consented: consent,
+                    error_count: 0,
                 });
             }
             AssistantContent::Reasoning(reasoning_arg) => {

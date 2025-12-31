@@ -51,7 +51,8 @@ CREATE TABLE chats(
     start_timestamp timestamp NOT NULL,
     end_timestamp timestamp NOT NULL,
     error_count integer NOT NULL,
-    consecutive_llm_messages integer NOT NULL
+    consecutive_llm_messages integer NOT NULL,
+    max_consecutive_llm_messages integer NOT NULL
 );
 CREATE TABLE messages(
     chat uuid REFERENCES chats ON DELETE CASCADE,
@@ -75,6 +76,7 @@ CREATE TABLE tool_calls(
     request varchar NOT NULL,
     response varchar,
     user_consented boolean,
+    error_count integer NOT NULL,
     PRIMARY KEY(chat, sequence, call_id),
     FOREIGN KEY (chat, sequence) REFERENCES messages ON DELETE CASCADE
 )

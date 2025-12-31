@@ -9,6 +9,7 @@ diesel::table! {
         end_timestamp -> Timestamp,
         error_count -> Int4,
         consecutive_llm_messages -> Int4,
+        max_consecutive_llm_messages -> Int4,
     }
 }
 
@@ -87,6 +88,7 @@ diesel::table! {
         request -> Varchar,
         response -> Nullable<Varchar>,
         user_consented -> Nullable<Bool>,
+        error_count -> Int4,
     }
 }
 

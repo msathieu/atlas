@@ -61,6 +61,7 @@ pub struct SendMessageRequest {
 #[derive(Deserialize)]
 pub struct ManageToolCallConsentRequest {
     approved: bool,
+    rejection_reason: String,
 }
 pub async fn chats_list(headers: HeaderMap) -> Result<Json<Vec<APIChat>>, StatusCode> {
     let user = authenticate(headers).await?;
@@ -93,6 +94,7 @@ pub async fn create_chat(headers: HeaderMap) -> Result<Json<CreateChatResponse>,
         end_timestamp: SystemTime::now(),
         error_count: 0,
         consecutive_llm_messages: 0,
+        max_consecutive_llm_messages: 20,
     };
     chat = diesel::insert_into(chats::table).values(chat).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
@@ -236,7 +238,10 @@ pub async fn manage_tool_call_consent(headers: HeaderMap, Path((id, seq, call_id
         notify_server("MASTER:TOOLS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     } else {
         diesel::update(tool_calls::table.filter(tool_calls::chat.eq(chat_uuid).and(tool_calls::sequence.eq(seq)).and(tool_calls::call_id.eq(call_id))))
-            .set((tool_calls::user_consented.eq(false), tool_calls::response.eq("User has rejected the tool call")))
+            .set((
+                tool_calls::user_consented.eq(false),
+                tool_calls::response.eq(format!("User has rejected the tool call: {}", request.rejection_reason)),
+            ))
             .execute(&mut db)
             .or(Err(StatusCode::NOT_FOUND))?;
         notify_server("MASTER:LLM").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

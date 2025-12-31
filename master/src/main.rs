@@ -100,7 +100,7 @@ fn create_settings(db: &mut PgConnection) {
             diesel::insert_into(settings::table)
                 .values(Setting {
                     name: "openrouter_model".to_owned(),
-                    value: "qwen/qwen3-coder".to_string(),
+                    value: "z-ai/glm-4.7".to_string(),
                 })
                 .execute(db)?;
             diesel::insert_into(settings::table)
