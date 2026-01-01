@@ -76,7 +76,6 @@ CREATE TABLE tool_calls(
     request varchar NOT NULL,
     response varchar,
     user_consented boolean,
-    error_count integer NOT NULL,
     PRIMARY KEY(chat, sequence, call_id),
     FOREIGN KEY (chat, sequence) REFERENCES messages ON DELETE CASCADE
 )

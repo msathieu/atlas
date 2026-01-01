@@ -197,7 +197,6 @@ The servers you can access are: {}
                     request,
                     response: None,
                     user_consented: consent,
-                    error_count: 0,
                 });
             }
             AssistantContent::Reasoning(reasoning_arg) => {

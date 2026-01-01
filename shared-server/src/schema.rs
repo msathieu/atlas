@@ -88,7 +88,6 @@ diesel::table! {
         request -> Varchar,
         response -> Nullable<Varchar>,
         user_consented -> Nullable<Bool>,
-        error_count -> Int4,
     }
 }
 
