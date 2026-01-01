@@ -241,28 +241,39 @@ async fn handle_connection(
         }
         let command: Option<Command> = commands::table.filter(commands::device.eq(uuid).and(commands::completed.eq(false))).first(&mut db).optional()?;
         if let Some(mut command) = command {
-            let request = CommandRequest { code: command.code.clone() };
-            write_message(MessageType::CommandRequest, request, &mut stream).await?;
-            let (mut message_type, mut buf);
-            loop {
-                (message_type, buf) = read_message(&mut stream, None).await?;
-                if message_type == MessageType::HeartbeatRequest {
-                    let request = HeartbeatRequest::decode(&*buf)?;
-                    write_message(MessageType::HeartbeatResponse, HeartbeatResponse { random: request.random }, &mut stream).await?;
-                } else if message_type == MessageType::CommandResponse {
-                    break;
-                } else {
-                    return Err("Invalid message type".into());
+            if command.initiated {
+                command.completed = true;
+                command.status_code = 100;
+                command.stdout = "".to_string();
+                command.stderr = "Command didn't complete".to_string();
+                command.completed_timestamp = Some(SystemTime::now());
+                diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
+            } else {
+                command.initiated = true;
+                diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
+                let request = CommandRequest { code: command.code.clone() };
+                write_message(MessageType::CommandRequest, request, &mut stream).await?;
+                let (mut message_type, mut buf);
+                loop {
+                    (message_type, buf) = read_message(&mut stream, None).await?;
+                    if message_type == MessageType::HeartbeatRequest {
+                        let request = HeartbeatRequest::decode(&*buf)?;
+                        write_message(MessageType::HeartbeatResponse, HeartbeatResponse { random: request.random }, &mut stream).await?;
+                    } else if message_type == MessageType::CommandResponse {
+                        break;
+                    } else {
+                        return Err("Invalid message type".into());
+                    }
                 }
+                let response = CommandResponse::decode(&*buf)?;
+                command.completed = true;
+                command.status_code = response.status as i32;
+                command.stdout = response.stdout.replace("\0", "");
+                command.stderr = response.stderr.replace("\0", "");
+                command.completed_timestamp = Some(SystemTime::now());
+                diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
+                diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db)?;
             }
-            let response = CommandResponse::decode(&*buf)?;
-            command.completed = true;
-            command.status_code = response.status as i32;
-            command.stdout = response.stdout.replace("\0", "");
-            command.stderr = response.stderr.replace("\0", "");
-            command.completed_timestamp = Some(SystemTime::now());
-            diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
-            diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db)?;
             notify_server("WEB:REFRESH").await?;
             if command.origin == CommandOrigin::SystemIdentification as i32 {
                 notify_server("MASTER:DEVICES").await?;

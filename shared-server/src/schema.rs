@@ -27,6 +27,7 @@ diesel::table! {
         completed_timestamp -> Nullable<Timestamp>,
         origin -> Int4,
         origin_id -> Varchar,
+        initiated -> Bool,
     }
 }
 
@@ -88,6 +89,7 @@ diesel::table! {
         request -> Varchar,
         response -> Nullable<Varchar>,
         user_consented -> Nullable<Bool>,
+        initiated -> Bool,
     }
 }
 

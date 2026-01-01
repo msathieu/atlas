@@ -20,6 +20,7 @@ pub struct Command {
     pub completed_timestamp: Option<SystemTime>,
     pub origin: i32,
     pub origin_id: String,
+    pub initiated: bool,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
@@ -114,4 +115,5 @@ pub struct ToolCall {
     pub request: String,
     pub response: Option<String>,
     pub user_consented: Option<bool>,
+    pub initiated: bool,
 }

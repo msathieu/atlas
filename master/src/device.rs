@@ -92,6 +92,7 @@ async fn process_device(device: Device, pool: Pool<ConnectionManager<PgConnectio
                 origin: CommandOrigin::SystemIdentification as i32,
                 origin_id: i.0.to_string(),
                 uid: None,
+                initiated: false,
             };
             diesel::insert_into(commands::table).values(command).execute(db)?;
             added_cmd = true;

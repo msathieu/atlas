@@ -47,6 +47,7 @@ impl ExecuteCodeTool {
             completed_timestamp: None,
             origin: CommandOrigin::LLMTool as i32,
             origin_id: "".to_string(),
+            initiated: false,
         };
         let cmd: Command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
         let cmd_id = cmd.id.ok_or("Invalid command")?;
