@@ -10,6 +10,8 @@ diesel::table! {
         error_count -> Int4,
         consecutive_llm_messages -> Int4,
         max_consecutive_llm_messages -> Int4,
+        chat_type -> Int4,
+        refresh_consecutive_llm_messages -> Nullable<Timestamp>,
     }
 }
 

@@ -2,12 +2,13 @@
   import { goto } from "$app/navigation";
   import { authenticatedFetch } from "$lib/auth";
   import { formatTime } from "$lib/util.ts";
-  import { Plus, Trash } from "@lucide/svelte";
+  import { Bot, MessageCircle, Plus, Trash } from "@lucide/svelte";
   let { data } = $props();
 
-  async function createChat() {
+  async function createChat(chat_type: string) {
     await authenticatedFetch(`/api/chats`, {
       method: "POST",
+      body: JSON.stringify({ chat_type }),
     });
   }
   async function deleteChat(id: string) {
@@ -20,6 +21,7 @@
 <table class="border border-base-content/10 table">
   <thead>
     <tr>
+      <th>Type</th>
       <th>Summary</th>
       <th>Initial Message</th>
       <th>Last Message</th>
@@ -34,6 +36,9 @@
           await goto(`/chats/${chat.id}`);
         }}
       >
+        <td>
+          {#if chat.chat_type == "interactive"}<MessageCircle />{:else if chat.chat_type == "noninteractive"}<Bot />{/if}
+        </td>
         <td>{chat.summary}</td>
         <td>{formatTime(chat.start_timestamp)}</td>
         <td>{formatTime(chat.end_timestamp)}</td>
@@ -52,13 +57,27 @@
     {/each}
   </tbody>
 </table>
-<div class="fab">
+<div class="fab fab-flower">
+  <div tabindex="0" role="button" class="btn btn-circle btn-xl btn-accent">
+    <Plus />
+  </div>
+  <button class="fab-main-action btn btn-circle btn-xl btn-accent">
+    <Plus />
+  </button>
   <button
     class="btn btn-circle btn-xl btn-accent"
     onclick={async () => {
-      await createChat();
+      await createChat("interactive");
     }}
   >
-    <Plus />
+    <MessageCircle />
+  </button>
+  <button
+    class="btn btn-circle btn-xl btn-accent"
+    onclick={async () => {
+      await createChat("noninteractive");
+    }}
+  >
+    <Bot />
   </button>
 </div>

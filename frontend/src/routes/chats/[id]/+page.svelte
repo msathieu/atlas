@@ -60,8 +60,7 @@
     </div>
     <div class="chat-bubble whitespace-pre-wrap">
       {#if message.reasoning}
-        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-        <div class="border collapse collapse-arrow" tabindex="0">
+        <div class="border collapse collapse-arrow" role="button" tabindex="0">
           <div class="collapse-title">Reasoning</div>
           <div class="collapse-content">
             {@html DOMPurify.sanitize(marked(message.reasoning) as string)}
@@ -69,8 +68,7 @@
         </div>
       {/if}
       {#if message.tool_calls.length !== 0}
-        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-        <div class="border collapse collapse-arrow" class:bg-primary={isCallPendingConsent(message.tool_calls)} tabindex="0">
+        <div class="border collapse collapse-arrow" class:bg-primary={isCallPendingConsent(message.tool_calls)} tabindex="0" role="button">
           <div class="collapse-title">Tool Calls</div>
           <div class="collapse-content">
             {#each message.tool_calls as call}

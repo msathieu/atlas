@@ -53,7 +53,9 @@ CREATE TABLE chats(
     end_timestamp timestamp NOT NULL,
     error_count integer NOT NULL,
     consecutive_llm_messages integer NOT NULL,
-    max_consecutive_llm_messages integer NOT NULL
+    max_consecutive_llm_messages integer NOT NULL,
+    chat_type integer NOT NULL,
+    refresh_consecutive_llm_messages timestamp
 );
 CREATE TABLE messages(
     chat uuid REFERENCES chats ON DELETE CASCADE,

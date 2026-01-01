@@ -29,6 +29,12 @@ pub enum CommandOrigin {
     UserRequested = 1,
     LLMTool = 2,
 }
+#[derive(PartialEq, TryFromPrimitive)]
+#[repr(u32)]
+pub enum ChatType {
+    Interactive = 0,
+    NonInteractive = 1,
+}
 
 pub fn print_startup(component: &str, version: &str) {
     println!("--------------------------------------------------");
@@ -61,4 +67,12 @@ pub async fn read_message<T: AsyncRead + Unpin>(stream: &mut T, message_type_req
     let mut buf = vec![0; len];
     stream.read_exact(&mut buf).await?;
     Ok((message_type, buf))
+}
+pub fn chat_type_to_str(chat_type: i32) -> Result<String, Box<dyn Error>> {
+    let chat_type = ChatType::try_from_primitive(chat_type as u32)?;
+    Ok(match chat_type {
+        ChatType::Interactive => "interactive",
+        ChatType::NonInteractive => "noninteractive",
+    }
+    .to_string())
 }

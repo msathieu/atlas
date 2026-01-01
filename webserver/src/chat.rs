@@ -6,12 +6,13 @@ use axum::{
 };
 use diesel::{dsl::max, prelude::*};
 use serde::{Deserialize, Serialize};
+use shared_api::{ChatType, chat_type_to_str};
 use shared_server::{
     models::{Chat, Message, ToolCall},
     notify_server,
     schema::{chats, messages, tool_calls},
 };
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
 #[derive(Serialize)]
@@ -20,6 +21,7 @@ pub struct APIChat {
     summary: String,
     start_timestamp: u64,
     end_timestamp: u64,
+    chat_type: String,
 }
 #[derive(Serialize)]
 pub struct APIToolCall {
@@ -49,6 +51,7 @@ pub struct APIChatDetailed {
     start_timestamp: u64,
     end_timestamp: u64,
     messages: Vec<APIMessage>,
+    chat_type: String,
 }
 #[derive(Serialize)]
 pub struct CreateChatResponse {
@@ -63,6 +66,11 @@ pub struct ManageToolCallConsentRequest {
     approved: bool,
     rejection_reason: String,
 }
+#[derive(Deserialize)]
+pub struct CreateChatRequest {
+    chat_type: String,
+}
+
 pub async fn chats_list(headers: HeaderMap) -> Result<Json<Vec<APIChat>>, StatusCode> {
     let user = authenticate(headers).await?;
     let mut db = get_db()?;
@@ -78,13 +86,25 @@ pub async fn chats_list(headers: HeaderMap) -> Result<Json<Vec<APIChat>>, Status
                 summary: chat.summary.clone(),
                 start_timestamp: convert_timestamp(chat.start_timestamp)?,
                 end_timestamp: convert_timestamp(chat.end_timestamp)?,
+                chat_type: chat_type_to_str(chat.chat_type).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?,
             })
         })
         .collect();
     Ok(Json(chats?))
 }
-pub async fn create_chat(headers: HeaderMap) -> Result<Json<CreateChatResponse>, StatusCode> {
+pub async fn create_chat(headers: HeaderMap, Json(request): Json<CreateChatRequest>) -> Result<Json<CreateChatResponse>, StatusCode> {
     let user = authenticate(headers).await?;
+    let chat_type = match request.chat_type.as_str() {
+        "interactive" => ChatType::Interactive,
+        "noninteractive" => ChatType::NonInteractive,
+        _ => {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    };
+    let mut refresh_time = None;
+    if chat_type == ChatType::NonInteractive {
+        refresh_time = Some(SystemTime::now().checked_add(Duration::from_hours(24)).ok_or(StatusCode::INTERNAL_SERVER_ERROR)?);
+    }
     let mut db = get_db()?;
     let mut chat = Chat {
         id: None,
@@ -95,6 +115,8 @@ pub async fn create_chat(headers: HeaderMap) -> Result<Json<CreateChatResponse>,
         error_count: 0,
         consecutive_llm_messages: 0,
         max_consecutive_llm_messages: 20,
+        chat_type: chat_type as i32,
+        refresh_consecutive_llm_messages: refresh_time,
     };
     chat = diesel::insert_into(chats::table).values(chat).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
@@ -170,6 +192,7 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>) -> Result<Json
         start_timestamp: convert_timestamp(chat.start_timestamp)?,
         end_timestamp: convert_timestamp(chat.end_timestamp)?,
         messages: messages?,
+        chat_type: chat_type_to_str(chat.chat_type).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?,
     };
     Ok(Json(chat))
 }

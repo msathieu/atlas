@@ -2,6 +2,7 @@
 
 use crate::device::process_devices;
 use crate::llm::process_chats;
+use crate::timers::process_timers;
 use crate::tool::process_tool_calls;
 use argon2::password_hash::SaltString;
 use argon2::password_hash::rand_core::OsRng;
@@ -27,6 +28,7 @@ use tokio::time::{sleep, timeout};
 mod device;
 mod llm;
 mod lua;
+mod timers;
 mod tool;
 mod tools;
 
@@ -49,10 +51,12 @@ async fn main() {
     let device_pool = pool.clone();
     let llm_pool = pool.clone();
     let tool_pool = pool.clone();
+    let timers_pool = pool.clone();
     DB_POOL.set(pool).unwrap();
     tokio::spawn(async { tasks_loop_wrapper(device_pool, "MASTER:DEVICES", process_devices).await });
     tokio::spawn(async { tasks_loop_wrapper(llm_pool, "MASTER:LLM", process_chats).await });
     tokio::spawn(async { tasks_loop_wrapper(tool_pool, "MASTER:TOOLS", process_tool_calls).await });
+    tokio::spawn(async { tasks_loop_wrapper(timers_pool, "MASTER:TIMERS", process_timers).await });
     loop {
         sleep(Duration::from_hours(24)).await;
     }

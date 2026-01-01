@@ -85,6 +85,8 @@ pub struct Chat {
     pub error_count: i32,
     pub consecutive_llm_messages: i32,
     pub max_consecutive_llm_messages: i32,
+    pub chat_type: i32,
+    pub refresh_consecutive_llm_messages: Option<SystemTime>,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]

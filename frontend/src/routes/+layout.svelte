@@ -14,7 +14,7 @@
 
   setInterval(async () => {
     await invalidateAll();
-  }, 60000);
+  }, 600000);
   setInterval(async () => {
     await connectWS();
   }, 5000);

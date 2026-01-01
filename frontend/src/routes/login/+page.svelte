@@ -25,7 +25,7 @@
   }
 </script>
 
-<div class="flex h-full">
+<div class="flex" style="height: 90%">
   <div class="m-auto">
     <h1 class="text-6xl">
       <img src="/logo.png" alt="logo" class="inline h-32" />Atlas
