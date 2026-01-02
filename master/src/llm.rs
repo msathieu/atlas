@@ -14,6 +14,7 @@ use rig::{
     providers::openrouter,
     tools::ThinkTool,
 };
+use shared_api::ChatType;
 use shared_server::{
     models::{Chat, Device, Message, Setting, ToolCall},
     notify_server,
@@ -106,6 +107,11 @@ async fn process_chat(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, e
         })
         .collect();
     let device_names = device_names.join(", ");
+    let mut chat_type_prompt = "";
+    if chat.chat_type == ChatType::NonInteractive as i32 {
+        chat_type_prompt =
+            "This is a non-interactive session. Execute your task autonomously without prompting the user. Avoid tools that require approval, as they will end the chat until the user handles it."
+    }
     let preamble = format!(
         r#"You are an advanced AI tasked with system administration.
 You have access to various servers owned by the user.
@@ -118,9 +124,13 @@ Respect the following rules:
 - Your output should be formatted in Markdown.
 - Don't waste context tokens: if some output isn't needed, don't request it.
 
+If a tool states that it requires approval, that means that the session will be interrupted to prompt the user.
+
+{}
+
 The servers you can access are: {}
 "#,
-        device_names
+        chat_type_prompt, device_names
     );
     let client: openrouter::Client = openrouter::Client::new(&api_key.value)?;
     let agent = client

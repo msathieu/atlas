@@ -58,7 +58,7 @@
         </div>
       {/if}
     </div>
-    <div class="chat-bubble whitespace-pre-wrap">
+    <div class="chat-bubble whitespace-pre-wrap break-all">
       {#if message.reasoning}
         <div class="border collapse collapse-arrow" role="button" tabindex="0">
           <div class="collapse-title">Reasoning</div>

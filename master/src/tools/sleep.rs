@@ -29,7 +29,7 @@ impl Tool for SleepTool {
               "properties": {
                 "seconds": {"type": "number", "description": "The amount of seconds to sleep for"},
               },
-              "required": ["sleep"]
+              "required": ["seconds"]
             }),
         }
     }
