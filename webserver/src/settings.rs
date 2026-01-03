@@ -21,7 +21,16 @@ pub struct UpdateSettingRequest {
 pub async fn get_setting(headers: HeaderMap, Path(name): Path<String>) -> Result<Json<APISetting>, StatusCode> {
     require_admin(headers).await?;
     let mut db = get_db()?;
-    let allowed_settings = ["allow_new_devices", "apiserver_host", "openrouter_model", "tls_cert"];
+    let allowed_settings = [
+        "allow_new_devices",
+        "apiserver_host",
+        "mail_server",
+        "mail_username",
+        "mail_from",
+        "mail_to",
+        "openrouter_model",
+        "tls_cert",
+    ];
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);
     }
@@ -34,7 +43,17 @@ pub async fn get_setting(headers: HeaderMap, Path(name): Path<String>) -> Result
 pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, Json(request): Json<UpdateSettingRequest>) -> Result<(), StatusCode> {
     require_admin(headers).await?;
     let mut db = get_db()?;
-    let allowed_settings = ["allow_new_devices", "apiserver_host", "openrouter_model", "openrouter_key"];
+    let allowed_settings = [
+        "allow_new_devices",
+        "apiserver_host",
+        "mail_server",
+        "mail_username",
+        "mail_password",
+        "mail_from",
+        "mail_to",
+        "openrouter_model",
+        "openrouter_key",
+    ];
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);
     }

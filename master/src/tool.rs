@@ -1,4 +1,4 @@
-use crate::tools::{device_info::DeviceInfoTool, execute_code::ExecuteCodeTool, sleep::SleepTool};
+use crate::tools::{device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, sleep::SleepTool};
 use diesel::{
     PgConnection,
     prelude::*,
@@ -49,6 +49,7 @@ async fn process_tool_call(call: ToolCall, pool: Pool<ConnectionManager<PgConnec
     let mut incorrect_tool = false;
     let tool: Box<dyn ToolDyn> = match call.tool.as_str() {
         "device_info" => Box::new(DeviceInfoTool {}),
+        "email" => Box::new(EmailTool {}),
         "execute_code" => Box::new(ExecuteCodeTool { user: chat.uid }),
         "think" => Box::new(ThinkTool {}),
         "sleep" => Box::new(SleepTool {}),

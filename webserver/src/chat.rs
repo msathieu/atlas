@@ -223,10 +223,14 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, Json(reque
             return Err(StatusCode::BAD_REQUEST);
         }
     }
+    let content = request.content.trim().to_string();
+    if content.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
     let message = Message {
         chat: chat_id,
         sequence: last_sequence + 1,
-        content: request.content.trim().to_string(),
+        content,
         sent_on: SystemTime::now(),
         user_message: true,
         generation_id: None,

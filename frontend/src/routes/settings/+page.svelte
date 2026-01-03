@@ -1,26 +1,24 @@
 <script lang="ts">
   import { authenticatedFetch } from "$lib/auth.ts";
-  import { API_HOST } from "$lib/util.js";
+  import { updateSetting } from "$lib/settings.ts";
+  import { API_HOST } from "$lib/util.ts";
   import { Check } from "@lucide/svelte";
-  import { toast } from "svelte-sonner";
+  import Setting from "./Setting.svelte";
 
   let { data } = $props();
   let openrouterModel = $derived(data.openrouterModel.value);
   let openrouterKey = $state("");
   let allowNewDevices = $derived(data.allowNewDevices.value === "true");
   let apiServerHost = $derived(data.apiserverHost.value);
+  let mailServer = $derived(data.mailServer.value);
+  let mailUsername = $derived(data.mailUsername.value);
+  let mailPassword = $state("");
+  let mailFrom = $derived(data.mailFrom.value);
+  let mailTo = $derived(data.mailTo.value);
+
   let downloadLink: any = $state();
   let actuallyDownload = false;
 
-  async function updateSetting(name: string, value: string) {
-    const response = await authenticatedFetch(`/api/settings/${name}`, {
-      method: "PUT",
-      body: JSON.stringify({ value }),
-    });
-    if (response.ok) {
-      toast.success("Updated Setting");
-    }
-  }
   async function requestDownloadLink() {
     const res = await authenticatedFetch("/api/download_auth", { method: "POST" });
     const downloadAuth = await res.json();
@@ -33,29 +31,8 @@
   }
 </script>
 
-<h1 class="text-xl">Openrouter Model</h1>
-<br />
-<form
-  onsubmit={async () => {
-    await updateSetting("openrouter_model", openrouterModel);
-  }}
->
-  <input type="text" placeholder="Openrouter Model" class="input" bind:value={openrouterModel} />
-  <button class="btn"><Check /></button>
-</form>
-<br />
-
-<h1 class="text-xl">Openrouter API Key</h1>
-<br />
-<form
-  onsubmit={async () => {
-    await updateSetting("openrouter_key", openrouterKey);
-  }}
->
-  <input type="text" placeholder="Openrouter API Key" class="input" bind:value={openrouterKey} />
-  <button class="btn"><Check /></button>
-</form>
-<br />
+<Setting name="openrouter_model" description="Openrouter Model" val={openrouterModel} />
+<Setting name="openrouter_key" description="Openrouter API Key" val={openrouterKey} />
 
 <h1 class="text-xl">Allow New Devices</h1>
 <br />
@@ -69,17 +46,12 @@
 </form>
 <br />
 
-<h1 class="text-xl">API Server Host</h1>
-<br />
-<form
-  onsubmit={async () => {
-    await updateSetting("apiserver_host", String(apiServerHost));
-  }}
->
-  <input type="text" placeholder="API Server Host" class="input" bind:value={apiServerHost} />
-  <button class="btn"><Check /></button>
-</form>
-<br />
+<Setting name="apiserver_host" description="API Server Host" val={apiServerHost} />
+<Setting name="mail_server" description="Mail Server" val={mailServer} />
+<Setting name="mail_username" description="Mail Username" val={mailUsername} />
+<Setting name="mail_password" description="Mail Password" val={mailPassword} />
+<Setting name="mail_from" description="Mail From" val={mailFrom} />
+<Setting name="mail_to" description="Mail To" val={mailTo} />
 
 <h1 class="text-xl">API Certificate</h1>
 <br />

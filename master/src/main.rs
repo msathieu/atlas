@@ -113,6 +113,36 @@ fn create_settings(db: &mut PgConnection) {
                     value: "".to_string(),
                 })
                 .execute(db)?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "mail_server".to_owned(),
+                    value: "".to_string(),
+                })
+                .execute(db)?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "mail_username".to_owned(),
+                    value: "".to_string(),
+                })
+                .execute(db)?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "mail_password".to_owned(),
+                    value: "".to_string(),
+                })
+                .execute(db)?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "mail_from".to_owned(),
+                    value: "".to_string(),
+                })
+                .execute(db)?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "mail_to".to_owned(),
+                    value: "".to_string(),
+                })
+                .execute(db)?;
             Ok::<(), Box<dyn Error>>(())
         })
         .unwrap();

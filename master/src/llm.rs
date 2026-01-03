@@ -1,4 +1,4 @@
-use crate::tools::{device_info::DeviceInfoTool, execute_code::ExecuteCodeTool, sleep::SleepTool};
+use crate::tools::{device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, sleep::SleepTool};
 use diesel::{
     PgConnection,
     dsl::insert_into,
@@ -110,7 +110,8 @@ async fn process_chat(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, e
     let mut chat_type_prompt = "";
     if chat.chat_type == ChatType::NonInteractive as i32 {
         chat_type_prompt =
-            "This is a non-interactive session. Execute your task autonomously without prompting the user. Avoid tools that require approval, as they will end the chat until the user handles it."
+            "This is a non-interactive session. Execute your task autonomously without prompting the user. Avoid tools that require approval, as they will end the chat until the user handles it.
+            Avoid sending messages without tool calls, as that too will halt the session."
     }
     let preamble = format!(
         r#"You are an advanced AI tasked with system administration.
@@ -137,6 +138,7 @@ The servers you can access are: {}
         .agent(&model.value)
         .preamble(&preamble)
         .tool(DeviceInfoTool)
+        .tool(EmailTool)
         .tool(ExecuteCodeTool { user: chat.uid })
         .tool(ThinkTool)
         .tool(SleepTool)
@@ -180,7 +182,7 @@ The servers you can access are: {}
     let mut text = None;
     let mut calls = Vec::new();
     let mut reasoning = None;
-    let auto_approved_tools = ["device_info", "think", "sleep"];
+    let auto_approved_tools = ["device_info", "email", "sleep", "think"];
     for part in completion.choice {
         match part {
             AssistantContent::Text(text_part) => {
@@ -221,10 +223,14 @@ The servers you can access are: {}
             }
         }
     }
+    let mut content = text.ok_or("Invalid LLM response")?.text;
+    if content.is_empty() {
+        content = "-".to_string(); // Some API providers reject empty messages
+    }
     let reply = Message {
         chat: chat_id,
         sequence: last_sequence + 1,
-        content: text.ok_or("Invalid LLM response")?.text,
+        content,
         sent_on: SystemTime::now(),
         user_message: false,
         generation_id: Some(completion.raw_response.id),
