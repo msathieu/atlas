@@ -15,11 +15,12 @@ fred = "10.1.0"
 lettre = {version = "0.11.19", features = ["tokio1", "tokio1-native-tls"]}
 rand = "0.9.2"
 rcgen = {version = "0.14.3", features = ["aws_lc_rs"]}
-rig-core = "0.26.0"
+rig-core = "0.28.0"
 serde = {version = "1.0.228", features = ["derive"]}
 serde_json = "1.0.145"
 shared-api = {path = "../shared-api"}
 shared-server = {path = "../shared-server"}
+time = "0.3.44"
 tokio = {version = "1.47.1", features = ["macros", "rt-multi-thread", "time"]}
 unicode-rs = "0.1.0"
 uuid = "1.18.1"

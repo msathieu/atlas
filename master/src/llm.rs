@@ -1,4 +1,4 @@
-use crate::tools::{device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, sleep::SleepTool};
+use crate::tools::{device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, sleep::SleepTool, time::TimeTool};
 use diesel::{
     PgConnection,
     dsl::insert_into,
@@ -141,6 +141,7 @@ The servers you can access are: {}
         .tool(EmailTool)
         .tool(ExecuteCodeTool { user: chat.uid })
         .tool(ThinkTool)
+        .tool(TimeTool)
         .tool(SleepTool)
         .build();
     let mut ai_messages = Vec::new();
@@ -159,6 +160,8 @@ The servers you can access are: {}
                     id: call.call_id.clone(),
                     call_id: None,
                     function,
+                    additional_params: None,
+                    signature: None,
                 }));
             }
             ai_messages.push(rig::message::Message::Assistant { id: None, content: parts });
@@ -182,7 +185,7 @@ The servers you can access are: {}
     let mut text = None;
     let mut calls = Vec::new();
     let mut reasoning = None;
-    let auto_approved_tools = ["device_info", "email", "sleep", "think"];
+    let auto_approved_tools = ["device_info", "email", "sleep", "think", "time"];
     for part in completion.choice {
         match part {
             AssistantContent::Text(text_part) => {
