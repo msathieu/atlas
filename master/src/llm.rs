@@ -10,7 +10,7 @@ use rig::{
     agent::Text,
     client::CompletionClient,
     completion::Completion,
-    message::{AssistantContent, ToolFunction, ToolResult, ToolResultContent, UserContent},
+    message::{AssistantContent, ReasoningContent, ToolFunction, ToolResult, ToolResultContent, UserContent},
     providers::openrouter,
     tools::ThinkTool,
 };
@@ -216,10 +216,17 @@ The servers you can access are: {}
                 });
             }
             AssistantContent::Reasoning(reasoning_arg) => {
-                if reasoning_arg.reasoning.len() != 1 {
+                if reasoning_arg.content.len() != 1 {
                     return Err("Invalid LLM response".into());
                 }
-                reasoning = Some(reasoning_arg.reasoning.first().ok_or("Invalid LLM response")?.to_owned())
+                let reasoning_content = reasoning_arg.content.first().ok_or("Invalid LLM response")?.to_owned();
+                reasoning = match reasoning_content {
+                    ReasoningContent::Text { text, signature: _ } => Some(text),
+                    ReasoningContent::Encrypted(_) => None,
+                    ReasoningContent::Redacted { data: _ } => None,
+                    ReasoningContent::Summary(text) => Some(text),
+                    _ => return Err("Invalid LLM response".into()),
+                };
             }
             AssistantContent::Image(_) => {
                 return Err("Invalid LLM response".into());

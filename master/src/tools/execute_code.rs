@@ -83,7 +83,7 @@ impl Tool for ExecuteCodeTool {
               "type": "object",
               "properties": {
                 "device": {"type": "string", "description": "The server to execute code on"},
-                "code": {"type": "string", "description": "The code to execute. This must be Lua 5.4 code, if you want to retrieve information, ensure it is printed to stdout or stderr"},
+                "code": {"type": "string", "description": "The code to execute. This must be Lua 5.5 code, if you want to retrieve information, ensure it is printed to stdout or stderr"},
                 "return_stdout": {"type": "boolean", "description": "Include stdout in the tool response"},
                 "return_stderr": {"type": "boolean", "description": "Include stderr in the tool response"}
               },
