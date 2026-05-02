@@ -22,7 +22,7 @@
   async function requestDownloadLink() {
     const res = await authenticatedFetch("/api/download_auth", { method: "POST" });
     const downloadAuth = await res.json();
-    downloadLink.href = `${API_HOST}/api/atlas-agent?auth=${downloadAuth.jwt}`;
+    downloadLink.href = `${API_HOST}/api/atlas-agent?auth=${downloadAuth.jwt}&arch=x86_64&os=linux`;
     actuallyDownload = true;
     downloadLink.click();
   }

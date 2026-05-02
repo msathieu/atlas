@@ -31,7 +31,7 @@ impl Tool for PreapproveCodeTool {
             parameters: json!({
               "type": "object",
               "properties": {
-                "code": {"type": "string", "description": "The code to preapprove. This must be Lua 5.5 code, if you want to retrieve information, ensure it is printed to stdout or stderr"},
+                "code": {"type": "string", "description": "The code to preapprove. Reference the execute_code tool for instructions"},
               },
               "required": ["code"]
             }),

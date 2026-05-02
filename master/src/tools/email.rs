@@ -77,6 +77,7 @@ impl Tool for EmailTool {
                 email: mail_to.value.parse().map_err(|_| ToolError::ToolCallError("Invalid from address".into()))?,
             })
             .header(ContentType::TEXT_PLAIN)
+            .message_id(None)
             .subject(args.subject)
             .body(args.body)
             .map_err(|_| ToolError::ToolCallError("Invalid email".into()))?;

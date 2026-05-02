@@ -62,9 +62,6 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, Json(r
         .execute(&mut db)
         .or(Err(StatusCode::BAD_REQUEST))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    if name == "apiserver_host" {
-        notify_server("API:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    }
     Ok(())
 }
 pub async fn restart_system(headers: HeaderMap) -> Result<(), StatusCode> {

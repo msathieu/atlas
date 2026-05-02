@@ -8,7 +8,7 @@ use object::{Object, ObjectSection};
 use std::{error::Error, ffi::CString, str::FromStr};
 use tokio::fs;
 
-pub async fn personalize_binary(db: &mut PgConnection) -> Result<Vec<u8>, Box<dyn Error>> {
+pub async fn personalize_binary(db: &mut PgConnection, arch: &str, os: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     let host: Setting = settings::table.find("apiserver_host").get_result(db)?;
     let host = host.value;
     let tls_cert: Setting = settings::table.find("tls_cert").get_result(db)?;
@@ -18,7 +18,7 @@ pub async fn personalize_binary(db: &mut PgConnection) -> Result<Vec<u8>, Box<dy
     if host.len() > 255 || tls_cert.len() > 1023 || registration_token.len() != 64 {
         return Err("Parameters are too long".into());
     }
-    let mut content = fs::read("agent").await?;
+    let mut content = fs::read(format!("agent-{}-{}", arch, os)).await?;
     let binary = object::File::parse(content.as_slice())?;
 
     let host_section = binary.section_by_name("apiserver_host").ok_or("Invalid binary")?;

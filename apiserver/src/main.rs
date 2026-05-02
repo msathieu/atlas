@@ -24,8 +24,8 @@ use rustls::{
 };
 use sha2::{Digest, Sha512};
 use shared_api::{
-    API_VERSION, CommandOrigin, CommandRequest, CommandResponse, HandshakeFinish, HandshakeRequest, HandshakeResponse, HeartbeatRequest, HeartbeatResponse, MAGIC, MessageType, UpdateRequest,
-    UpdateResponse, print_startup, read_message, write_message,
+    API_VERSION, CommandOrigin, CommandRequest, CommandResponse, HandshakeFinish, HandshakeRequest, HandshakeResponse, HeartbeatRequest, HeartbeatResponse, MAGIC, MessageType, SUPPORTED_ARCH,
+    SUPPORTED_OS, UpdateRequest, UpdateResponse, print_startup, read_message, write_message,
 };
 use shared_server::{
     binary::personalize_binary,
@@ -60,8 +60,6 @@ async fn main() {
     .unwrap();
     let pool = get_db_pool().unwrap();
     let tls_acceptor;
-    let mut agent = None;
-    let mut agent_hash = None;
     {
         let mut db = pool.get().unwrap();
         let tls_key: Setting = settings::table.find("tls_key").first(&mut db).unwrap();
@@ -73,35 +71,17 @@ async fn main() {
             .with_single_cert(vec![cert_der], key_der)
             .unwrap();
         tls_acceptor = TlsAcceptor::from(Arc::new(tls_config));
-        let tmp_agent = personalize_binary(&mut db).await;
-        match tmp_agent {
-            Ok(tmp_agent) => {
-                agent_hash = Some(Sha512::digest(&tmp_agent).to_vec());
-                agent = Some(tmp_agent);
-            }
-            Err(e) => {
-                println!("Failed to initialize auto-updater: {}", e);
-            }
-        };
     }
-    let agent = Arc::new(agent);
-    let agent_hash = Arc::new(agent_hash);
     let listener = TcpListener::bind("0.0.0.0:8612").await.unwrap();
     loop {
-        let result = accept_connection(&listener, tls_acceptor.clone(), pool.clone(), agent.clone(), agent_hash.clone()).await;
+        let result = accept_connection(&listener, tls_acceptor.clone(), pool.clone()).await;
         if let Err(e) = result {
             println!("Error in connection: {}", e)
         }
     }
 }
 
-async fn accept_connection(
-    listener: &TcpListener,
-    tls_acceptor: TlsAcceptor,
-    pool: Pool<ConnectionManager<PgConnection>>,
-    agent: Arc<Option<Vec<u8>>>,
-    agent_hash: Arc<Option<Vec<u8>>>,
-) -> Result<(), Box<dyn Error>> {
+async fn accept_connection(listener: &TcpListener, tls_acceptor: TlsAcceptor, pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
     let (stream, addr) = listener.accept().await?;
     let ip = addr.ip().to_string();
     tokio::spawn(async {
@@ -112,7 +92,7 @@ async fn accept_connection(
                 return;
             }
         };
-        if let Err(e) = handle_connection(stream, ip, tls_acceptor, pool, &sub_client, agent, agent_hash).await {
+        if let Err(e) = handle_connection(stream, ip, tls_acceptor, pool, &sub_client).await {
             println!("Error in connection: {}", e);
         }
         if let Err(e) = sub_client.quit().await {
@@ -122,15 +102,7 @@ async fn accept_connection(
     Ok(())
 }
 
-async fn handle_connection(
-    stream: TcpStream,
-    ip: String,
-    tls_acceptor: TlsAcceptor,
-    pool: Pool<ConnectionManager<PgConnection>>,
-    sub_client: &SubscriberClient,
-    agent: Arc<Option<Vec<u8>>>,
-    agent_hash: Arc<Option<Vec<u8>>>,
-) -> Result<(), Box<dyn Error>> {
+async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAcceptor, pool: Pool<ConnectionManager<PgConnection>>, sub_client: &SubscriberClient) -> Result<(), Box<dyn Error>> {
     let mut stream = tls_acceptor.accept(stream).await?;
     let mut db = pool.get()?;
     let (_, buf) = read_message(&mut stream, Some(MessageType::HandshakeRequest)).await?;
@@ -141,10 +113,10 @@ async fn handle_connection(
     if !handshake_request.hostname.is_ascii() || !handshake_request.hostname.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
         return Err("Invalid hostname".into());
     }
-    if handshake_request.arch != "x86_64" && handshake_request.arch != "aarch64" {
+    if !SUPPORTED_ARCH.contains(&handshake_request.arch.as_str()) {
         return Err("Invalid architecture".into());
     }
-    if handshake_request.os != "linux" {
+    if !SUPPORTED_OS.contains(&handshake_request.os.as_str()) {
         return Err("Invalid OS".into());
     }
     let mut handshake_response = HandshakeResponse {
@@ -217,18 +189,16 @@ async fn handle_connection(
     diesel::update(devices::table.find(uuid)).set(&device).execute(&mut db)?;
     notify_server("WEB:REFRESH").await?;
 
-    if let Some(hash) = &*agent_hash
-        && *hash != device.agent_hash
-    {
-        let request = UpdateRequest {
-            agent: agent.as_ref().clone().ok_or("agent was None")?,
-            hash: hash.clone(),
-        };
-        write_message(MessageType::UpdateRequest, request, &mut stream).await?;
-        let (_, buf) = read_message(&mut stream, Some(MessageType::UpdateResponse)).await?;
-        let response = UpdateResponse::decode(&*buf)?;
-        if response.success {
-            return Ok(());
+    if let Ok(agent) = personalize_binary(&mut db, &device.arch, &device.os).await.map_err(|_| "Failed to get agent") {
+        let hash = Sha512::digest(&agent).to_vec();
+        if hash != device.agent_hash {
+            let request = UpdateRequest { agent, hash };
+            write_message(MessageType::UpdateRequest, request, &mut stream).await?;
+            let (_, buf) = read_message(&mut stream, Some(MessageType::UpdateResponse)).await?;
+            let response = UpdateResponse::decode(&*buf)?;
+            if response.success {
+                return Ok(());
+            }
         }
     }
 

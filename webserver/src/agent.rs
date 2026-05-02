@@ -8,11 +8,14 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use serde::{Deserialize, Serialize};
+use shared_api::{SUPPORTED_ARCH, SUPPORTED_OS};
 use shared_server::binary::personalize_binary;
 
 #[derive(Deserialize)]
 pub struct DownloadAuth {
     pub auth: String,
+    pub arch: String,
+    pub os: String,
 }
 #[derive(Serialize)]
 pub struct DownloadAuthResponse {
@@ -21,8 +24,14 @@ pub struct DownloadAuthResponse {
 
 pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, StatusCode> {
     authenticate_jwt(&query.auth, "webserver-download").await?;
+    if !SUPPORTED_ARCH.contains(&query.arch.as_str()) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if !SUPPORTED_OS.contains(&query.os.as_str()) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
     let mut db = get_db()?;
-    let binary = personalize_binary(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let binary = personalize_binary(&mut db, &query.arch, &query.os).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(binary)
 }
 pub async fn download_auth(headers: HeaderMap) -> Result<Json<DownloadAuthResponse>, StatusCode> {

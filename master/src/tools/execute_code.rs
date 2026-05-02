@@ -104,7 +104,8 @@ impl Tool for ExecuteCodeTool {
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: self.name(),
-            description: "Execute code on a server. This tool requires approval unless preapproved code is used.".into(),
+            description: "Execute code on a server. You will only receive the results of this code after it has finished executing. This tool requires approval unless preapproved code is used."
+                .into(),
             parameters: json!({
               "type": "object",
               "properties": {

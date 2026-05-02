@@ -9,6 +9,8 @@ include!(concat!(env!("OUT_DIR"), "/agent.rs"));
 
 pub const MAGIC: usize = 13609285118649036194;
 pub const API_VERSION: usize = 1;
+pub const SUPPORTED_ARCH: [&str; 1] = ["x86_64"];
+pub const SUPPORTED_OS: [&str; 1] = ["linux"];
 
 #[derive(PartialEq, TryFromPrimitive)]
 #[repr(u32)]
