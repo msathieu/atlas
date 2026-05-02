@@ -48,11 +48,18 @@ async fn process_device(device: Device, pool: Pool<ConnectionManager<PgConnectio
             )
             .get_results(db)?;
         for i in completed_commands {
-            diesel::delete(device_info::table.filter(device_info::device.eq(device_id).and(device_info::info_type.eq(&i.origin_id)))).execute(db)?;
+            diesel::delete(
+                device_info::table.filter(
+                    device_info::device
+                        .eq(device_id)
+                        .and(device_info::info_type.eq(&i.device_info_type.clone().ok_or("Invalid command result")?)),
+                ),
+            )
+            .execute(db)?;
             diesel::insert_into(device_info::table)
                 .values(DeviceInfo {
                     device: device_id,
-                    info_type: i.origin_id,
+                    info_type: i.device_info_type.ok_or("Invalid command result")?,
                     success: i.status_code == 0,
                     data: i.stdout,
                     updated_timestamp: i.completed_timestamp.ok_or("Invalid command")?,
@@ -90,9 +97,12 @@ async fn process_device(device: Device, pool: Pool<ConnectionManager<PgConnectio
                 requested_timestamp: SystemTime::now(),
                 completed_timestamp: None,
                 origin: CommandOrigin::SystemIdentification as i32,
-                origin_id: i.0.to_string(),
+                device_info_type: Some(i.0.to_string()),
                 uid: None,
                 initiated: false,
+                chat_id: None,
+                chat_sequence: None,
+                chat_tool_call_id: None,
             };
             diesel::insert_into(commands::table).values(command).execute(db)?;
             added_cmd = true;

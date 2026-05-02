@@ -28,7 +28,10 @@ diesel::table! {
         requested_timestamp -> Timestamp,
         completed_timestamp -> Nullable<Timestamp>,
         origin -> Int4,
-        origin_id -> Varchar,
+        device_info_type -> Nullable<Varchar>,
+        chat_id -> Nullable<Uuid>,
+        chat_sequence -> Nullable<Int4>,
+        chat_tool_call_id -> Nullable<Varchar>,
         initiated -> Bool,
     }
 }
@@ -76,6 +79,14 @@ diesel::table! {
 }
 
 diesel::table! {
+    preapproved_code (id) {
+        id -> Uuid,
+        chat -> Uuid,
+        code -> Varchar,
+    }
+}
+
+diesel::table! {
     settings (name) {
         name -> Varchar,
         value -> Varchar,
@@ -110,5 +121,6 @@ diesel::joinable!(commands -> devices (device));
 diesel::joinable!(commands -> users (uid));
 diesel::joinable!(device_info -> devices (device));
 diesel::joinable!(messages -> chats (chat));
+diesel::joinable!(preapproved_code -> chats (chat));
 
-diesel::allow_tables_to_appear_in_same_query!(chats, commands, device_info, devices, messages, settings, tool_calls, users,);
+diesel::allow_tables_to_appear_in_same_query!(chats, commands, device_info, devices, messages, preapproved_code, settings, tool_calls, users,);

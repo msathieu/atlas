@@ -19,7 +19,10 @@ pub struct Command {
     pub requested_timestamp: SystemTime,
     pub completed_timestamp: Option<SystemTime>,
     pub origin: i32,
-    pub origin_id: String,
+    pub device_info_type: Option<String>,
+    pub chat_id: Option<Uuid>,
+    pub chat_sequence: Option<i32>,
+    pub chat_tool_call_id: Option<String>,
     pub initiated: bool,
 }
 
@@ -118,4 +121,14 @@ pub struct ToolCall {
     pub response: Option<String>,
     pub user_consented: Option<bool>,
     pub initiated: bool,
+}
+
+#[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
+#[diesel(table_name = crate::schema::preapproved_code)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct PreapprovedCode {
+    #[diesel(deserialize_as = Uuid)]
+    pub id: Option<Uuid>,
+    pub chat: Uuid,
+    pub code: String,
 }

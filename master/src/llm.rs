@@ -1,4 +1,4 @@
-use crate::tools::{device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, sleep::SleepTool, time::TimeTool};
+use crate::tools::{device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, preapprove_code::PreapproveCodeTool, sleep::SleepTool, time::TimeTool};
 use diesel::{
     PgConnection,
     dsl::insert_into,
@@ -139,7 +139,13 @@ The servers you can access are: {}
         .preamble(&preamble)
         .tool(DeviceInfoTool)
         .tool(EmailTool)
-        .tool(ExecuteCodeTool { user: chat.uid })
+        .tool(ExecuteCodeTool {
+            user: chat.uid,
+            chat: chat.id.ok_or("Invalid code")?,
+            sequence: 0,
+            tool_call_id: "".to_string(),
+        })
+        .tool(PreapproveCodeTool { chat: chat.id.ok_or("Invalid chat")? })
         .tool(ThinkTool)
         .tool(TimeTool)
         .tool(SleepTool)
@@ -197,6 +203,9 @@ The servers you can access are: {}
             AssistantContent::ToolCall(call) => {
                 let mut consent = None;
                 if auto_approved_tools.contains(&call.function.name.as_str()) {
+                    consent = Some(true);
+                }
+                if call.function.name == "execute_code" && call.function.arguments.get("code").is_none() {
                     consent = Some(true);
                 }
                 let request = call.function.arguments.to_string();

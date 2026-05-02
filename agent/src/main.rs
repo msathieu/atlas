@@ -80,7 +80,7 @@ async fn main() {
     let mut _tls_cert = CStr::from_bytes_until_nul(&_tls_cert).unwrap().to_str().unwrap().to_string();
     #[cfg(debug_assertions)]
     {
-        _host = env::var("APISERVER_HOST").unwrap();
+        _host = "localhost".to_string();
         _tls_cert = env::var("APISERVER_CERT").unwrap();
     }
     println!("Connecting to {}", _host);

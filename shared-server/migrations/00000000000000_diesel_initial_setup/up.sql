@@ -22,21 +22,6 @@ CREATE TABLE users(
     jwt_counter integer NOT NULL,
     admin boolean NOT NULL
 );
-CREATE TABLE commands(
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    device uuid NOT NULL REFERENCES devices ON DELETE CASCADE,
-    uid uuid REFERENCES users ON DELETE CASCADE,
-    code varchar NOT NULL,
-    completed boolean NOT NULL,
-    status_code integer NOT NULL,
-    stdout varchar NOT NULL,
-    stderr varchar NOT NULL,
-    requested_timestamp timestamp NOT NULL,
-    completed_timestamp timestamp,
-    origin integer NOT NULL,
-    origin_id varchar NOT NULL,
-    initiated boolean NOT NULL
-);
 CREATE TABLE device_info(
     device uuid REFERENCES devices ON DELETE CASCADE,
     info_type varchar,
@@ -82,4 +67,28 @@ CREATE TABLE tool_calls(
     initiated boolean NOT NULL,
     PRIMARY KEY(chat, sequence, call_id),
     FOREIGN KEY (chat, sequence) REFERENCES messages ON DELETE CASCADE
-)
+);
+CREATE TABLE commands(
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    device uuid NOT NULL REFERENCES devices ON DELETE CASCADE,
+    uid uuid REFERENCES users ON DELETE CASCADE,
+    code varchar NOT NULL,
+    completed boolean NOT NULL,
+    status_code integer NOT NULL,
+    stdout varchar NOT NULL,
+    stderr varchar NOT NULL,
+    requested_timestamp timestamp NOT NULL,
+    completed_timestamp timestamp,
+    origin integer NOT NULL,
+    device_info_type varchar,
+    chat_id uuid,
+    chat_sequence integer,
+    chat_tool_call_id varchar,
+    initiated boolean NOT NULL,
+    FOREIGN KEY (chat_id, chat_sequence, chat_tool_call_id) REFERENCES tool_calls ON DELETE CASCADE
+);
+CREATE TABLE preapproved_code(
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    chat uuid NOT NULL REFERENCES chats ON DELETE CASCADE,
+    code varchar NOT NULL
+);
