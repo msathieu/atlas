@@ -233,7 +233,10 @@ The servers you can access are: {}
             }
         }
     }
-    let mut content = text.ok_or("Invalid LLM response")?.text;
+    let mut content = match text {
+        Some(text) => text.text,
+        None => "".to_owned(),
+    };
     if content.is_empty() {
         content = "-".to_string(); // Some API providers reject empty messages
     }
