@@ -8,6 +8,9 @@ jobs:
         run: apt-get update && apt-get install -y sudo
       - name: Install Nix
         uses: https://github.com/cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            filter-syscalls = false
       - name: Checkout
         uses: actions/checkout@v6
         with:
