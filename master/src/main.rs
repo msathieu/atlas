@@ -7,6 +7,8 @@ use crate::tool::process_tool_calls;
 use argon2::password_hash::SaltString;
 use argon2::password_hash::rand_core::OsRng;
 use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
+use aws_lc_rs::encoding::AsDer;
+use aws_lc_rs::rsa::{KeySize, PrivateDecryptingKey};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use diesel::OptionalExtension;
@@ -186,6 +188,13 @@ fn create_settings(db: &mut PgConnection) {
                 .values(Setting {
                     name: "registration_token".to_owned(),
                     value: BASE64_STANDARD.encode(registration_token),
+                })
+                .execute(db)?;
+            let web_encryption_key = PrivateDecryptingKey::generate(KeySize::Rsa8192)?.as_der()?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "web_encryption_key".to_owned(),
+                    value: BASE64_STANDARD.encode(web_encryption_key.as_ref()),
                 })
                 .execute(db)?;
             Ok::<(), Box<dyn Error>>(())

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { authenticatedFetch } from "$lib/auth.ts";
+  import { encryptToServer } from "$lib/util";
   import { toast } from "svelte-sonner";
 
   let dialog: any = $state();
@@ -11,10 +12,16 @@
       alert("New password fields don't match");
       return;
     }
-    const response = await authenticatedFetch(`/api/user/update_password`, {
-      method: "POST",
-      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
-    });
+    const body = JSON.stringify({ old_password: oldPassword, new_password: newPassword });
+    const response = await authenticatedFetch(
+      `/api/user/update_password`,
+      {
+        method: "POST",
+        body: await encryptToServer(body),
+      },
+      undefined,
+      "application/octet-stream",
+    );
     if (response.ok) {
       dialog.close();
       toast.success("Changed password");

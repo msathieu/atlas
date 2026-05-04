@@ -1,8 +1,9 @@
-use crate::{JWT_KEY, get_db};
+use crate::{JWT_KEY, get_db, util::decrypt_body};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use aws_lc_rs::signature::{ED25519, ParsedPublicKey, UnparsedPublicKey};
 use axum::{
     Json,
+    body::Bytes,
     http::{HeaderMap, StatusCode},
 };
 use axum_extra::headers::{Authorization, HeaderMapExt, authorization::Bearer};
@@ -28,6 +29,7 @@ pub struct LoginRequest {
     username: String,
     password: String,
     pubkey: String,
+    timestamp: u64,
 }
 #[derive(Serialize)]
 pub struct LoginResponse {
@@ -64,7 +66,13 @@ pub async fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<Str
     let jwt = encode(&header, &claims, &key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(jwt)
 }
-pub async fn login(Json(request): Json<LoginRequest>) -> Result<Json<LoginResponse>, StatusCode> {
+pub async fn login(body: Bytes) -> Result<Json<LoginResponse>, StatusCode> {
+    let request: LoginRequest = serde_json::from_str(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let now = SystemTime::now();
+    let now = now.duration_since(UNIX_EPOCH).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.as_secs();
+    if now + 10 < request.timestamp || now > request.timestamp + 30 {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
     let mut db = get_db()?;
     let user: User = users::table.filter(users::username.eq(request.username)).first(&mut db).or(Err(StatusCode::UNAUTHORIZED))?;
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::UNAUTHORIZED))?;

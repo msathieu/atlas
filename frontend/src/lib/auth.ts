@@ -5,9 +5,16 @@ export async function authenticatedFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
   fn?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+  contentType?: string,
 ): Promise<Response> {
   if (!init) {
     init = {};
+  }
+  if (!contentType) {
+    contentType = "application/json";
+  }
+  if (!fn) {
+    fn = fetch;
   }
   const jwt = localStorage.getItem("jwt");
   if (!jwt) {
@@ -16,14 +23,9 @@ export async function authenticatedFetch(
   input = API_HOST + input;
   init["headers"] = new Headers({
     "Authorization": `Bearer ${jwt}`,
-    "Content-Type": "application/json",
+    "Content-Type": contentType,
   });
-  let response;
-  if (fn) {
-    response = await fn(input, init);
-  } else {
-    response = await fetch(input, init);
-  }
+  const response = await fetch(input, init);
   if (response.status === 401) {
     localStorage.clear();
     throw redirect(300, "/login");

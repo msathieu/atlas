@@ -1607,6 +1607,7 @@ name = "master"
 version = "0.0.1"
 dependencies = [
  "argon2",
+ "aws-lc-rs",
  "base64",
  "diesel",
  "diesel_migrations",
@@ -3728,6 +3729,7 @@ dependencies = [
  "gethostname",
  "jsonwebtoken",
  "serde",
+ "serde_json",
  "shared-api",
  "shared-server",
  "tokio",

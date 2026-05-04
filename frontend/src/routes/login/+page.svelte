@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { API_HOST, bufferToBase64 } from "$lib/util";
+  import { API_HOST, bufferToBase64, encryptToServer } from "$lib/util";
   import { connectWS } from "$lib/ws.svelte";
   import { toast } from "svelte-sonner";
 
@@ -10,10 +10,11 @@
   async function login() {
     const keyPair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
     const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
+    const body = JSON.stringify({ username, password, pubkey, timestamp: Math.floor(Date.now() / 1000) });
     const response = await fetch(`${API_HOST}/api/login`, {
       method: "POST",
-      body: JSON.stringify({ username, password, pubkey }),
-      headers: { "Content-Type": "application/json" },
+      body: await encryptToServer(body),
+      headers: { "Content-Type": "application/octet-stream" },
     });
     if (response.ok) {
       const json = await response.json();

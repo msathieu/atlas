@@ -22,3 +22,4 @@ tower-http = {version = "0.6.6", features = ["fs"]}
 gethostname = "1.0.2"
 fred = "10.1.0"
 aws-lc-rs = "1.16.3"
+serde_json = "1.0.149"

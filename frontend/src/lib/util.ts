@@ -16,5 +16,15 @@ export function getHostnameForDevice(devices: { id: string; hostname: string }[]
 }
 export function bufferToBase64(buf: ArrayBuffer): string {
   const array = new Uint8Array(buf);
-  return btoa(String.fromCharCode(...array))
+  return array.toBase64();
+}
+export function base64ToBuffer(encoded: string): ArrayBuffer {
+  return Uint8Array.fromBase64(encoded).buffer;
+}
+export async function encryptToServer(data: string): Promise<ArrayBuffer> {
+  const infoRes = await fetch(`${API_HOST}/api/info`);
+  const info = await infoRes.json();
+  const serverPubKey = await crypto.subtle.importKey("spki", base64ToBuffer(info.pubkey), { name: "RSA-OAEP", hash: "SHA-512" }, true, ["encrypt"]);
+  const encoder = new TextEncoder();
+  return await crypto.subtle.encrypt({ name: "RSA-OAEP" }, serverPubKey, encoder.encode(data));
 }
