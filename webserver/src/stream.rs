@@ -25,7 +25,7 @@ pub struct StreamAuthResponse {
 
 pub async fn stream_auth(headers: HeaderMap) -> Result<Json<StreamAuthResponse>, StatusCode> {
     let user = authenticate(headers).await?;
-    let jwt = generate_jwt("webserver-stream", &user, 60).await?;
+    let jwt = generate_jwt("webserver-stream", &user, 60, None).await?;
     let response = StreamAuthResponse { jwt };
     Ok(Json(response))
 }

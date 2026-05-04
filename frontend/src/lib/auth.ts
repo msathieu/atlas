@@ -25,7 +25,7 @@ export async function authenticatedFetch(
     response = await fetch(input, init);
   }
   if (response.status === 401) {
-    localStorage.removeItem("jwt");
+    localStorage.clear();
     throw redirect(300, "/login");
   }
   return response;

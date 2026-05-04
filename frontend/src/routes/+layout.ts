@@ -15,7 +15,10 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
     return { connected: false, info: { hostname: "Disconnected" } };
   }
   const info = await infoRes.json();
-  if (info.magic !== "13609285118649036194" || info.api_version !== 1) {
+  if (info.magic !== "13609285118649036194") {
+    return { connected: false, info: { hostname: "Disconnected" } };
+  }
+  if (info.api_version !== 1) {
     location.reload();
   }
   await connectWS(fetch);

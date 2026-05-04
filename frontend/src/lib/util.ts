@@ -14,3 +14,7 @@ export function getHostnameForDevice(devices: { id: string; hostname: string }[]
   }
   return "Invalid Device";
 }
+export function bufferToBase64(buf: ArrayBuffer): string {
+  const array = new Uint8Array(buf);
+  return btoa(String.fromCharCode(...array))
+}

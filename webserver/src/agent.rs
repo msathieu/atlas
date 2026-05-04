@@ -36,7 +36,7 @@ pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, Statu
 }
 pub async fn download_auth(headers: HeaderMap) -> Result<Json<DownloadAuthResponse>, StatusCode> {
     let user = authenticate(headers).await?;
-    let jwt = generate_jwt("webserver-download", &user, 10 * 60).await?;
+    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None).await?;
     let response = DownloadAuthResponse { jwt };
     Ok(Json(response))
 }
