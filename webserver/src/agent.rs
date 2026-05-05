@@ -23,7 +23,7 @@ pub struct DownloadAuthResponse {
 }
 
 pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, StatusCode> {
-    authenticate_jwt(&query.auth, "webserver-download").await?;
+    authenticate_jwt(&query.auth, "webserver-download")?;
     if !SUPPORTED_ARCH.contains(&query.arch.as_str()) {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -35,8 +35,8 @@ pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, Statu
     Ok(binary)
 }
 pub async fn download_auth(headers: HeaderMap) -> Result<Json<DownloadAuthResponse>, StatusCode> {
-    let user = authenticate(headers).await?;
-    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None).await?;
+    let user = authenticate(&headers)?.0;
+    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None)?;
     let response = DownloadAuthResponse { jwt };
     Ok(Json(response))
 }

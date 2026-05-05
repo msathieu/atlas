@@ -24,13 +24,13 @@ pub struct StreamAuthResponse {
 }
 
 pub async fn stream_auth(headers: HeaderMap) -> Result<Json<StreamAuthResponse>, StatusCode> {
-    let user = authenticate(headers).await?;
-    let jwt = generate_jwt("webserver-stream", &user, 60, None).await?;
+    let user = authenticate(&headers)?.0;
+    let jwt = generate_jwt("webserver-stream", &user, 60, None)?;
     let response = StreamAuthResponse { jwt };
     Ok(Json(response))
 }
 pub async fn stream(query: Query<StreamAuth>, socket: WebSocketUpgrade) -> Response {
-    if authenticate_jwt(&query.auth, "webserver-stream").await.is_err() {
+    if authenticate_jwt(&query.auth, "webserver-stream").is_err() {
         return Response::new("Unauthorized".into());
     }
     socket.on_upgrade(stream_wrapper)

@@ -1,5 +1,5 @@
 import { redirect } from "@sveltejs/kit";
-import { API_HOST } from "./util.ts";
+import { API_HOST, bufferToBase64, signRequest } from "./util.ts";
 
 export async function authenticatedFetch(
   input: RequestInfo | URL,
@@ -20,15 +20,24 @@ export async function authenticatedFetch(
   if (!jwt) {
     throw redirect(300, "/login");
   }
-  input = API_HOST + input;
+  const url = API_HOST + input;
   init["headers"] = new Headers({
     "Authorization": `Bearer ${jwt}`,
     "Content-Type": contentType,
   });
-  const response = await fetch(input, init);
+  const encoder = new TextEncoder();
+  let body = init["body"];
+  if (!body) {
+    body = "";
+  }
+  const url_hash = await crypto.subtle.digest("SHA-512", encoder.encode(input.toString()));
+  const body_hash = await crypto.subtle.digest("SHA-512", encoder.encode(body as string));
+  init["headers"].append("X-Request-Signature", await signRequest(init["method"] + "-" + bufferToBase64(url_hash) + "-" + bufferToBase64(body_hash)));
+  const response = await fn(url, init);
   if (response.status === 401) {
     localStorage.clear();
-    throw redirect(300, "/login");
+    location.reload();
+    throw null;
   }
   return response;
 }

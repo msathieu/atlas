@@ -1,4 +1,4 @@
-use crate::util::decrypt_body;
+use crate::util::{decrypt_body, validate_signature};
 use crate::{auth::authenticate, get_db};
 use argon2::PasswordHasher;
 use argon2::{
@@ -6,6 +6,7 @@ use argon2::{
     password_hash::{SaltString, rand_core::OsRng},
 };
 use axum::body::Bytes;
+use axum::extract::OriginalUri;
 use axum::http::{HeaderMap, StatusCode};
 use diesel::prelude::*;
 use serde::Deserialize;
@@ -22,8 +23,9 @@ pub struct ChangePasswordRequest {
     new_password: String,
 }
 
-pub async fn change_password(headers: HeaderMap, body: Bytes) -> Result<(), StatusCode> {
-    let user = authenticate(headers).await?;
+pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
+    let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "POST")?;
     let request: ChangePasswordRequest = serde_json::from_str(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     if request.new_password.is_empty() || request.new_password.len() < MIN_PASSWORD_LENGTH {
         return Err(StatusCode::BAD_REQUEST);

@@ -1,8 +1,12 @@
-use crate::get_db;
+use crate::{auth::authenticate, get_db};
 use aws_lc_rs::rsa::{OAEP_SHA512_MGF1SHA512, OaepPrivateDecryptingKey, PrivateDecryptingKey};
-use axum::{body::Bytes, http::StatusCode};
+use axum::{
+    body::Bytes,
+    http::{HeaderMap, StatusCode, Uri},
+};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
+use sha2::{Digest, Sha512};
 use shared_server::{models::Setting, schema};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -22,4 +26,14 @@ pub fn decrypt_body(body: Bytes) -> Result<String, StatusCode> {
     let decrypted = key.decrypt(&OAEP_SHA512_MGF1SHA512, &body, &mut decrypted, None).or(Err(StatusCode::BAD_REQUEST))?;
     let decrypted = String::from_utf8(decrypted.to_owned()).or(Err(StatusCode::BAD_REQUEST))?;
     Ok(decrypted)
+}
+pub fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, method: &str) -> Result<(), StatusCode> {
+    let signature = headers.get("X-Request-Signature").ok_or(StatusCode::UNAUTHORIZED)?;
+    let signature = BASE64_STANDARD.decode(signature).or(Err(StatusCode::UNAUTHORIZED))?;
+    let pubkey = authenticate(headers)?.1.ok_or(StatusCode::UNAUTHORIZED)?;
+    let uri_hashed = BASE64_STANDARD.encode(Sha512::digest(uri.to_string()));
+    let body_hashed = BASE64_STANDARD.encode(Sha512::digest(body));
+    let hash = format!("{}-{}-{}", method, uri_hashed, body_hashed);
+    pubkey.verify_sig(hash.as_bytes(), &signature).or(Err(StatusCode::UNAUTHORIZED))?;
+    Ok(())
 }

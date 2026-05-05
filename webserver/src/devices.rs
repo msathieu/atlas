@@ -29,7 +29,7 @@ pub struct APIDevice {
 }
 
 pub async fn devices_list(headers: HeaderMap) -> Result<Json<Vec<APIDevice>>, StatusCode> {
-    authenticate(headers).await?;
+    authenticate(&headers)?;
     let mut db = get_db()?;
     let devices: Vec<Device> = devices::table.get_results(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let devices: Result<Vec<APIDevice>, StatusCode> = devices
@@ -52,7 +52,7 @@ pub async fn devices_list(headers: HeaderMap) -> Result<Json<Vec<APIDevice>>, St
     Ok(Json(devices?))
 }
 pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>) -> Result<(), StatusCode> {
-    require_admin(headers).await?;
+    require_admin(&headers)?;
     let mut db = get_db()?;
     diesel::update(devices::table.find(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?))
         .set(devices::approved.eq(true))
@@ -63,7 +63,7 @@ pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>) -> Resul
     Ok(())
 }
 pub async fn delete_device(headers: HeaderMap, Path(id): Path<String>) -> Result<(), StatusCode> {
-    require_admin(headers).await?;
+    require_admin(&headers)?;
     let mut db = get_db()?;
     diesel::delete(devices::table.find(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?))
         .execute(&mut db)

@@ -20,6 +20,7 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
   }
   if (info.api_version !== 1) {
     location.reload();
+    throw null;
   }
   await connectWS(fetch);
   return { connected: true, info };

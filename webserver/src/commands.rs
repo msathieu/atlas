@@ -34,7 +34,7 @@ pub struct CreateCommandResponse {
 }
 
 pub async fn commands_list(headers: HeaderMap) -> Result<Json<Vec<APICommand>>, StatusCode> {
-    let user = authenticate(headers).await?;
+    let user = authenticate(&headers)?.0;
     let mut db = get_db()?;
     let commands: Vec<Command> = commands::table
         .filter(
@@ -63,7 +63,7 @@ pub async fn commands_list(headers: HeaderMap) -> Result<Json<Vec<APICommand>>, 
     Ok(Json(commands?))
 }
 pub async fn create_command(headers: HeaderMap, Json(request): Json<CreateCommandRequest>) -> Result<Json<CreateCommandResponse>, StatusCode> {
-    let user = authenticate(headers).await?;
+    let user = authenticate(&headers)?.0;
     let mut db = get_db()?;
     let mut cmd = Command {
         id: None,
@@ -91,7 +91,7 @@ pub async fn create_command(headers: HeaderMap, Json(request): Json<CreateComman
     }))
 }
 pub async fn delete_command(headers: HeaderMap, Path(id): Path<String>) -> Result<(), StatusCode> {
-    let user = authenticate(headers).await?;
+    let user = authenticate(&headers)?.0;
     let mut db = get_db()?;
     diesel::delete(
         commands::table.filter(

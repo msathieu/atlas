@@ -1,7 +1,8 @@
-use crate::{auth::require_admin, get_db};
+use crate::{auth::require_admin, get_db, util::validate_signature};
 use axum::{
     Json,
-    extract::Path,
+    body::Bytes,
+    extract::{OriginalUri, Path},
     http::{HeaderMap, StatusCode},
 };
 use diesel::prelude::*;
@@ -19,7 +20,7 @@ pub struct UpdateSettingRequest {
 }
 
 pub async fn get_setting(headers: HeaderMap, Path(name): Path<String>) -> Result<Json<APISetting>, StatusCode> {
-    require_admin(headers).await?;
+    require_admin(&headers)?;
     let mut db = get_db()?;
     let allowed_settings = [
         "allow_new_devices",
@@ -40,8 +41,10 @@ pub async fn get_setting(headers: HeaderMap, Path(name): Path<String>) -> Result
         value: setting.value,
     }))
 }
-pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, Json(request): Json<UpdateSettingRequest>) -> Result<(), StatusCode> {
-    require_admin(headers).await?;
+pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
+    require_admin(&headers)?;
+    validate_signature(&headers, uri.0, &body, "PUT")?;
+    let request: UpdateSettingRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let allowed_settings = [
         "allow_new_devices",
@@ -65,7 +68,7 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, Json(r
     Ok(())
 }
 pub async fn restart_system(headers: HeaderMap) -> Result<(), StatusCode> {
-    require_admin(headers).await?;
+    require_admin(&headers)?;
     notify_server("MASTER:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("API:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

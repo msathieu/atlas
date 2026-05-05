@@ -48,7 +48,7 @@ pub fn parse_pubkey(pubkey: String) -> Result<ParsedPublicKey, StatusCode> {
         .or(Err(StatusCode::BAD_REQUEST))?;
     Ok(key)
 }
-pub async fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) -> Result<String, StatusCode> {
+pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) -> Result<String, StatusCode> {
     if let Some(pubkey) = &pubkey {
         parse_pubkey(pubkey.clone())?;
     }
@@ -77,11 +77,11 @@ pub async fn login(body: Bytes) -> Result<Json<LoginResponse>, StatusCode> {
     let user: User = users::table.filter(users::username.eq(request.username)).first(&mut db).or(Err(StatusCode::UNAUTHORIZED))?;
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::UNAUTHORIZED))?;
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::UNAUTHORIZED))?;
-    let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey)).await?;
+    let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
     let response = LoginResponse { jwt, admin: user.admin };
     Ok(Json(response))
 }
-pub async fn authenticate_jwt(jwt: &str, aud: &str) -> Result<User, StatusCode> {
+pub fn authenticate_jwt(jwt: &str, aud: &str) -> Result<(User, Option<ParsedPublicKey>), StatusCode> {
     let key = DecodingKey::from_secret(JWT_KEY.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?);
     let mut validation = Validation::new(Algorithm::HS512);
     validation.validate_nbf = true;
@@ -96,14 +96,18 @@ pub async fn authenticate_jwt(jwt: &str, aud: &str) -> Result<User, StatusCode> 
     if user.jwt_counter as usize != token.claims.counter {
         return Err(StatusCode::UNAUTHORIZED);
     }
-    Ok(user)
+    let mut pubkey = None;
+    if let Some(pubkey_claim) = token.claims.pubkey {
+        pubkey = Some(parse_pubkey(pubkey_claim)?);
+    }
+    Ok((user, pubkey))
 }
-pub async fn authenticate(headers: HeaderMap) -> Result<User, StatusCode> {
+pub fn authenticate(headers: &HeaderMap) -> Result<(User, Option<ParsedPublicKey>), StatusCode> {
     let bearer: Authorization<Bearer> = headers.typed_get().ok_or(StatusCode::UNAUTHORIZED)?;
-    authenticate_jwt(bearer.token(), "webserver").await
+    authenticate_jwt(bearer.token(), "webserver")
 }
-pub async fn require_admin(headers: HeaderMap) -> Result<(), StatusCode> {
-    let user = authenticate(headers).await?;
+pub fn require_admin(headers: &HeaderMap) -> Result<(), StatusCode> {
+    let user = authenticate(headers)?.0;
     if !user.admin {
         return Err(StatusCode::FORBIDDEN);
     }

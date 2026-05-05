@@ -25,6 +25,7 @@
     if (response.ok) {
       dialog.close();
       toast.success("Changed password");
+      localStorage.clear();
       location.reload();
     } else {
       toast.error("Request denied");
