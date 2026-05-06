@@ -1,10 +1,12 @@
 use crate::{
     auth::{authenticate, authenticate_jwt, generate_jwt},
     get_db,
+    util::validate_signature,
 };
 use axum::{
     Json,
-    extract::Query,
+    body::Bytes,
+    extract::{OriginalUri, Query},
     http::{HeaderMap, StatusCode},
 };
 use serde::{Deserialize, Serialize};
@@ -34,8 +36,9 @@ pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, Statu
     let binary = personalize_binary(&mut db, &query.arch, &query.os).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(binary)
 }
-pub async fn download_auth(headers: HeaderMap) -> Result<Json<DownloadAuthResponse>, StatusCode> {
+pub async fn download_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<DownloadAuthResponse>, StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "POST")?;
     let jwt = generate_jwt("webserver-download", &user, 10 * 60, None)?;
     let response = DownloadAuthResponse { jwt };
     Ok(Json(response))

@@ -1,11 +1,12 @@
 use crate::{
     auth::{authenticate, require_admin},
     get_db,
-    util::convert_timestamp,
+    util::{convert_timestamp, validate_signature},
 };
 use axum::{
     Json,
-    extract::Path,
+    body::Bytes,
+    extract::{OriginalUri, Path},
     http::{HeaderMap, StatusCode},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
@@ -28,8 +29,9 @@ pub struct APIDevice {
     ip: String,
 }
 
-pub async fn devices_list(headers: HeaderMap) -> Result<Json<Vec<APIDevice>>, StatusCode> {
+pub async fn devices_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<Vec<APIDevice>>, StatusCode> {
     authenticate(&headers)?;
+    validate_signature(&headers, uri.0, &body, "GET")?;
     let mut db = get_db()?;
     let devices: Vec<Device> = devices::table.get_results(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let devices: Result<Vec<APIDevice>, StatusCode> = devices
@@ -51,8 +53,9 @@ pub async fn devices_list(headers: HeaderMap) -> Result<Json<Vec<APIDevice>>, St
         .collect();
     Ok(Json(devices?))
 }
-pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>) -> Result<(), StatusCode> {
+pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
     require_admin(&headers)?;
+    validate_signature(&headers, uri.0, &body, "POST")?;
     let mut db = get_db()?;
     diesel::update(devices::table.find(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?))
         .set(devices::approved.eq(true))
@@ -62,8 +65,9 @@ pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>) -> Resul
     notify_server("MASTER:DEVICES").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }
-pub async fn delete_device(headers: HeaderMap, Path(id): Path<String>) -> Result<(), StatusCode> {
+pub async fn delete_device(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
     require_admin(&headers)?;
+    validate_signature(&headers, uri.0, &body, "DELETE")?;
     let mut db = get_db()?;
     diesel::delete(devices::table.find(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?))
         .execute(&mut db)

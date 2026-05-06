@@ -1,7 +1,12 @@
-use crate::{auth::authenticate, get_db, util::convert_timestamp};
+use crate::{
+    auth::authenticate,
+    get_db,
+    util::{convert_timestamp, validate_signature},
+};
 use axum::{
     Json,
-    extract::Path,
+    body::Bytes,
+    extract::{OriginalUri, Path},
     http::{HeaderMap, StatusCode},
 };
 use diesel::prelude::*;
@@ -33,8 +38,9 @@ pub struct CreateCommandResponse {
     id: Uuid,
 }
 
-pub async fn commands_list(headers: HeaderMap) -> Result<Json<Vec<APICommand>>, StatusCode> {
+pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<Vec<APICommand>>, StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "GET")?;
     let mut db = get_db()?;
     let commands: Vec<Command> = commands::table
         .filter(
@@ -62,8 +68,10 @@ pub async fn commands_list(headers: HeaderMap) -> Result<Json<Vec<APICommand>>, 
         .collect();
     Ok(Json(commands?))
 }
-pub async fn create_command(headers: HeaderMap, Json(request): Json<CreateCommandRequest>) -> Result<Json<CreateCommandResponse>, StatusCode> {
+pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<CreateCommandResponse>, StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "POST")?;
+    let request: CreateCommandRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let mut cmd = Command {
         id: None,
@@ -90,8 +98,9 @@ pub async fn create_command(headers: HeaderMap, Json(request): Json<CreateComman
         id: cmd.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
     }))
 }
-pub async fn delete_command(headers: HeaderMap, Path(id): Path<String>) -> Result<(), StatusCode> {
+pub async fn delete_command(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "DELETE")?;
     let mut db = get_db()?;
     diesel::delete(
         commands::table.filter(

@@ -44,8 +44,7 @@
         <li>
           <div class="text-xs">
             <div class:status-success={data.connected && wsState.connected} class:status-error={!data.connected || !wsState.connected} class="status"></div>
-            <span class="hidden lg:block"
-              >{data.info.hostname}
+            <span class="hidden lg:block">{data.info.hostname}
               <br />
               Version {data.info.version || "Unknown"}
             </span>

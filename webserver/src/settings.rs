@@ -1,4 +1,8 @@
-use crate::{auth::require_admin, get_db, util::validate_signature};
+use crate::{
+    auth::require_admin,
+    get_db,
+    util::{decrypt_body, validate_signature},
+};
 use axum::{
     Json,
     body::Bytes,
@@ -19,8 +23,9 @@ pub struct UpdateSettingRequest {
     value: String,
 }
 
-pub async fn get_setting(headers: HeaderMap, Path(name): Path<String>) -> Result<Json<APISetting>, StatusCode> {
+pub async fn get_setting(headers: HeaderMap, Path(name): Path<String>, uri: OriginalUri, body: Bytes) -> Result<Json<APISetting>, StatusCode> {
     require_admin(&headers)?;
+    validate_signature(&headers, uri.0, &body, "GET")?;
     let mut db = get_db()?;
     let allowed_settings = [
         "allow_new_devices",
@@ -44,7 +49,7 @@ pub async fn get_setting(headers: HeaderMap, Path(name): Path<String>) -> Result
 pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
     require_admin(&headers)?;
     validate_signature(&headers, uri.0, &body, "PUT")?;
-    let request: UpdateSettingRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: UpdateSettingRequest = serde_json::from_str(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let allowed_settings = [
         "allow_new_devices",

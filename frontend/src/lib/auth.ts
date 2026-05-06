@@ -30,9 +30,16 @@ export async function authenticatedFetch(
   if (!body) {
     body = "";
   }
+  if (typeof body === "string") {
+    body = encoder.encode(body as string);
+  }
   const url_hash = await crypto.subtle.digest("SHA-512", encoder.encode(input.toString()));
-  const body_hash = await crypto.subtle.digest("SHA-512", encoder.encode(body as string));
-  init["headers"].append("X-Request-Signature", await signRequest(init["method"] + "-" + bufferToBase64(url_hash) + "-" + bufferToBase64(body_hash)));
+  const body_hash = await crypto.subtle.digest("SHA-512", body as ArrayBuffer);
+  let method = init["method"];
+  if (!method) {
+    method = "GET";
+  }
+  init["headers"].append("X-Request-Signature", await signRequest(method + "-" + bufferToBase64(url_hash) + "-" + bufferToBase64(body_hash)));
   const response = await fn(url, init);
   if (response.status === 401) {
     localStorage.clear();

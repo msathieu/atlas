@@ -1,7 +1,12 @@
-use crate::{auth::authenticate, get_db, util::convert_timestamp};
+use crate::{
+    auth::authenticate,
+    get_db,
+    util::{convert_timestamp, validate_signature},
+};
 use axum::{
     Json,
-    extract::Path,
+    body::Bytes,
+    extract::{OriginalUri, Path},
     http::{HeaderMap, StatusCode},
 };
 use diesel::{dsl::max, prelude::*};
@@ -71,8 +76,9 @@ pub struct CreateChatRequest {
     chat_type: String,
 }
 
-pub async fn chats_list(headers: HeaderMap) -> Result<Json<Vec<APIChat>>, StatusCode> {
+pub async fn chats_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<Vec<APIChat>>, StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "GET")?;
     let mut db = get_db()?;
     let chats: Vec<Chat> = chats::table
         .filter(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
@@ -92,8 +98,10 @@ pub async fn chats_list(headers: HeaderMap) -> Result<Json<Vec<APIChat>>, Status
         .collect();
     Ok(Json(chats?))
 }
-pub async fn create_chat(headers: HeaderMap, Json(request): Json<CreateChatRequest>) -> Result<Json<CreateChatResponse>, StatusCode> {
+pub async fn create_chat(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<CreateChatResponse>, StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "POST")?;
+    let request: CreateChatRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let chat_type = match request.chat_type.as_str() {
         "interactive" => ChatType::Interactive,
         "noninteractive" => ChatType::NonInteractive,
@@ -124,8 +132,9 @@ pub async fn create_chat(headers: HeaderMap, Json(request): Json<CreateChatReque
         id: chat.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
     }))
 }
-pub async fn delete_chat(headers: HeaderMap, Path(id): Path<String>) -> Result<(), StatusCode> {
+pub async fn delete_chat(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "DELETE")?;
     let mut db = get_db()?;
     diesel::delete(
         chats::table.filter(
@@ -139,8 +148,9 @@ pub async fn delete_chat(headers: HeaderMap, Path(id): Path<String>) -> Result<(
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }
-pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>) -> Result<Json<APIChatDetailed>, StatusCode> {
+pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<Json<APIChatDetailed>, StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "GET")?;
     let mut db = get_db()?;
     let chat: Chat = chats::table
         .filter(
@@ -196,8 +206,10 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>) -> Result<Json
     };
     Ok(Json(chat))
 }
-pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, Json(request): Json<SendMessageRequest>) -> Result<(), StatusCode> {
+pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "POST")?;
+    let request: SendMessageRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let chat: Chat = chats::table
         .filter(
@@ -249,8 +261,10 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, Json(reque
     notify_server("MASTER:LLM").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }
-pub async fn manage_tool_call_consent(headers: HeaderMap, Path((id, seq, call_id)): Path<(String, i32, String)>, Json(request): Json<ManageToolCallConsentRequest>) -> Result<(), StatusCode> {
+pub async fn manage_tool_call_consent(headers: HeaderMap, Path((id, seq, call_id)): Path<(String, i32, String)>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "POST")?;
+    let request: ManageToolCallConsentRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let chat_uuid = Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?;
     let _chat: Chat = chats::table

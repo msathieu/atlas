@@ -1,7 +1,11 @@
-use crate::auth::{authenticate, authenticate_jwt, generate_jwt};
+use crate::{
+    auth::{authenticate, authenticate_jwt, generate_jwt},
+    util::validate_signature,
+};
 use axum::{
     Json,
-    extract::{Query, WebSocketUpgrade, ws::WebSocket},
+    body::Bytes,
+    extract::{OriginalUri, Query, WebSocketUpgrade, ws::WebSocket},
     http::{HeaderMap, StatusCode},
     response::Response,
 };
@@ -23,8 +27,9 @@ pub struct StreamAuthResponse {
     jwt: String,
 }
 
-pub async fn stream_auth(headers: HeaderMap) -> Result<Json<StreamAuthResponse>, StatusCode> {
+pub async fn stream_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<StreamAuthResponse>, StatusCode> {
     let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "POST")?;
     let jwt = generate_jwt("webserver-stream", &user, 60, None)?;
     let response = StreamAuthResponse { jwt };
     Ok(Json(response))
