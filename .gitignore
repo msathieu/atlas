@@ -8,3 +8,4 @@ target
 .svelte-kit
 agent.db
 THIRD-PARTY.txt
+*.keystore

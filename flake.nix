@@ -16,6 +16,7 @@
           deno
           diesel-cli
           git
+          jq
           lua5_5
           openjdk
           openssl

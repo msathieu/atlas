@@ -30,23 +30,25 @@
       <ul class="menu bg-base-200 min-h-full">
         <li>
           <a class="text-2xl" href="/">
-            <img src="/logo.png" alt="logo" class="h-15" /> Atlas
+            <img src="/logo.png" alt="logo" class="h-12" /><span class="hidden lg:block"> Atlas</span>
           </a>
         </li>
-        <li><a href="/devices"><Server />Devices</a></li>
-        <li><a href="/commands"><Code />Commands</a></li>
-        <li><a href="/chats"><MessageSquare />Chats</a></li>
+        <li><a href="/devices"><Server /><span class="hidden lg:block">Devices</span></a></li>
+        <li><a href="/commands"><Code /><span class="hidden lg:block">Commands</span></a></li>
+        <li><a href="/chats"><MessageSquare /><span class="hidden lg:block">Chats</span></a></li>
         {#if localStorage.getItem("admin") === "true"}
-          <li><a href="/settings"><Settings />Settings</a></li>
+          <li><a href="/settings"><Settings /><span class="hidden lg:block">Settings</span></a></li>
         {/if}
-        <li class="mt-auto"><a href="/profile"><User />Profile</a></li>
-        <li><button onclick={logout}><LogOut />Logout</button></li>
+        <li class="mt-auto"><a href="/profile"><User /><span class="hidden lg:block">Profile</span></a></li>
+        <li><button onclick={logout}><LogOut /><span class="hidden lg:block">Logout</span></button></li>
         <li>
           <div class="text-xs">
             <div class:status-success={data.connected && wsState.connected} class:status-error={!data.connected || !wsState.connected} class="status"></div>
-            {data.info.hostname}
-            <br />
-            Version {data.info.version || "Unknown"}
+            <span class="hidden lg:block"
+              >{data.info.hostname}
+              <br />
+              Version {data.info.version || "Unknown"}
+            </span>
           </div>
         </li>
       </ul>

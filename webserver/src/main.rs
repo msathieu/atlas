@@ -26,7 +26,10 @@ use shared_api::print_startup;
 use shared_server::{get_db_pool, listen_for_restarts, models::Setting, schema};
 use std::sync::OnceLock;
 use tokio::net::TcpListener;
-use tower_http::services::{ServeDir, ServeFile};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    services::{ServeDir, ServeFile},
+};
 
 mod agent;
 mod auth;
@@ -78,7 +81,8 @@ async fn main() {
         .route("/api/atlas-agent", get(download_agent))
         .route("/api/download_auth", post(download_auth))
         .route("/api/restart", post(restart_system))
-        .route("/api/user/update_password", post(change_password));
+        .route("/api/user/update_password", post(change_password))
+        .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();
 }
