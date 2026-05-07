@@ -72,8 +72,9 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }
-pub async fn restart_system(headers: HeaderMap) -> Result<(), StatusCode> {
+pub async fn restart_system(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
     require_admin(&headers)?;
+    validate_signature(&headers, uri.0, &body, "POST")?;
     notify_server("MASTER:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("API:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

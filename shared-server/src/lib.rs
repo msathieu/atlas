@@ -5,12 +5,14 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
 };
 use redis::{AsyncCommands, PushInfo, PushKind, RedisError, aio::ConnectionManagerConfig};
-use std::{env, error::Error, process::exit};
+use std::{env, error::Error, process::exit, sync::OnceLock};
 use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
 
 pub mod binary;
 pub mod models;
 pub mod schema;
+
+static PUBSUB_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
 
 pub fn get_db_pool() -> Result<Pool<ConnectionManager<PgConnection>>, Box<dyn Error>> {
     let url = format!(
@@ -35,8 +37,11 @@ pub async fn get_pubsub_client() -> Result<(redis::aio::ConnectionManager, Unbou
     Ok((manager, rx))
 }
 pub async fn notify_server(channel: &str) -> Result<(), Box<dyn Error>> {
-    let (mut pubsub_client, _) = get_pubsub_client().await?;
-    pubsub_client.publish::<&str, &str, ()>(channel, "").await?;
+    if PUBSUB_POOL.get().is_none() {
+        let client = get_pubsub_client().await?;
+        PUBSUB_POOL.set(client.0).ok();
+    }
+    PUBSUB_POOL.get().ok_or("Failed to get pubsub client")?.clone().publish::<&str, &str, ()>(channel, "").await?;
     Ok(())
 }
 pub async fn wait_for_pubsub_msg(receiver: &mut UnboundedReceiver<PushInfo>) {
