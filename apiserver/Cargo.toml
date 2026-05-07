@@ -10,9 +10,9 @@ aws-lc-rs = "1.14.0"
 base64 = "0.22.1"
 diesel = {version = "2.2.12", features = ["postgres", "uuid"]}
 dotenvy = "0.15.7"
-fred = "10.1.0"
 prost = "0.14.1"
 rand = "0.10.0"
+redis = "1.2.1"
 sha2 = "0.11.0"
 shared-api = {path = "../shared-api"}
 shared-server = {path = "../shared-server"}

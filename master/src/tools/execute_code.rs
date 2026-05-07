@@ -1,6 +1,5 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
-use fred::prelude::{ClientLike, EventInterface, PubsubInterface};
 use rig::{
     completion::ToolDefinition,
     tool::{Tool, ToolError},
@@ -9,10 +8,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use shared_api::CommandOrigin;
 use shared_server::{
-    get_sub_client,
+    get_pubsub_client,
     models::{Command, PreapprovedCode},
     notify_server,
     schema::{commands, preapproved_code},
+    wait_for_pubsub_msg,
 };
 use std::{error::Error, str::FromStr, time::SystemTime};
 use uuid::Uuid;
@@ -77,13 +77,11 @@ impl ExecuteCodeTool {
         };
         let cmd: Command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
         let cmd_id = cmd.id.ok_or("Invalid command")?;
-        let sub_client = get_sub_client().await?;
-        sub_client.subscribe(format!("MASTER:CMD:{}", cmd_id)).await?;
-        let mut receiver = sub_client.message_rx();
+        let (mut pubsub_client, mut receiver) = get_pubsub_client().await?;
+        pubsub_client.subscribe(format!("MASTER:CMD:{}", cmd_id)).await?;
         diesel::update(commands::table.find(cmd_id)).set(commands::completed.eq(false)).execute(&mut db)?;
         notify_server(&format!("API:DEVICE:{}", device_uuid)).await?;
-        receiver.recv().await?;
-        sub_client.quit().await?;
+        wait_for_pubsub_msg(&mut receiver).await;
         let cmd: Command = commands::table.find(cmd_id).get_result(&mut db)?;
         diesel::delete(commands::table.find(cmd_id)).execute(&mut db)?;
         let stdout = if args.return_stdout { cmd.stdout } else { "".to_string() };

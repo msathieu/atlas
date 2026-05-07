@@ -20,7 +20,6 @@ base64 = "0.22.1"
 axum-extra = {version = "0.12.0", features = ["typed-header"]}
 tower-http = {version = "0.6.6", features = ["cors", "fs"]}
 gethostname = "1.0.2"
-fred = "10.1.0"
 aws-lc-rs = "1.16.3"
 serde_json = "1.0.149"
 sha2 = "0.11.0"

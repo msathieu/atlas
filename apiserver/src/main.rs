@@ -9,10 +9,6 @@ use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, Pool},
 };
-use fred::{
-    clients::SubscriberClient,
-    prelude::{ClientLike, EventInterface, PubsubInterface},
-};
 use prost::Message;
 use rustls::{
     ServerConfig,
@@ -29,10 +25,11 @@ use shared_api::{
 };
 use shared_server::{
     binary::personalize_binary,
-    get_db_pool, get_sub_client, listen_for_restarts,
+    get_db_pool, get_pubsub_client, listen_for_restarts,
     models::{Command, Device, Setting},
     notify_server,
     schema::{commands, devices, settings},
+    wait_for_pubsub_msg,
 };
 use std::{
     error::Error,
@@ -85,24 +82,14 @@ async fn accept_connection(listener: &TcpListener, tls_acceptor: TlsAcceptor, po
     let (stream, addr) = listener.accept().await?;
     let ip = addr.ip().to_string();
     tokio::spawn(async {
-        let sub_client = match get_sub_client().await {
-            Ok(client) => client,
-            Err(e) => {
-                println!("Error connecting to Valkey: {}", e);
-                return;
-            }
-        };
-        if let Err(e) = handle_connection(stream, ip, tls_acceptor, pool, &sub_client).await {
+        if let Err(e) = handle_connection(stream, ip, tls_acceptor, pool).await {
             println!("Error in connection: {}", e);
-        }
-        if let Err(e) = sub_client.quit().await {
-            println!("Error closing Valkey connection: {}", e);
         }
     });
     Ok(())
 }
 
-async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAcceptor, pool: Pool<ConnectionManager<PgConnection>>, sub_client: &SubscriberClient) -> Result<(), Box<dyn Error>> {
+async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAcceptor, pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
     let mut stream = tls_acceptor.accept(stream).await?;
     let mut db = pool.get()?;
     let (_, buf) = read_message(&mut stream, Some(MessageType::HandshakeRequest)).await?;
@@ -202,8 +189,8 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         }
     }
 
-    sub_client.subscribe(format!("API:DEVICE:{}", uuid)).await?;
-    let mut receiver = sub_client.message_rx();
+    let (mut pubsub_client, mut receiver) = get_pubsub_client().await?;
+    pubsub_client.subscribe(format!("API:DEVICE:{}", uuid)).await?;
     loop {
         let device_exists = devices::table.find(uuid).first::<Device>(&mut db).optional()?.is_some();
         if !device_exists {
@@ -250,8 +237,8 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
             } else if command.origin == CommandOrigin::LLMTool as i32 {
                 notify_server(&format!("MASTER:CMD:{}", command.id.ok_or("Invalid command")?)).await?;
             }
-        } else if timeout(Duration::from_secs(30), async {
-            receiver.recv().await.ok();
+        } else if timeout(Duration::from_secs(60), async {
+            wait_for_pubsub_msg(&mut receiver).await;
         })
         .await
         .is_err()

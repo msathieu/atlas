@@ -20,6 +20,7 @@ export async function connectWS(fn?: (input: RequestInfo | URL, init?: RequestIn
       if (msg.data === "POLL") {
         await invalidateAll();
       }
+      wsState.ws?.send("");
     });
   }
 }

@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 base64 = "0.22.1"
 diesel = {version = "2.2.12", features = ["postgres", "r2d2", "uuid"]}
-fred = {version = "10.1.0", features = ["subscriber-client"]}
 object = "0.39.1"
+redis = {version = "1.2.1", features = ["connection-manager", "tokio-comp"]}
 tokio = {version = "1.48.0", features = ["fs"]}
 uuid = "1.18.1"

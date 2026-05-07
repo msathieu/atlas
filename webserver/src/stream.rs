@@ -9,12 +9,8 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::Response,
 };
-use fred::{
-    clients::SubscriberClient,
-    prelude::{ClientLike, EventInterface, PubsubInterface},
-};
 use serde::{Deserialize, Serialize};
-use shared_server::get_sub_client;
+use shared_server::{get_pubsub_client, wait_for_pubsub_msg};
 use std::{error::Error, time::Duration};
 use tokio::time::timeout;
 
@@ -41,26 +37,17 @@ pub async fn stream(query: Query<StreamAuth>, socket: WebSocketUpgrade) -> Respo
     socket.on_upgrade(stream_wrapper)
 }
 async fn stream_wrapper(socket: WebSocket) {
-    let sub_client = match get_sub_client().await {
-        Ok(client) => client,
-        Err(e) => {
-            println!("Error connecting to Valkey: {}", e);
-            return;
-        }
-    };
-    stream_handler(socket, &sub_client).await.ok();
-    if let Err(e) = sub_client.quit().await {
-        println!("Error closing Valkey connection: {}", e);
-    }
+    stream_handler(socket).await.ok();
 }
-async fn stream_handler(mut socket: WebSocket, sub_client: &SubscriberClient) -> Result<(), Box<dyn Error>> {
-    sub_client.subscribe("WEB:REFRESH").await?;
-    let mut receiver = sub_client.message_rx();
+async fn stream_handler(mut socket: WebSocket) -> Result<(), Box<dyn Error>> {
+    let (mut pubsub_client, mut receiver) = get_pubsub_client().await?;
+    pubsub_client.subscribe("WEB:REFRESH").await?;
     loop {
-        if timeout(Duration::from_secs(30), async { receiver.recv().await.ok() }).await.is_ok() {
+        if timeout(Duration::from_secs(30), async { wait_for_pubsub_msg(&mut receiver).await }).await.is_ok() {
             socket.send("POLL".into()).await?;
         } else {
             socket.send("".into()).await?;
         }
+        socket.recv().await.ok_or("No message received")??;
     }
 }
