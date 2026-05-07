@@ -1,4 +1,7 @@
-use crate::{JWT_KEY, get_db, util::decrypt_body};
+use crate::{
+    JWT_KEY, get_db,
+    util::{decrypt_body, validate_timestamp},
+};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use aws_lc_rs::signature::{ED25519, ParsedPublicKey, UnparsedPublicKey};
 use axum::{
@@ -68,11 +71,7 @@ pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) 
 }
 pub async fn login(body: Bytes) -> Result<Json<LoginResponse>, StatusCode> {
     let request: LoginRequest = serde_json::from_str(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
-    let now = SystemTime::now();
-    let now = now.duration_since(UNIX_EPOCH).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.as_secs();
-    if now + 10 < request.timestamp || now > request.timestamp + 30 {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
+    validate_timestamp(request.timestamp)?;
     let mut db = get_db()?;
     let user: User = users::table.filter(users::username.eq(request.username)).first(&mut db).or(Err(StatusCode::UNAUTHORIZED))?;
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::UNAUTHORIZED))?;

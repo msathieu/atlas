@@ -29,11 +29,22 @@ pub fn decrypt_body(body: Bytes) -> Result<String, StatusCode> {
 }
 pub fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, method: &str) -> Result<(), StatusCode> {
     let signature = headers.get("X-Request-Signature").ok_or(StatusCode::UNAUTHORIZED)?;
+    let timestamp = headers.get("X-Request-Timestamp").ok_or(StatusCode::UNAUTHORIZED)?.to_str().or(Err(StatusCode::UNAUTHORIZED))?;
+    let timestamp: u64 = timestamp.parse().or(Err(StatusCode::UNAUTHORIZED))?;
     let signature = BASE64_STANDARD.decode(signature).or(Err(StatusCode::UNAUTHORIZED))?;
     let pubkey = authenticate(headers)?.1.ok_or(StatusCode::UNAUTHORIZED)?;
     let uri_hashed = BASE64_STANDARD.encode(Sha512::digest(uri.to_string()));
     let body_hashed = BASE64_STANDARD.encode(Sha512::digest(body));
-    let hash = format!("{}-{}-{}", method, uri_hashed, body_hashed);
+    let hash = format!("{}-{}-{}-{}", method, timestamp, uri_hashed, body_hashed);
     pubkey.verify_sig(hash.as_bytes(), &signature).or(Err(StatusCode::UNAUTHORIZED))?;
+    validate_timestamp(timestamp)?;
+    Ok(())
+}
+pub fn validate_timestamp(timestamp: u64) -> Result<(), StatusCode> {
+    let now = SystemTime::now();
+    let now = now.duration_since(UNIX_EPOCH).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.as_secs();
+    if now + 10 < timestamp || now - 10 > timestamp {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
     Ok(())
 }

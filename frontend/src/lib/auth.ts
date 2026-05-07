@@ -39,7 +39,9 @@ export async function authenticatedFetch(
   if (!method) {
     method = "GET";
   }
-  init["headers"].append("X-Request-Signature", await signRequest(method + "-" + bufferToBase64(url_hash) + "-" + bufferToBase64(body_hash)));
+  const timestamp = Math.floor(Date.now() / 1000);
+  init["headers"].append("X-Request-Timestamp", String(timestamp));
+  init["headers"].append("X-Request-Signature", await signRequest(method + "-" + String(timestamp) + "-" + bufferToBase64(url_hash) + "-" + bufferToBase64(body_hash)));
   const response = await fn(url, init);
   if (response.status === 401) {
     localStorage.clear();
