@@ -1,8 +1,9 @@
 <script lang="ts">
   import { authenticatedFetch } from "$lib/auth.ts";
-  import { BadgeCheck, BadgeX, Bot, CircleUser, SendHorizontal } from "@lucide/svelte";
+  import { BadgeCheck, BadgeX, Bot, CircleUser, SendHorizontal, Trash } from "@lucide/svelte";
   import { marked } from "marked";
   import DOMPurify from "dompurify";
+  import { formatTime } from "$lib/util";
   let { data } = $props();
   let content = $state("");
 
@@ -12,6 +13,11 @@
       body: JSON.stringify({ content }),
     });
     content = "";
+  }
+  async function deleteMessage(seq: number) {
+    await authenticatedFetch(`/api/chats/${data.id}/${seq}`, {
+      method: "DELETE",
+    });
   }
   function disableSend(): boolean {
     if (data.chat.messages.length === 0) {
@@ -42,7 +48,7 @@
 
 {#each data.chat.messages as message}
   <div class="chat" class:chat-start={!message.user_message} class:chat-end={message.user_message}>
-    <div class="chat-image dropdown dropdown-hover">
+    <div class="chat-image dropdown dropdown-hover" class:dropdown-end={message.user_message}>
       <div>
         {#if message.user_message}
           <CircleUser size="48" />
@@ -50,13 +56,22 @@
           <Bot size="48" />
         {/if}
       </div>
-      {#if !message.user_message}
-        <div class="dropdown-content menu bg-base-200 w-50">
+      <div class="dropdown-content menu bg-base-200 w-50">
+        <p>Time: {formatTime(message.sent_on)}</p>
+        {#if !message.user_message}
           <p>Model: {message.model}</p>
           <p>Input Tokens: {message.input_tokens}</p>
           <p>Output Tokens: {message.output_tokens}</p>
-        </div>
-      {/if}
+        {/if}
+        <button
+          class="btn w-15"
+          onclick={async () => {
+            await deleteMessage(message.sequence);
+          }}
+        >
+          <Trash />
+        </button>
+      </div>
     </div>
     <div class="chat-bubble whitespace-pre-wrap break-all">
       {#if message.reasoning}

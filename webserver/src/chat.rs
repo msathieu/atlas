@@ -290,3 +290,19 @@ pub async fn manage_tool_call_consent(headers: HeaderMap, Path((id, seq, call_id
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(())
 }
+pub async fn delete_message(headers: HeaderMap, Path((id, seq)): Path<(String, i32)>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
+    let user = authenticate(&headers)?.0;
+    validate_signature(&headers, uri.0, &body, "DELETE")?;
+    let mut db = get_db()?;
+    let chat_uuid = Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?;
+    let _chat: Chat = chats::table
+        .filter(chats::id.eq(chat_uuid).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
+        .get_result(&mut db)
+        .or(Err(StatusCode::NOT_FOUND))?;
+    diesel::delete(messages::table.filter(messages::chat.eq(chat_uuid).and(messages::sequence.eq(seq))))
+        .execute(&mut db)
+        .or(Err(StatusCode::NOT_FOUND))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("MASTER:LLM").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    Ok(())
+}

@@ -21,7 +21,7 @@
           openjdk
           openssl
           pkg-config
-          postgresql
+          postgresql_18
           protobuf
           sdkmanager
           sqlite-interactive

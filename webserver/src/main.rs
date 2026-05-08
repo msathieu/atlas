@@ -3,7 +3,7 @@
 use crate::{
     agent::{download_agent, download_auth},
     auth::login,
-    chat::{chats_list, create_chat, delete_chat, get_chat, manage_tool_call_consent, send_message},
+    chat::{chats_list, create_chat, delete_chat, delete_message, get_chat, manage_tool_call_consent, send_message},
     commands::{commands_list, create_command, delete_command},
     devices::{approve_device, delete_device, devices_list},
     info::server_info,
@@ -72,6 +72,7 @@ async fn main() {
         .route("/api/chats/{id}", delete(delete_chat))
         .route("/api/chats/{id}", get(get_chat))
         .route("/api/chats/{id}", post(send_message))
+        .route("/api/chats/{id}/{seq}", delete(delete_message))
         .route("/api/chats/{id}/{seq}/{call_id}/consent", post(manage_tool_call_consent))
         .route("/api/settings/{name}", get(get_setting))
         .route("/api/settings/{name}", put(update_setting))
