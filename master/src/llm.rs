@@ -5,7 +5,7 @@ use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, Pool},
 };
-use rig::{
+use rig_core::{
     OneOrMany,
     agent::Text,
     client::CompletionClient,
@@ -153,7 +153,7 @@ The servers you can access are: {}
     let mut ai_messages = Vec::new();
     for msg in messages {
         if msg.user_message {
-            ai_messages.push(rig::message::Message::user(msg.content.clone()));
+            ai_messages.push(rig_core::message::Message::user(msg.content.clone()));
         } else {
             let tool_calls: Vec<ToolCall> = tool_calls::table.filter(tool_calls::chat.eq(chat_id).and(tool_calls::sequence.eq(msg.sequence))).get_results(&mut db)?;
             let mut parts = OneOrMany::one(AssistantContent::Text(Text { text: msg.content.clone() }));
@@ -162,7 +162,7 @@ The servers you can access are: {}
                     name: call.tool.clone(),
                     arguments: serde_json::from_str(&call.request)?,
                 };
-                parts.push(AssistantContent::ToolCall(rig::message::ToolCall {
+                parts.push(AssistantContent::ToolCall(rig_core::message::ToolCall {
                     id: call.call_id.clone(),
                     call_id: None,
                     function,
@@ -170,7 +170,7 @@ The servers you can access are: {}
                     signature: None,
                 }));
             }
-            ai_messages.push(rig::message::Message::Assistant { id: None, content: parts });
+            ai_messages.push(rig_core::message::Message::Assistant { id: None, content: parts });
             if !tool_calls.is_empty() {
                 let mut parts = Vec::new();
                 for call in &tool_calls {
@@ -182,7 +182,7 @@ The servers you can access are: {}
                     }));
                 }
                 let parts = OneOrMany::many(parts)?;
-                ai_messages.push(rig::message::Message::User { content: parts });
+                ai_messages.push(rig_core::message::Message::User { content: parts });
             }
         }
     }

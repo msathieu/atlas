@@ -1,6 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
-use rig::{
+use rig_core::{
     completion::ToolDefinition,
     tool::{Tool, ToolError},
 };

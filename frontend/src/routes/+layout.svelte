@@ -46,7 +46,7 @@
             <div class:status-success={data.connected && wsState.connected} class:status-error={!data.connected || !wsState.connected} class="status"></div>
             <span class="hidden lg:block">{data.info.hostname}
               <br />
-              Version {data.info.version || "Unknown"}
+              {data.info.version || "Unknown version"}
             </span>
           </div>
         </li>

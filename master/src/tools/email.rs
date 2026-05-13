@@ -5,7 +5,7 @@ use lettre::{
     message::{Mailbox, header::ContentType},
     transport::smtp::authentication::Credentials,
 };
-use rig::{
+use rig_core::{
     completion::ToolDefinition,
     tool::{Tool, ToolError},
 };
