@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 alpine:3.23 AS agent-x86_64-linux-builder
+FROM --platform=linux/amd64 alpine:3.24 AS agent-x86_64-linux-builder
 RUN apk upgrade
 RUN apk add musl-dev protobuf gcc rustup
 RUN rustup-init -y

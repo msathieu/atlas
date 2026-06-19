@@ -12,7 +12,7 @@ jobs:
           extra_nix_config: |
             filter-syscalls = false
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: true
       - name: Build

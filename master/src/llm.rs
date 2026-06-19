@@ -156,7 +156,10 @@ The servers you can access are: {}
             ai_messages.push(rig_core::message::Message::user(msg.content.clone()));
         } else {
             let tool_calls: Vec<ToolCall> = tool_calls::table.filter(tool_calls::chat.eq(chat_id).and(tool_calls::sequence.eq(msg.sequence))).get_results(&mut db)?;
-            let mut parts = OneOrMany::one(AssistantContent::Text(Text { text: msg.content.clone() }));
+            let mut parts = OneOrMany::one(AssistantContent::Text(Text {
+                text: msg.content.clone(),
+                additional_params: None,
+            }));
             for call in &tool_calls {
                 let function = ToolFunction {
                     name: call.tool.clone(),
@@ -178,7 +181,10 @@ The servers you can access are: {}
                     parts.push(UserContent::ToolResult(ToolResult {
                         id: call.call_id.clone(),
                         call_id: None,
-                        content: OneOrMany::one(ToolResultContent::Text(Text { text: response })),
+                        content: OneOrMany::one(ToolResultContent::Text(Text {
+                            text: response,
+                            additional_params: None,
+                        })),
                     }));
                 }
                 let parts = OneOrMany::many(parts)?;
