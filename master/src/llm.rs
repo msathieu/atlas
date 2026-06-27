@@ -173,6 +173,9 @@ The servers you can access are: {}
                     signature: None,
                 }));
             }
+            if let Some(reasoning) = msg.reasoning {
+                parts.push(AssistantContent::Reasoning(rig_core::message::Reasoning::new(&reasoning)));
+            }
             ai_messages.push(rig_core::message::Message::Assistant { id: None, content: parts });
             if !tool_calls.is_empty() {
                 let mut parts = Vec::new();

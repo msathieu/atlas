@@ -104,7 +104,7 @@ fn create_settings(db: &mut PgConnection) {
             diesel::insert_into(settings::table)
                 .values(Setting {
                     name: "openrouter_model".to_owned(),
-                    value: "z-ai/glm-5.1".to_string(),
+                    value: "z-ai/glm-5.2".to_string(),
                 })
                 .execute(db)?;
             diesel::insert_into(settings::table)
