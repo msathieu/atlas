@@ -139,7 +139,7 @@ async fn process_chat<C: CompletionClient>(chat: Chat, pool: Pool<ConnectionMana
     if chat.chat_type == ChatType::NonInteractive as i32 {
         chat_type_prompt =
             "This is a non-interactive session. Execute your task autonomously without prompting the user. Avoid tools that require approval, as they will end the chat until the user handles it.
-            Avoid sending messages without tool calls, as that too will halt the session."
+            Avoid sending messages without tool calls, as that too will halt the session. You can schedule executions by using the preapprove_code tool in combination with the sleep tool."
     }
     let preamble = format!(
         r#"You are an advanced AI tasked with system administration.

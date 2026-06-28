@@ -47,6 +47,7 @@ pub struct APIMessage {
     tool_calls: Vec<APIToolCall>,
     input_tokens: u64,
     output_tokens: u64,
+    provider: String,
     model: String,
 }
 #[derive(Serialize)]
@@ -192,6 +193,7 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>, uri: OriginalU
                 tool_calls,
                 input_tokens: message.input_tokens as u64,
                 output_tokens: message.output_tokens as u64,
+                provider: message.provider.clone(),
                 model: message.model.clone(),
             })
         })

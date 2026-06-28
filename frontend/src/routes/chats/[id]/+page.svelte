@@ -59,6 +59,7 @@
       <div class="dropdown-content menu bg-base-200 w-50">
         <p>Time: {formatTime(message.sent_on)}</p>
         {#if !message.user_message}
+          <p>Provider: {message.provider}</p>
           <p>Model: {message.model}</p>
           <p>Input Tokens: {message.input_tokens}</p>
           <p>Output Tokens: {message.output_tokens}</p>
