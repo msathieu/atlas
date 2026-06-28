@@ -11,7 +11,7 @@ use rig_core::{
     client::CompletionClient,
     completion::Completion,
     message::{AssistantContent, ReasoningContent, ToolFunction, ToolResult, ToolResultContent, UserContent},
-    providers::openrouter,
+    providers::{openai, openrouter},
     tools::ThinkTool,
 };
 use shared_api::ChatType;
@@ -26,9 +26,14 @@ use unicode_rs::security::{RiskLevel, analyze_text};
 pub async fn process_chats(pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
     let mut db = pool.get()?;
     let chats_vec: Vec<Chat> = chats::table.get_results(&mut db)?;
+    let llm_provider = settings::table.find("llm_default_provider").first::<Setting>(&mut db)?.value;
+    if llm_provider.is_empty() {
+        return Ok(());
+    }
     let mut tasks = Vec::new();
     for chat in chats_vec {
         let pool = pool.clone();
+        let llm_provider = llm_provider.clone();
         let chat_id;
         let error_count = chat.error_count;
         if let Some(id) = chat.id {
@@ -36,9 +41,36 @@ pub async fn process_chats(pool: Pool<ConnectionManager<PgConnection>>) -> Resul
         } else {
             continue;
         }
+        let (mut openrouter_client, mut generic_client) = (None, None);
+        let model;
+        match llm_provider.as_str() {
+            "openrouter" => {
+                let api_key = settings::table.find("llm_openrouter_key").first::<Setting>(&mut db)?;
+                model = settings::table.find("llm_openrouter_model").first::<Setting>(&mut db)?.value;
+                if api_key.value.is_empty() || model.is_empty() {
+                    return Ok(());
+                }
+                openrouter_client = Some(openrouter::Client::new(&api_key.value)?);
+            }
+            "generic" => {
+                let endpoint = settings::table.find("llm_generic_endpoint").first::<Setting>(&mut db)?;
+                let api_key = settings::table.find("llm_generic_key").first::<Setting>(&mut db)?;
+                model = settings::table.find("llm_generic_model").first::<Setting>(&mut db)?.value;
+                if endpoint.value.is_empty() || model.is_empty() {
+                    return Ok(());
+                }
+                generic_client = Some(openai::Client::builder().base_url(endpoint.value).api_key(&api_key.value).build()?);
+            }
+            _ => return Err("Invalid LLM provider")?,
+        };
         tasks.push(tokio::spawn(async move {
-            if let Err(e) = process_chat(chat, pool.clone(), error_count).await {
-                println!("Error while running tasks: {}", e);
+            let result = match llm_provider.as_str() {
+                "openrouter" => process_chat::<openrouter::Client>(chat, pool.clone(), error_count, &llm_provider, openrouter_client.unwrap(), model).await,
+                "generic" => process_chat::<openai::Client>(chat, pool.clone(), error_count, &llm_provider, generic_client.unwrap(), model).await,
+                _ => Err("Invalid LLM provider".into()),
+            };
+            if let Err(e) = result {
+                println!("Error while processing chats: {}", e);
                 if let Ok(mut db) = pool.get() {
                     diesel::update(chats::table.find(chat_id)).set(chats::error_count.eq(error_count + 1)).execute(&mut db).ok();
                 }
@@ -47,12 +79,12 @@ pub async fn process_chats(pool: Pool<ConnectionManager<PgConnection>>) -> Resul
     }
     for i in tasks {
         if let Err(e) = i.await {
-            println!("Error while running tasks: {}", e);
+            println!("Error while processing chats: {}", e);
         }
     }
     Ok(())
 }
-async fn process_chat(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, error_count: i32) -> Result<(), Box<dyn Error>> {
+async fn process_chat<C: CompletionClient>(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, error_count: i32, provider: &str, client: C, model: String) -> Result<(), Box<dyn Error>> {
     let mut db = pool.get()?;
     let chat_id = chat.id.ok_or("Invalid chat")?;
     let messages: Vec<Message> = messages::table.filter(messages::chat.eq(chat_id)).order_by(messages::sequence.asc()).get_results(&mut db)?;
@@ -67,11 +99,6 @@ async fn process_chat(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, e
     if unfinished_tools != 0 {
         return Ok(());
     }
-    let api_key = settings::table.find("openrouter_key").first::<Setting>(&mut db)?;
-    let model = settings::table.find("openrouter_model").first::<Setting>(&mut db)?;
-    if api_key.value.is_empty() || model.value.is_empty() {
-        return Ok(());
-    }
     if error_count >= 5 || chat.consecutive_llm_messages > chat.max_consecutive_llm_messages {
         let mut reply = Message {
             chat: chat_id,
@@ -84,6 +111,7 @@ async fn process_chat(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, e
             reasoning: None,
             input_tokens: 0,
             output_tokens: 0,
+            provider: "internal".to_owned(),
             model: "".to_owned(),
         };
         if error_count < 5 {
@@ -133,9 +161,8 @@ The servers you can access are: {}
 "#,
         chat_type_prompt, device_names
     );
-    let client: openrouter::Client = openrouter::Client::new(&api_key.value)?;
     let agent = client
-        .agent(&model.value)
+        .agent(&model)
         .preamble(&preamble)
         .tool(DeviceInfoTool)
         .tool(EmailTool)
@@ -167,7 +194,7 @@ The servers you can access are: {}
                 };
                 parts.push(AssistantContent::ToolCall(rig_core::message::ToolCall {
                     id: call.call_id.clone(),
-                    call_id: None,
+                    call_id: call.provider_id.clone(),
                     function,
                     additional_params: None,
                     signature: None,
@@ -183,7 +210,7 @@ The servers you can access are: {}
                     let response = call.response.clone().ok_or("Invalid tool call")?;
                     parts.push(UserContent::ToolResult(ToolResult {
                         id: call.call_id.clone(),
-                        call_id: None,
+                        call_id: call.provider_id.clone(),
                         content: OneOrMany::one(ToolResultContent::Text(Text {
                             text: response,
                             additional_params: None,
@@ -231,6 +258,7 @@ The servers you can access are: {}
                     response: None,
                     user_consented: consent,
                     initiated: false,
+                    provider_id: call.call_id,
                 });
             }
             AssistantContent::Reasoning(reasoning_arg) => {
@@ -264,12 +292,13 @@ The servers you can access are: {}
         content,
         sent_on: SystemTime::now(),
         user_message: false,
-        generation_id: Some(completion.raw_response.id),
+        generation_id: completion.message_id,
         finished: calls.is_empty(),
         reasoning,
         input_tokens: completion.usage.input_tokens as i32,
         output_tokens: completion.usage.output_tokens as i32,
-        model: model.value,
+        provider: provider.to_owned(),
+        model,
     };
     db.transaction(|db| {
         insert_into(messages::table).values(reply).execute(db)?;

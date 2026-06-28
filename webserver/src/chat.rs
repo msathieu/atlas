@@ -250,6 +250,7 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, uri: Origi
         reasoning: None,
         input_tokens: 0,
         output_tokens: 0,
+        provider: "user".to_owned(),
         model: "".to_owned(),
     };
     diesel::update(chats::table.find(chat_id))

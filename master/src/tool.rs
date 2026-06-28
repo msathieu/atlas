@@ -22,13 +22,13 @@ pub async fn process_tool_calls(pool: Pool<ConnectionManager<PgConnection>>) -> 
         let pool = pool.clone();
         tasks.push(tokio::spawn(async {
             if let Err(e) = process_tool_call(call, pool).await {
-                println!("Error while running tasks: {}", e);
+                println!("Error while processing tool calls: {}", e);
             }
         }));
     }
     for i in tasks {
         if let Err(e) = i.await {
-            println!("Error while running tasks: {}", e);
+            println!("Error while processing tool calls: {}", e);
         }
     }
     Ok(())

@@ -106,6 +106,7 @@ pub struct Message {
     pub reasoning: Option<String>,
     pub input_tokens: i32,
     pub output_tokens: i32,
+    pub provider: String,
     pub model: String,
 }
 
@@ -121,6 +122,7 @@ pub struct ToolCall {
     pub response: Option<String>,
     pub user_consented: Option<bool>,
     pub initiated: bool,
+    pub provider_id: Option<String>,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]

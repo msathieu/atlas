@@ -24,13 +24,13 @@ pub async fn process_devices(pool: Pool<ConnectionManager<PgConnection>>) -> Res
         let pool = pool.clone();
         tasks.push(tokio::spawn(async {
             if let Err(e) = process_device(device, pool).await {
-                println!("Error while running tasks: {}", e);
+                println!("Error while processing devices: {}", e);
             }
         }));
     }
     for i in tasks {
         if let Err(e) = i.await {
-            println!("Error while running tasks: {}", e);
+            println!("Error while processing devices: {}", e);
         }
     }
     Ok(())

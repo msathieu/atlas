@@ -34,7 +34,10 @@ pub async fn get_setting(headers: HeaderMap, Path(name): Path<String>, uri: Orig
         "mail_username",
         "mail_from",
         "mail_to",
-        "openrouter_model",
+        "llm_default_provider",
+        "llm_generic_endpoint",
+        "llm_generic_model",
+        "llm_openrouter_model",
         "tls_cert",
     ];
     if !allowed_settings.contains(&name.as_str()) {
@@ -59,8 +62,12 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
         "mail_password",
         "mail_from",
         "mail_to",
-        "openrouter_model",
-        "openrouter_key",
+        "llm_default_provider",
+        "llm_generic_endpoint",
+        "llm_generic_key",
+        "llm_generic_model",
+        "llm_openrouter_key",
+        "llm_openrouter_model",
     ];
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);

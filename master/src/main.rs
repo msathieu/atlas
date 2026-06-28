@@ -103,14 +103,38 @@ fn create_settings(db: &mut PgConnection) {
                 .execute(db)?;
             diesel::insert_into(settings::table)
                 .values(Setting {
-                    name: "openrouter_model".to_owned(),
-                    value: "z-ai/glm-5.2".to_string(),
+                    name: "llm_default_provider".to_owned(),
+                    value: "openrouter".to_string(),
                 })
                 .execute(db)?;
             diesel::insert_into(settings::table)
                 .values(Setting {
-                    name: "openrouter_key".to_owned(),
+                    name: "llm_generic_endpoint".to_owned(),
                     value: "".to_string(),
+                })
+                .execute(db)?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "llm_generic_key".to_owned(),
+                    value: "".to_string(),
+                })
+                .execute(db)?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "llm_generic_model".to_owned(),
+                    value: "".to_string(),
+                })
+                .execute(db)?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "llm_openrouter_key".to_owned(),
+                    value: "".to_string(),
+                })
+                .execute(db)?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "llm_openrouter_model".to_owned(),
+                    value: "z-ai/glm-5.2".to_string(),
                 })
                 .execute(db)?;
             diesel::insert_into(settings::table)

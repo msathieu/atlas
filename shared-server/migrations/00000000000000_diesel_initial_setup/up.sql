@@ -53,6 +53,7 @@ CREATE TABLE messages(
     reasoning varchar,
     input_tokens integer NOT NULL,
     output_tokens integer NOT NULL,
+    provider varchar NOT NULL,
     model varchar NOT NULL,
     PRIMARY KEY(chat, sequence)
 );
@@ -65,6 +66,7 @@ CREATE TABLE tool_calls(
     response varchar,
     user_consented boolean,
     initiated boolean NOT NULL,
+    provider_id varchar,
     PRIMARY KEY(chat, sequence, call_id),
     FOREIGN KEY (chat, sequence) REFERENCES messages ON DELETE CASCADE
 );

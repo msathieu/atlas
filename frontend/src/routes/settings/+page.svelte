@@ -6,8 +6,12 @@
   import Setting from "./Setting.svelte";
 
   let { data } = $props();
+  let defaultProvider = $derived(data.defaultProvider.value);
   let openrouterModel = $derived(data.openrouterModel.value);
   let openrouterKey = $state("");
+  let genericEndpoint = $derived(data.genericEndpoint.value);
+  let genericModel = $derived(data.genericModel.value);
+  let genericKey = $state("");
   let allowNewDevices = $derived(data.allowNewDevices.value === "true");
   let apiServerHost = $derived(data.apiserverHost.value);
   let mailServer = $derived(data.mailServer.value);
@@ -31,8 +35,12 @@
   }
 </script>
 
-<Setting name="openrouter_model" description="Openrouter Model" val={openrouterModel} />
-<Setting name="openrouter_key" description="Openrouter API Key" val={openrouterKey} />
+<Setting name="llm_default_provider" description="Default LLM Provider" val={defaultProvider} />
+<Setting name="llm_openrouter_model" description="Openrouter Model" val={openrouterModel} />
+<Setting name="llm_openrouter_key" description="Openrouter API Key" val={openrouterKey} />
+<Setting name="llm_generic_endpoint" description="Generic LLM Endpoint" val={genericEndpoint} />
+<Setting name="llm_generic_model" description="Generic LLM Model" val={genericModel} />
+<Setting name="llm_generic_key" description="Generic LLM API Key" val={genericKey} />
 
 <h1 class="text-xl">Allow New Devices</h1>
 <br />

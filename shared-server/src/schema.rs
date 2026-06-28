@@ -74,6 +74,7 @@ diesel::table! {
         reasoning -> Nullable<Varchar>,
         input_tokens -> Int4,
         output_tokens -> Int4,
+        provider -> Varchar,
         model -> Varchar,
     }
 }
@@ -103,6 +104,7 @@ diesel::table! {
         response -> Nullable<Varchar>,
         user_consented -> Nullable<Bool>,
         initiated -> Bool,
+        provider_id -> Nullable<Varchar>,
     }
 }
 
