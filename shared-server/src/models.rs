@@ -108,6 +108,7 @@ pub struct Message {
     pub output_tokens: i32,
     pub provider: String,
     pub model: String,
+    pub compacted: bool,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]

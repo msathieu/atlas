@@ -76,6 +76,7 @@ diesel::table! {
         output_tokens -> Int4,
         provider -> Varchar,
         model -> Varchar,
+        compacted -> Bool,
     }
 }
 

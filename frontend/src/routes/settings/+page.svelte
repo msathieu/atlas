@@ -49,7 +49,7 @@
     await updateSetting("allow_new_devices", String(allowNewDevices));
   }}
 >
-  <input type="checkbox" class="checkbox" bind:checked={allowNewDevices} />
+  <input id="allowNewDevices" type="checkbox" class="checkbox" bind:checked={allowNewDevices} />
   <button class="btn"><Check /></button>
 </form>
 <br />

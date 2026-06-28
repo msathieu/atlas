@@ -1,4 +1,4 @@
-use crate::tools::{device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, preapprove_code::PreapproveCodeTool, sleep::SleepTool, time::TimeTool};
+use crate::tools::{compact::CompactTool, device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, preapprove_code::PreapproveCodeTool, sleep::SleepTool, time::TimeTool};
 use diesel::{
     PgConnection,
     dsl::insert_into,
@@ -113,6 +113,7 @@ async fn process_chat<C: CompletionClient>(chat: Chat, pool: Pool<ConnectionMana
             output_tokens: 0,
             provider: "internal".to_owned(),
             model: "".to_owned(),
+            compacted: false,
         };
         if error_count < 5 {
             reply.content = "Maximum number of consecutive LLM messages reached".into();
@@ -139,7 +140,8 @@ async fn process_chat<C: CompletionClient>(chat: Chat, pool: Pool<ConnectionMana
     if chat.chat_type == ChatType::NonInteractive as i32 {
         chat_type_prompt =
             "This is a non-interactive session. Execute your task autonomously without prompting the user. Avoid tools that require approval, as they will end the chat until the user handles it.
-            Avoid sending messages without tool calls, as that too will halt the session. You can schedule executions by using the preapprove_code tool in combination with the sleep tool."
+            Avoid sending messages without tool calls, as that too will halt the session. You can schedule executions by using the preapprove_code tool in combination with the sleep tool.
+            Try to hide superfluous messages from the context when possible with the compact tool."
     }
     let preamble = format!(
         r#"You are an advanced AI tasked with system administration.
@@ -168,7 +170,7 @@ The servers you can access are: {}
         .tool(EmailTool)
         .tool(ExecuteCodeTool {
             user: chat.uid,
-            chat: chat.id.ok_or("Invalid code")?,
+            chat: chat.id.ok_or("Invalid chat")?,
             sequence: 0,
             tool_call_id: "".to_string(),
         })
@@ -176,9 +178,16 @@ The servers you can access are: {}
         .tool(ThinkTool)
         .tool(TimeTool)
         .tool(SleepTool)
+        .tool(CompactTool {
+            chat: chat.id.ok_or("Invalid chat")?,
+            sequence: 0,
+        })
         .build();
     let mut ai_messages = Vec::new();
     for msg in messages {
+        if msg.compacted {
+            continue;
+        }
         if msg.user_message {
             ai_messages.push(rig_core::message::Message::user(msg.content.clone()));
         } else {
@@ -227,7 +236,7 @@ The servers you can access are: {}
     let mut text = None;
     let mut calls = Vec::new();
     let mut reasoning = None;
-    let auto_approved_tools = ["device_info", "email", "sleep", "think", "time"];
+    let auto_approved_tools = ["device_info", "email", "sleep", "think", "time", "compact"];
     for part in completion.choice {
         match part {
             AssistantContent::Text(text_part) => {
@@ -299,6 +308,7 @@ The servers you can access are: {}
         output_tokens: completion.usage.output_tokens as i32,
         provider: provider.to_owned(),
         model,
+        compacted: false,
     };
     db.transaction(|db| {
         insert_into(messages::table).values(reply).execute(db)?;

@@ -64,6 +64,9 @@
           <p>Input Tokens: {message.input_tokens}</p>
           <p>Output Tokens: {message.output_tokens}</p>
         {/if}
+        {#if message.compacted}
+          <p>Message Compacted</p>
+        {/if}
         <button
           class="btn w-15"
           onclick={async () => {

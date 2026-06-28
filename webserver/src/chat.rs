@@ -49,6 +49,7 @@ pub struct APIMessage {
     output_tokens: u64,
     provider: String,
     model: String,
+    compacted: bool,
 }
 #[derive(Serialize)]
 pub struct APIChatDetailed {
@@ -111,8 +112,10 @@ pub async fn create_chat(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
         }
     };
     let mut refresh_time = None;
+    let mut max_consecutive_llm_messages = 20;
     if chat_type == ChatType::NonInteractive {
         refresh_time = Some(SystemTime::now().checked_add(Duration::from_hours(24)).ok_or(StatusCode::INTERNAL_SERVER_ERROR)?);
+        max_consecutive_llm_messages = 50;
     }
     let mut db = get_db()?;
     let mut chat = Chat {
@@ -123,7 +126,7 @@ pub async fn create_chat(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
         end_timestamp: SystemTime::now(),
         error_count: 0,
         consecutive_llm_messages: 0,
-        max_consecutive_llm_messages: 20,
+        max_consecutive_llm_messages,
         chat_type: chat_type as i32,
         refresh_consecutive_llm_messages: refresh_time,
     };
@@ -195,6 +198,7 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>, uri: OriginalU
                 output_tokens: message.output_tokens as u64,
                 provider: message.provider.clone(),
                 model: message.model.clone(),
+                compacted: message.compacted,
             })
         })
         .collect();
@@ -254,6 +258,7 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, uri: Origi
         output_tokens: 0,
         provider: "user".to_owned(),
         model: "".to_owned(),
+        compacted: false,
     };
     diesel::update(chats::table.find(chat_id))
         .set((chats::end_timestamp.eq(SystemTime::now()), chats::error_count.eq(0), chats::consecutive_llm_messages.eq(0)))

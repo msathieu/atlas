@@ -48,13 +48,14 @@ CREATE TABLE messages(
     content varchar NOT NULL,
     sent_on timestamp NOT NULL,
     user_message boolean NOT NULL,
-    generation_id varchar UNIQUE,
+    generation_id varchar,
     finished boolean NOT NULL,
     reasoning varchar,
     input_tokens integer NOT NULL,
     output_tokens integer NOT NULL,
     provider varchar NOT NULL,
     model varchar NOT NULL,
+    compacted boolean NOT NULL,
     PRIMARY KEY(chat, sequence)
 );
 CREATE TABLE tool_calls(

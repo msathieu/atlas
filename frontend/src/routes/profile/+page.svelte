@@ -53,9 +53,9 @@
       }}
     >
       <fieldset class="fieldset">
-        <input type="password" placeholder="Old password" class="input" required bind:value={oldPassword} />
-        <input type="password" placeholder="New password" class="input" required bind:value={newPassword} />
-        <input type="password" placeholder="Confirm password" class="input" required bind:value={passwordConfirmation} />
+        <input id="oldPassword" type="password" placeholder="Old password" class="input" required autocomplete="current-password" bind:value={oldPassword} />
+        <input id="newPassword" type="password" placeholder="New password" class="input" required autocomplete="new-password" bind:value={newPassword} />
+        <input id="passwordConfirmation" type="password" placeholder="Confirm password" class="input" required autocomplete="new-password" bind:value={passwordConfirmation} />
         <button class="btn btn-primary">Update</button>
       </fieldset>
     </form>

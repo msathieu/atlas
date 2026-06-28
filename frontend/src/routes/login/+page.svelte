@@ -41,8 +41,8 @@
       }}
     >
       <fieldset class="fieldset">
-        <input type="text" placeholder="Username" class="input" required bind:value={username} />
-        <input type="password" placeholder="Password" class="input" required bind:value={password} />
+        <input id="username" type="text" placeholder="Username" class="input" required autocomplete="username" bind:value={username} />
+        <input id="password" type="password" placeholder="Password" class="input" required autocomplete="current-password" bind:value={password} />
         <button class="btn btn-primary">Login</button>
       </fieldset>
     </form>

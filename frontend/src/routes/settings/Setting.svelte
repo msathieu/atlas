@@ -12,7 +12,7 @@
     await updateSetting(name, val);
   }}
 >
-  <input type="text" placeholder={description} class="input" bind:value={val} />
+  <input id={name} type="text" placeholder={description} class="input" bind:value={val} />
   <button class="btn"><Check /></button>
 </form>
 <br />
