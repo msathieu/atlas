@@ -23,9 +23,13 @@
 <div class="drawer drawer-open h-screen">
   <input id="sidebar" type="checkbox" class="drawer-toggle" />
   <div class="drawer-content p-10 overflow-auto">
-    {@render children()}
+    {#if data.client_error}
+      <p>Incorrect client for this server, reload the page or reinstall the client.</p>
+    {:else}
+      {@render children()}
+    {/if}
   </div>
-  {#if page.url.pathname !== "/login"}
+  {#if page.url.pathname !== "/login" && !data.client_error}
     <div class="drawer-side">
       <ul class="menu bg-base-200 min-h-full">
         <li>

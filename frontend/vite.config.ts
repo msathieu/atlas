@@ -10,7 +10,7 @@ export default defineConfig({
         thirdParty: {
           multipleVersions: true,
           output: {
-            file: "static/THIRD-PARTY.txt",
+            file: ".svelte-kit/output/client/THIRD-PARTY.txt",
           },
         },
       })],
