@@ -6,19 +6,19 @@
   import Setting from "./Setting.svelte";
 
   let { data } = $props();
-  let defaultProvider = $derived(data.defaultProvider.value);
-  let openrouterModel = $derived(data.openrouterModel.value);
+  let defaultProvider = $derived(data.defaultProvider);
+  let openrouterModel = $derived(data.openrouterModel);
   let openrouterKey = $state("");
-  let genericEndpoint = $derived(data.genericEndpoint.value);
-  let genericModel = $derived(data.genericModel.value);
+  let genericEndpoint = $derived(data.genericEndpoint);
+  let genericModel = $derived(data.genericModel);
   let genericKey = $state("");
-  let allowNewDevices = $derived(data.allowNewDevices.value === "true");
-  let apiServerHost = $derived(data.apiserverHost.value);
-  let mailServer = $derived(data.mailServer.value);
-  let mailUsername = $derived(data.mailUsername.value);
+  let allowNewDevices = $derived(data.allowNewDevices === "true");
+  let apiServerHost = $derived(data.apiserverHost);
+  let mailServer = $derived(data.mailServer);
+  let mailUsername = $derived(data.mailUsername);
   let mailPassword = $state("");
-  let mailFrom = $derived(data.mailFrom.value);
-  let mailTo = $derived(data.mailTo.value);
+  let mailFrom = $derived(data.mailFrom);
+  let mailTo = $derived(data.mailTo);
 
   let downloadLink: any = $state();
   let actuallyDownload = false;
@@ -63,7 +63,7 @@
 
 <h1 class="text-xl">API Certificate</h1>
 <br />
-<textarea disabled class="textarea w-3xl h-100 resize-none">{data.tlsCert.value}</textarea>
+<textarea disabled class="textarea w-3xl h-100 resize-none">{data.tlsCert}</textarea>
 <br />
 
 <a

@@ -7,7 +7,7 @@ use crate::{
     commands::{commands_list, create_command, delete_command},
     devices::{approve_device, delete_device, devices_list},
     info::server_info,
-    settings::{get_setting, restart_system, update_setting},
+    settings::{get_settings, restart_system, update_setting},
     stream::{stream, stream_auth},
     user::change_password,
 };
@@ -74,7 +74,7 @@ async fn main() {
         .route("/api/chats/{id}", post(send_message))
         .route("/api/chats/{id}/{seq}", delete(delete_message))
         .route("/api/chats/{id}/{seq}/{call_id}/consent", post(manage_tool_call_consent))
-        .route("/api/settings/{name}", get(get_setting))
+        .route("/api/settings", get(get_settings))
         .route("/api/settings/{name}", put(update_setting))
         .route("/api/login", post(login))
         .route("/api/stream", get(stream))

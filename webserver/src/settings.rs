@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     auth::require_admin,
     get_db,
@@ -10,20 +12,15 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use diesel::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use shared_server::{models::Setting, notify_server, schema::settings};
 
-#[derive(Serialize)]
-pub struct APISetting {
-    name: String,
-    value: String,
-}
 #[derive(Deserialize)]
 pub struct UpdateSettingRequest {
     value: String,
 }
 
-pub async fn get_setting(headers: HeaderMap, Path(name): Path<String>, uri: OriginalUri, body: Bytes) -> Result<Json<APISetting>, StatusCode> {
+pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<HashMap<String, String>>, StatusCode> {
     require_admin(&headers)?;
     validate_signature(&headers, uri.0, &body, "GET")?;
     let mut db = get_db()?;
@@ -40,14 +37,12 @@ pub async fn get_setting(headers: HeaderMap, Path(name): Path<String>, uri: Orig
         "llm_openrouter_model",
         "tls_cert",
     ];
-    if !allowed_settings.contains(&name.as_str()) {
-        return Err(StatusCode::NOT_FOUND);
+    let mut settings = HashMap::new();
+    for name in allowed_settings {
+        let setting: Setting = settings::table.find(name).get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        settings.insert(setting.name, setting.value);
     }
-    let setting: Setting = settings::table.find(name).get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    Ok(Json(APISetting {
-        name: setting.name,
-        value: setting.value,
-    }))
+    Ok(Json(settings))
 }
 pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
     require_admin(&headers)?;
