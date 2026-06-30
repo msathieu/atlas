@@ -1,5 +1,5 @@
 import { redirect } from "@sveltejs/kit";
-import { API_HOST, bufferToBase64, signRequest } from "./util.ts";
+import { API_HOST, bufferToBase64, signRequest, verifySignature } from "./util.ts";
 
 export async function authenticatedFetch(
   input: RequestInfo | URL,
@@ -33,18 +33,31 @@ export async function authenticatedFetch(
   if (typeof body === "string") {
     body = encoder.encode(body as string);
   }
-  const url_hash = await crypto.subtle.digest("SHA-512", encoder.encode(input.toString()));
-  const body_hash = await crypto.subtle.digest("SHA-512", body as ArrayBuffer);
+  const urlHash = await crypto.subtle.digest("SHA-512", encoder.encode(input.toString()));
+  const bodyHash = await crypto.subtle.digest("SHA-512", body as ArrayBuffer);
   let method = init["method"];
   if (!method) {
     method = "GET";
   }
   const timestamp = Math.floor(Date.now() / 1000);
+  const nonce = crypto.randomUUID();
+  init["headers"].append("X-Request-Nonce", nonce);
   init["headers"].append("X-Request-Timestamp", String(timestamp));
-  init["headers"].append("X-Request-Signature", await signRequest(method + "-" + String(timestamp) + "-" + bufferToBase64(url_hash) + "-" + bufferToBase64(body_hash)));
+  const requestSignature = await signRequest(method + "-" + String(timestamp) + "-" + nonce + "-" + bufferToBase64(urlHash) + "-" + bufferToBase64(bodyHash));
+  init["headers"].append("X-Request-Signature", requestSignature);
   const response = await fn(url, init);
   if (response.status === 401) {
     localStorage.clear();
+    location.reload();
+    throw null;
+  }
+  if (response.status !== 200 && response.status !== 204) {
+    location.reload();
+    throw null;
+  }
+  const responseHash = await crypto.subtle.digest("SHA-512", encoder.encode(await response.clone().text()));
+  const responseSignaturePlaintext = requestSignature + "-" + bufferToBase64(responseHash);
+  if (!await verifySignature(responseSignaturePlaintext, response.headers.get("X-Response-Signature") || "")) {
     location.reload();
     throw null;
   }

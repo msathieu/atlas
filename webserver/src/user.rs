@@ -1,4 +1,4 @@
-use crate::util::{decrypt_body, validate_signature};
+use crate::util::{decrypt_body, sign_response, validate_signature};
 use crate::{auth::authenticate, get_db};
 use argon2::PasswordHasher;
 use argon2::{
@@ -23,9 +23,9 @@ pub struct ChangePasswordRequest {
     new_password: String,
 }
 
-pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
+pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
-    validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
     let request: ChangePasswordRequest = serde_json::from_str(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     if request.new_password.is_empty() || request.new_password.len() < MIN_PASSWORD_LENGTH {
         return Err(StatusCode::BAD_REQUEST);
@@ -41,5 +41,5 @@ pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) 
         .set((users::password.eq(hash.to_string()), users::jwt_counter.eq(user.jwt_counter + 1)))
         .execute(&mut db)
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    Ok(())
+    sign_response::<String>(signature, None)
 }

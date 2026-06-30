@@ -1,6 +1,6 @@
 use crate::{
     auth::{authenticate, authenticate_jwt, generate_jwt},
-    util::validate_signature,
+    util::{sign_response, validate_signature},
 };
 use axum::{
     Json,
@@ -23,12 +23,12 @@ pub struct StreamAuthResponse {
     jwt: String,
 }
 
-pub async fn stream_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<StreamAuthResponse>, StatusCode> {
+pub async fn stream_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<StreamAuthResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
-    validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
     let jwt = generate_jwt("webserver-stream", &user, 60, None)?;
     let response = StreamAuthResponse { jwt };
-    Ok(Json(response))
+    Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
 pub async fn stream(query: Query<StreamAuth>, socket: WebSocketUpgrade) -> Response {
     if authenticate_jwt(&query.auth, "webserver-stream").is_err() {

@@ -9,6 +9,7 @@ use argon2::password_hash::rand_core::OsRng;
 use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
 use aws_lc_rs::encoding::AsDer;
 use aws_lc_rs::rsa::{KeySize, PrivateDecryptingKey};
+use aws_lc_rs::signature::Ed25519KeyPair;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use diesel::OptionalExtension;
@@ -217,6 +218,13 @@ fn create_settings(db: &mut PgConnection) {
                 .values(Setting {
                     name: "web_encryption_key".to_owned(),
                     value: BASE64_STANDARD.encode(web_encryption_key.as_ref()),
+                })
+                .execute(db)?;
+            let web_signing_key = Ed25519KeyPair::generate()?.to_pkcs8()?;
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "web_signing_key".to_owned(),
+                    value: BASE64_STANDARD.encode(web_signing_key.as_ref()),
                 })
                 .execute(db)?;
             Ok::<(), Box<dyn Error>>(())

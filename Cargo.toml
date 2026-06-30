@@ -3,7 +3,7 @@ resolver = "3"
 members = ["agent", "apiserver", "master", "shared-api", "shared-server", "webserver"]
 
 [workspace.package]
-version = "2026.6.27"
+version = "2026.6.30"
 
 [profile.release]
 lto = true

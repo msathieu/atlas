@@ -2,8 +2,10 @@
 set -euo pipefail
 cd frontend
 export PUBLIC_API_HOST="$1"
-pubkey=$(curl -f "https://$1/api/info" | jq -r .pubkey)
-export PUBLIC_API_PUBKEY="$pubkey"
+encryption_pubkey=$(curl -f "https://$1/api/info" | jq -r .encryption_pubkey)
+export PUBLIC_API_ENCRYPTION_PUBKEY="$encryption_pubkey"
+signing_pubkey=$(curl -f "https://$1/api/info" | jq -r .signing_pubkey)
+export PUBLIC_API_SIGNING_PUBKEY="$signing_pubkey"
 deno task build
 deno run -A npm:@capacitor/cli telemetry off
 deno run -A npm:@capacitor/cli add android || true

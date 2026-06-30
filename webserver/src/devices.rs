@@ -1,7 +1,7 @@
 use crate::{
     auth::{authenticate, require_admin},
     get_db,
-    util::{convert_timestamp, validate_signature},
+    util::{convert_timestamp, sign_response, validate_signature},
 };
 use axum::{
     Json,
@@ -29,9 +29,9 @@ pub struct APIDevice {
     ip: String,
 }
 
-pub async fn devices_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<Vec<APIDevice>>, StatusCode> {
+pub async fn devices_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIDevice>>), StatusCode> {
     authenticate(&headers)?;
-    validate_signature(&headers, uri.0, &body, "GET")?;
+    let signature = validate_signature(&headers, uri.0, &body, "GET")?;
     let mut db = get_db()?;
     let devices: Vec<Device> = devices::table.get_results(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let devices: Result<Vec<APIDevice>, StatusCode> = devices
@@ -51,11 +51,12 @@ pub async fn devices_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
             })
         })
         .collect();
-    Ok(Json(devices?))
+    let devices = devices?;
+    Ok((sign_response(signature, Some(&devices))?, Json(devices)))
 }
-pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
+pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     require_admin(&headers)?;
-    validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
     let mut db = get_db()?;
     diesel::update(devices::table.find(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?))
         .set(devices::approved.eq(true))
@@ -63,15 +64,15 @@ pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>, uri: Ori
         .or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:DEVICES").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    Ok(())
+    sign_response::<String>(signature, None)
 }
-pub async fn delete_device(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
+pub async fn delete_device(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     require_admin(&headers)?;
-    validate_signature(&headers, uri.0, &body, "DELETE")?;
+    let signature = validate_signature(&headers, uri.0, &body, "DELETE")?;
     let mut db = get_db()?;
     diesel::delete(devices::table.find(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?))
         .execute(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    Ok(())
+    sign_response::<String>(signature, None)
 }

@@ -1,7 +1,7 @@
 use crate::{
     auth::authenticate,
     get_db,
-    util::{convert_timestamp, validate_signature},
+    util::{convert_timestamp, sign_response, validate_signature},
 };
 use axum::{
     Json,
@@ -38,9 +38,9 @@ pub struct CreateCommandResponse {
     id: Uuid,
 }
 
-pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<Vec<APICommand>>, StatusCode> {
+pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APICommand>>), StatusCode> {
     let user = authenticate(&headers)?.0;
-    validate_signature(&headers, uri.0, &body, "GET")?;
+    let signature = validate_signature(&headers, uri.0, &body, "GET")?;
     let mut db = get_db()?;
     let commands: Vec<Command> = commands::table
         .filter(
@@ -66,11 +66,12 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
             })
         })
         .collect();
-    Ok(Json(commands?))
+    let commands = commands?;
+    Ok((sign_response(signature, Some(&commands))?, Json(commands)))
 }
-pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<Json<CreateCommandResponse>, StatusCode> {
+pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateCommandResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
-    validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
     let request: CreateCommandRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let mut cmd = Command {
@@ -94,13 +95,14 @@ pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -
     cmd = diesel::insert_into(commands::table).values(cmd).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
     notify_server(&format!("API:DEVICE:{}", request.device)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    Ok(Json(CreateCommandResponse {
+    let response = CreateCommandResponse {
         id: cmd.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
-    }))
+    };
+    Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
-pub async fn delete_command(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(), StatusCode> {
+pub async fn delete_command(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
-    validate_signature(&headers, uri.0, &body, "DELETE")?;
+    let signature = validate_signature(&headers, uri.0, &body, "DELETE")?;
     let mut db = get_db()?;
     diesel::delete(
         commands::table.filter(
@@ -113,5 +115,5 @@ pub async fn delete_command(headers: HeaderMap, Path(id): Path<String>, uri: Ori
     .execute(&mut db)
     .or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    Ok(())
+    sign_response::<String>(signature, None)
 }

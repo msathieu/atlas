@@ -1,22 +1,27 @@
-use crate::{auth::authenticate, get_db};
-use aws_lc_rs::rsa::{OAEP_SHA512_MGF1SHA512, OaepPrivateDecryptingKey, PrivateDecryptingKey};
+use crate::{ENCRYPTION_KEY, SIGNING_KEY, auth::authenticate};
+use aws_lc_rs::{
+    rsa::{OAEP_SHA512_MGF1SHA512, OaepPrivateDecryptingKey, PrivateDecryptingKey},
+    signature::Ed25519KeyPair,
+};
 use axum::{
     body::Bytes,
-    http::{HeaderMap, StatusCode, Uri},
+    http::{HeaderMap, HeaderValue, StatusCode, Uri},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
-use diesel::prelude::*;
+use serde::Serialize;
 use sha2::{Digest, Sha512};
-use shared_server::{models::Setting, schema};
 use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
 pub fn convert_timestamp(time: SystemTime) -> Result<u64, StatusCode> {
     Ok(time.duration_since(UNIX_EPOCH).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.as_secs())
 }
 pub fn get_encryption_key() -> Result<PrivateDecryptingKey, StatusCode> {
-    let mut db = get_db()?;
-    let encoded = schema::settings::table.find("web_encryption_key").first::<Setting>(&mut db).unwrap().value;
-    let key = PrivateDecryptingKey::from_pkcs8(&BASE64_STANDARD.decode(encoded).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let key = PrivateDecryptingKey::from_pkcs8(ENCRYPTION_KEY.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    Ok(key)
+}
+pub fn get_signing_key() -> Result<Ed25519KeyPair, StatusCode> {
+    let key = Ed25519KeyPair::from_pkcs8(SIGNING_KEY.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(key)
 }
 pub fn decrypt_body(body: Bytes) -> Result<String, StatusCode> {
@@ -27,18 +32,19 @@ pub fn decrypt_body(body: Bytes) -> Result<String, StatusCode> {
     let decrypted = String::from_utf8(decrypted.to_owned()).or(Err(StatusCode::BAD_REQUEST))?;
     Ok(decrypted)
 }
-pub fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, method: &str) -> Result<(), StatusCode> {
+pub fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, method: &str) -> Result<String, StatusCode> {
     let signature = headers.get("X-Request-Signature").ok_or(StatusCode::UNAUTHORIZED)?;
     let timestamp = headers.get("X-Request-Timestamp").ok_or(StatusCode::UNAUTHORIZED)?.to_str().or(Err(StatusCode::UNAUTHORIZED))?;
+    let nonce = Uuid::parse_str(headers.get("X-Request-Nonce").ok_or(StatusCode::UNAUTHORIZED)?.to_str().or(Err(StatusCode::UNAUTHORIZED))?).or(Err(StatusCode::UNAUTHORIZED))?;
     let timestamp: u64 = timestamp.parse().or(Err(StatusCode::UNAUTHORIZED))?;
     let signature = BASE64_STANDARD.decode(signature).or(Err(StatusCode::UNAUTHORIZED))?;
     let pubkey = authenticate(headers)?.1.ok_or(StatusCode::UNAUTHORIZED)?;
     let uri_hashed = BASE64_STANDARD.encode(Sha512::digest(uri.to_string()));
     let body_hashed = BASE64_STANDARD.encode(Sha512::digest(body));
-    let hash = format!("{}-{}-{}-{}", method, timestamp, uri_hashed, body_hashed);
+    let hash = format!("{}-{}-{}-{}-{}", method, timestamp, nonce, uri_hashed, body_hashed);
     pubkey.verify_sig(hash.as_bytes(), &signature).or(Err(StatusCode::UNAUTHORIZED))?;
     validate_timestamp(timestamp)?;
-    Ok(())
+    Ok(BASE64_STANDARD.encode(signature))
 }
 pub fn validate_timestamp(timestamp: u64) -> Result<(), StatusCode> {
     let now = SystemTime::now();
@@ -47,4 +53,17 @@ pub fn validate_timestamp(timestamp: u64) -> Result<(), StatusCode> {
         return Err(StatusCode::UNAUTHORIZED);
     }
     Ok(())
+}
+pub fn sign_response<T: Serialize>(request_signature: String, json: Option<T>) -> Result<HeaderMap, StatusCode> {
+    let mut headers = HeaderMap::new();
+    let body = match json {
+        Some(data) => serde_json::to_string(&data).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?,
+        None => String::new(),
+    };
+    let body_hashed = BASE64_STANDARD.encode(Sha512::digest(body));
+    let hash = format!("{}-{}", request_signature, body_hashed);
+    let signing_key = get_signing_key()?;
+    let signature = BASE64_STANDARD.encode(signing_key.sign(hash.as_bytes()));
+    headers.insert("X-Response-Signature", HeaderValue::from_str(&signature).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?);
+    Ok(headers)
 }

@@ -43,6 +43,8 @@ mod user;
 mod util;
 
 static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
+static ENCRYPTION_KEY: OnceLock<Vec<u8>> = OnceLock::new();
+static SIGNING_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 static DB_POOL: OnceLock<Pool<ConnectionManager<PgConnection>>> = OnceLock::new();
 
 fn get_db() -> Result<PooledConnection<ConnectionManager<PgConnection>>, StatusCode> {
@@ -58,6 +60,20 @@ async fn main() {
     let jwt_secret = schema::settings::table.find("jwt_secret").first::<Setting>(&mut DB_POOL.get().unwrap().get().unwrap()).unwrap().value;
     let jwt_secret = BASE64_STANDARD.decode(jwt_secret).unwrap();
     JWT_KEY.set(jwt_secret).unwrap();
+    let encryption_key = schema::settings::table
+        .find("web_encryption_key")
+        .first::<Setting>(&mut DB_POOL.get().unwrap().get().unwrap())
+        .unwrap()
+        .value;
+    let encryption_key = BASE64_STANDARD.decode(encryption_key).unwrap();
+    ENCRYPTION_KEY.set(encryption_key).unwrap();
+    let signing_key = schema::settings::table
+        .find("web_signing_key")
+        .first::<Setting>(&mut DB_POOL.get().unwrap().get().unwrap())
+        .unwrap()
+        .value;
+    let signing_key = BASE64_STANDARD.decode(signing_key).unwrap();
+    SIGNING_KEY.set(signing_key).unwrap();
     let router = Router::new()
         .fallback_service(ServeDir::new("frontend").fallback(ServeFile::new("frontend/404.html")))
         .route("/api/info", get(server_info))
