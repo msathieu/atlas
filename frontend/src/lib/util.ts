@@ -5,8 +5,8 @@ export const API_HOST = env.PUBLIC_API_HOST ? `https://${env.PUBLIC_API_HOST}` :
 export const API_ENCRYPTION_PUBKEY = env.PUBLIC_API_ENCRYPTION_PUBKEY;
 export const API_SIGNING_PUBKEY = env.PUBLIC_API_SIGNING_PUBKEY;
 
-let encryptionPubkey = env.PUBLIC_API_ENCRYPTION_PUBKEY;
-let signingPubkey = env.PUBLIC_API_SIGNING_PUBKEY;
+let encryptionPubkey = API_ENCRYPTION_PUBKEY;
+let signingPubkey = API_SIGNING_PUBKEY;
 
 export function formatTime(timestamp: number): string {
   return formatRelative(timestamp * 1000, Date.now());
