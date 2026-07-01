@@ -25,6 +25,7 @@ pub enum MessageType {
     UpdateRequest = 8,
     UpdateResponse = 9,
 }
+#[derive(PartialEq, TryFromPrimitive)]
 #[repr(u32)]
 pub enum CommandOrigin {
     SystemIdentification = 0,

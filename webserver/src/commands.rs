@@ -27,6 +27,7 @@ pub struct APICommand {
     stderr: String,
     requested_timestamp: u64,
     completed_timestamp: Option<u64>,
+    origin: String,
 }
 #[derive(Deserialize)]
 pub struct CreateCommandRequest {
@@ -43,16 +44,17 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let mut db = get_db()?;
     let commands: Vec<Command> = commands::table
-        .filter(
-            commands::origin
-                .eq(CommandOrigin::UserRequested as i32)
-                .and(commands::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)),
-        )
+        .filter(commands::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .get_results(&mut db)
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let commands: Result<Vec<APICommand>, StatusCode> = commands
         .iter()
         .map(|command| {
+            let origin = match CommandOrigin::try_from(command.origin as u32).or(Err(StatusCode::INTERNAL_SERVER_ERROR))? {
+                CommandOrigin::SystemIdentification => "System Identification",
+                CommandOrigin::UserRequested => "User",
+                CommandOrigin::LLMTool => "LLM Tool",
+            };
             Ok(APICommand {
                 id: command.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
                 device: command.device,
@@ -63,6 +65,7 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
                 stderr: command.stderr.clone(),
                 requested_timestamp: convert_timestamp(command.requested_timestamp)?,
                 completed_timestamp: command.completed_timestamp.map(|timestamp| convert_timestamp(timestamp).unwrap_or(0)),
+                origin: origin.to_string(),
             })
         })
         .collect();
@@ -108,12 +111,12 @@ pub async fn delete_command(headers: HeaderMap, Path(id): Path<String>, uri: Ori
         commands::table.filter(
             commands::id
                 .eq(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?)
-                .and(commands::origin.eq(CommandOrigin::UserRequested as i32))
                 .and(commands::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)),
         ),
     )
     .execute(&mut db)
     .or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("MASTER:CMD:{}", id)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }

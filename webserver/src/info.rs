@@ -14,6 +14,7 @@ pub struct APIServerInfo {
     version: String,
     encryption_pubkey: String,
     signing_pubkey: String,
+    environment: String,
 }
 
 pub async fn server_info() -> Result<Json<APIServerInfo>, StatusCode> {
@@ -21,6 +22,10 @@ pub async fn server_info() -> Result<Json<APIServerInfo>, StatusCode> {
     let encryption_pubkey = encryption_key.public_key().as_der().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let signing_key = get_signing_key()?;
     let signing_pubkey = signing_key.public_key().as_der().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    #[cfg(not(debug_assertions))]
+    let environment = "production";
+    #[cfg(debug_assertions)]
+    let environment = "development";
     let info = APIServerInfo {
         magic: MAGIC.to_string(),
         api_version: API_VERSION,
@@ -28,6 +33,7 @@ pub async fn server_info() -> Result<Json<APIServerInfo>, StatusCode> {
         version: env!("CARGO_PKG_VERSION").to_string(),
         encryption_pubkey: BASE64_STANDARD.encode(encryption_pubkey.as_ref()),
         signing_pubkey: BASE64_STANDARD.encode(signing_pubkey.as_ref()),
+        environment: environment.to_string(),
     };
     Ok(Json(info))
 }

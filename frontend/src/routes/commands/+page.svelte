@@ -34,6 +34,7 @@
   <thead>
     <tr>
       <th>State</th>
+      <th>Origin</th>
       <th>Device</th>
       <th>Request Time</th>
       <th>Status Code</th>
@@ -57,6 +58,7 @@
             <X />
           {/if}
         </td>
+        <td>{command.origin}</td>
         <td>{getHostnameForDevice(data.devices, command.device)}</td>
         <td>{formatTime(command.requested_timestamp)}</td>
         <td>{command.status_code}</td>

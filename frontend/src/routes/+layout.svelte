@@ -46,7 +46,7 @@
         <li class="mt-auto"><a href="/profile"><User /><span class="hidden lg:block">Profile</span></a></li>
         <li><button onclick={logout}><LogOut /><span class="hidden lg:block">Logout</span></button></li>
         <li>
-          <div class="text-xs">
+          <div class="text-xs" class:bg-red-500={data.info.environment !== "production"}>
             <div class:status-success={data.connected && wsState.connected} class:status-error={!data.connected || !wsState.connected} class="status"></div>
             <span class="hidden lg:block">{data.info.hostname}
               <br />
