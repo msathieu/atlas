@@ -31,7 +31,7 @@ pub struct APIDevice {
 
 pub async fn devices_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIDevice>>), StatusCode> {
     authenticate(&headers)?;
-    let signature = validate_signature(&headers, uri.0, &body, "GET")?;
+    let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let mut db = get_db()?;
     let devices: Vec<Device> = devices::table.get_results(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let devices: Result<Vec<APIDevice>, StatusCode> = devices
@@ -56,7 +56,7 @@ pub async fn devices_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
 }
 pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     require_admin(&headers)?;
-    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db()?;
     diesel::update(devices::table.find(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?))
         .set(devices::approved.eq(true))
@@ -68,7 +68,7 @@ pub async fn approve_device(headers: HeaderMap, Path(id): Path<String>, uri: Ori
 }
 pub async fn delete_device(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     require_admin(&headers)?;
-    let signature = validate_signature(&headers, uri.0, &body, "DELETE")?;
+    let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
     diesel::delete(devices::table.find(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?))
         .execute(&mut db)

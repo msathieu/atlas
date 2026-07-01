@@ -21,7 +21,7 @@ use rcgen::{CertificateParams, KeyPair, PKCS_ECDSA_P521_SHA512};
 use shared_api::{CommandOrigin, print_startup};
 use shared_server::models::{Setting, User};
 use shared_server::schema::{commands, settings, users};
-use shared_server::{get_db_pool, get_pubsub_client, listen_for_restarts, notify_server, wait_for_pubsub_msg};
+use shared_server::{get_db_pool, get_valkey_client, listen_for_restarts, notify_server, wait_for_pubsub_msg};
 use std::error::Error;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -73,7 +73,7 @@ async fn tasks_loop<T: Future<Output = Result<(), Box<dyn Error>>>>(
     sub_channel: &str,
     func: fn(Pool<ConnectionManager<PgConnection>>) -> T,
 ) -> Result<(), Box<dyn Error>> {
-    let (mut pubsub_client, mut receiver) = get_pubsub_client().await?;
+    let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
     pubsub_client.subscribe(sub_channel).await?;
     loop {
         if let Err(e) = func(pool.clone()).await {

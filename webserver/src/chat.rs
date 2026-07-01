@@ -80,7 +80,7 @@ pub struct CreateChatRequest {
 
 pub async fn chats_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIChat>>), StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "GET")?;
+    let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let mut db = get_db()?;
     let chats: Vec<Chat> = chats::table
         .filter(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
@@ -103,7 +103,7 @@ pub async fn chats_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Re
 }
 pub async fn create_chat(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateChatResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateChatRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let chat_type = match request.chat_type.as_str() {
         "interactive" => ChatType::Interactive,
@@ -140,7 +140,7 @@ pub async fn create_chat(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
 }
 pub async fn delete_chat(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "DELETE")?;
+    let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
     diesel::delete(
         chats::table.filter(
@@ -156,7 +156,7 @@ pub async fn delete_chat(headers: HeaderMap, Path(id): Path<String>, uri: Origin
 }
 pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<APIChatDetailed>), StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "GET")?;
+    let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let mut db = get_db()?;
     let chat: Chat = chats::table
         .filter(
@@ -216,7 +216,7 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>, uri: OriginalU
 }
 pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: SendMessageRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let chat: Chat = chats::table
@@ -273,7 +273,7 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, uri: Origi
 }
 pub async fn manage_tool_call_consent(headers: HeaderMap, Path((id, seq, call_id)): Path<(String, i32, String)>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: ManageToolCallConsentRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let chat_uuid = Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?;
@@ -302,7 +302,7 @@ pub async fn manage_tool_call_consent(headers: HeaderMap, Path((id, seq, call_id
 }
 pub async fn delete_message(headers: HeaderMap, Path((id, seq)): Path<(String, i32)>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "DELETE")?;
+    let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
     let chat_uuid = Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?;
     let _chat: Chat = chats::table

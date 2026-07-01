@@ -10,7 +10,7 @@ use axum::{
     response::Response,
 };
 use serde::{Deserialize, Serialize};
-use shared_server::{get_pubsub_client, wait_for_pubsub_msg};
+use shared_server::{get_valkey_client, wait_for_pubsub_msg};
 use std::{error::Error, time::Duration};
 use tokio::time::timeout;
 
@@ -25,7 +25,7 @@ pub struct StreamAuthResponse {
 
 pub async fn stream_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<StreamAuthResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let jwt = generate_jwt("webserver-stream", &user, 60, None)?;
     let response = StreamAuthResponse { jwt };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
@@ -40,7 +40,7 @@ async fn stream_wrapper(socket: WebSocket) {
     stream_handler(socket).await.ok();
 }
 async fn stream_handler(mut socket: WebSocket) -> Result<(), Box<dyn Error>> {
-    let (mut pubsub_client, mut receiver) = get_pubsub_client().await?;
+    let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
     pubsub_client.subscribe("WEB:REFRESH").await?;
     loop {
         if timeout(Duration::from_secs(30), async { wait_for_pubsub_msg(&mut receiver).await }).await.is_ok() {

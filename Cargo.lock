@@ -3803,6 +3803,7 @@ dependencies = [
  "dotenvy",
  "gethostname",
  "jsonwebtoken",
+ "redis",
  "serde",
  "serde_json",
  "sha2",

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use shared_api::CommandOrigin;
 use shared_server::{
-    get_pubsub_client,
+    get_valkey_client,
     models::{Command, PreapprovedCode},
     notify_server,
     schema::{commands, preapproved_code},
@@ -77,7 +77,7 @@ impl ExecuteCodeTool {
         };
         let cmd: Command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
         let cmd_id = cmd.id.ok_or("Invalid command")?;
-        let (mut pubsub_client, mut receiver) = get_pubsub_client().await?;
+        let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
         pubsub_client.subscribe(format!("MASTER:CMD:{}", cmd_id)).await?;
         diesel::update(commands::table.find(cmd_id)).set(commands::completed.eq(false)).execute(&mut db)?;
         notify_server(&format!("API:DEVICE:{}", device_uuid)).await?;

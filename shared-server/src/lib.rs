@@ -26,7 +26,7 @@ pub fn get_db_pool() -> Result<Pool<ConnectionManager<PgConnection>>, Box<dyn Er
     let pool = Pool::builder().build(connection_manager)?;
     Ok(pool)
 }
-pub async fn get_pubsub_client() -> Result<(redis::aio::ConnectionManager, UnboundedReceiver<PushInfo>), RedisError> {
+pub async fn get_valkey_client() -> Result<(redis::aio::ConnectionManager, UnboundedReceiver<PushInfo>), RedisError> {
     let url = format!("redis://{}/?protocol=resp3", env::var("VALKEY_HOST").unwrap_or("localhost".to_string()));
     let client = redis::Client::open(url)?;
     let mut config = ConnectionManagerConfig::new();
@@ -38,7 +38,7 @@ pub async fn get_pubsub_client() -> Result<(redis::aio::ConnectionManager, Unbou
 }
 pub async fn notify_server(channel: &str) -> Result<(), Box<dyn Error>> {
     if PUBSUB_POOL.get().is_none() {
-        let client = get_pubsub_client().await?;
+        let client = get_valkey_client().await?;
         PUBSUB_POOL.set(client.0).ok();
     }
     PUBSUB_POOL.get().ok_or("Failed to get pubsub client")?.clone().publish::<&str, &str, ()>(channel, "").await?;
@@ -54,7 +54,7 @@ pub async fn wait_for_pubsub_msg(receiver: &mut UnboundedReceiver<PushInfo>) {
     }
 }
 async fn listen_for_restarts_task(component: String) -> Result<(), RedisError> {
-    let (mut manager, mut receiver) = get_pubsub_client().await?;
+    let (mut manager, mut receiver) = get_valkey_client().await?;
     manager.subscribe(format!("{}:RESTART", component)).await?;
     wait_for_pubsub_msg(&mut receiver).await;
     Ok(())

@@ -8,11 +8,36 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode, Uri},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
+use redis::{AsyncCommands, ExistenceCheck, SetExpiry, SetOptions};
 use serde::Serialize;
 use sha2::{Digest, Sha512};
-use std::time::{SystemTime, UNIX_EPOCH};
+use shared_server::get_valkey_client;
+use std::{
+    sync::OnceLock,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use uuid::Uuid;
 
+static VALKEY_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
+
+async fn validate_nonce(nonce: Uuid) -> Result<(), StatusCode> {
+    if VALKEY_POOL.get().is_none() {
+        let client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        VALKEY_POOL.set(client.0).ok();
+    }
+    let key = format!("NONCE:{}", nonce);
+    let exists: Option<String> = VALKEY_POOL
+        .get()
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
+        .clone()
+        .set_options(key, true, SetOptions::default().conditional_set(ExistenceCheck::NX).with_expiration(SetExpiry::EX(60)))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    if exists.is_none() {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+    Ok(())
+}
 pub fn convert_timestamp(time: SystemTime) -> Result<u64, StatusCode> {
     Ok(time.duration_since(UNIX_EPOCH).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.as_secs())
 }
@@ -32,7 +57,7 @@ pub fn decrypt_body(body: Bytes) -> Result<String, StatusCode> {
     let decrypted = String::from_utf8(decrypted.to_owned()).or(Err(StatusCode::BAD_REQUEST))?;
     Ok(decrypted)
 }
-pub fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, method: &str) -> Result<String, StatusCode> {
+pub async fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, method: &str) -> Result<String, StatusCode> {
     let signature = headers.get("X-Request-Signature").ok_or(StatusCode::UNAUTHORIZED)?;
     let timestamp = headers.get("X-Request-Timestamp").ok_or(StatusCode::UNAUTHORIZED)?.to_str().or(Err(StatusCode::UNAUTHORIZED))?;
     let nonce = Uuid::parse_str(headers.get("X-Request-Nonce").ok_or(StatusCode::UNAUTHORIZED)?.to_str().or(Err(StatusCode::UNAUTHORIZED))?).or(Err(StatusCode::UNAUTHORIZED))?;
@@ -44,6 +69,7 @@ pub fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, method: &
     let hash = format!("{}-{}-{}-{}-{}", method, timestamp, nonce, uri_hashed, body_hashed);
     pubkey.verify_sig(hash.as_bytes(), &signature).or(Err(StatusCode::UNAUTHORIZED))?;
     validate_timestamp(timestamp)?;
+    validate_nonce(nonce).await?;
     Ok(BASE64_STANDARD.encode(signature))
 }
 pub fn validate_timestamp(timestamp: u64) -> Result<(), StatusCode> {

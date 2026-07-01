@@ -40,7 +40,7 @@ pub struct CreateCommandResponse {
 
 pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APICommand>>), StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "GET")?;
+    let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let mut db = get_db()?;
     let commands: Vec<Command> = commands::table
         .filter(
@@ -71,7 +71,7 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
 }
 pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateCommandResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateCommandRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let mut cmd = Command {
@@ -102,7 +102,7 @@ pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -
 }
 pub async fn delete_command(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "DELETE")?;
+    let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
     diesel::delete(
         commands::table.filter(

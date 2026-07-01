@@ -25,7 +25,7 @@ use shared_api::{
 };
 use shared_server::{
     binary::personalize_binary,
-    get_db_pool, get_pubsub_client, listen_for_restarts,
+    get_db_pool, get_valkey_client, listen_for_restarts,
     models::{Command, Device, Setting},
     notify_server,
     schema::{commands, devices, settings},
@@ -189,7 +189,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         }
     }
 
-    let (mut pubsub_client, mut receiver) = get_pubsub_client().await?;
+    let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
     pubsub_client.subscribe(format!("API:DEVICE:{}", uuid)).await?;
     loop {
         let device_exists = devices::table.find(uuid).first::<Device>(&mut db).optional()?.is_some();

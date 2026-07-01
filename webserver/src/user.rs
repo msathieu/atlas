@@ -25,7 +25,7 @@ pub struct ChangePasswordRequest {
 
 pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "POST")?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: ChangePasswordRequest = serde_json::from_str(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     if request.new_password.is_empty() || request.new_password.len() < MIN_PASSWORD_LENGTH {
         return Err(StatusCode::BAD_REQUEST);
