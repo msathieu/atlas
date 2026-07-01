@@ -1,4 +1,6 @@
-use crate::tools::{compact::CompactTool, device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, preapprove_code::PreapproveCodeTool, sleep::SleepTool, time::TimeTool};
+use crate::tools::{
+    compact::CompactTool, device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, preapprove_code::PreapproveCodeTool, sleep::SleepTool, summary::SummaryTool, time::TimeTool,
+};
 use diesel::{
     PgConnection,
     prelude::*,
@@ -58,6 +60,7 @@ async fn process_tool_call(call: ToolCall, pool: Pool<ConnectionManager<PgConnec
             chat: call.chat,
             sequence: call.sequence,
         }),
+        "summary" => Box::new(SummaryTool { chat: call.chat }),
         _ => {
             incorrect_tool = true;
             Box::new(ThinkTool {})

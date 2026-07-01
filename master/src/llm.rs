@@ -1,4 +1,6 @@
-use crate::tools::{compact::CompactTool, device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, preapprove_code::PreapproveCodeTool, sleep::SleepTool, time::TimeTool};
+use crate::tools::{
+    compact::CompactTool, device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, preapprove_code::PreapproveCodeTool, sleep::SleepTool, summary::SummaryTool, time::TimeTool,
+};
 use diesel::{
     PgConnection,
     dsl::insert_into,
@@ -154,6 +156,7 @@ Respect the following rules:
 - Always refer to servers with their UUID, except when communicating to the user.
 - Your output should be formatted in Markdown.
 - Don't waste context tokens: if some output isn't needed, don't request it.
+- Each chat should have a summary, this will be shown in the chat overview. Include one in your initial reply.
 
 If a tool states that it requires approval, that means that the session will be interrupted to prompt the user.
 
@@ -182,6 +185,7 @@ The servers you can access are: {}
             chat: chat.id.ok_or("Invalid chat")?,
             sequence: 0,
         })
+        .tool(SummaryTool { chat: chat.id.ok_or("Invalid chat")? })
         .build();
     let mut ai_messages = Vec::new();
     for msg in messages {
@@ -236,7 +240,7 @@ The servers you can access are: {}
     let mut text = None;
     let mut calls = Vec::new();
     let mut reasoning = None;
-    let auto_approved_tools = ["device_info", "email", "sleep", "think", "time", "compact"];
+    let auto_approved_tools = ["device_info", "email", "sleep", "think", "time", "compact", "summary"];
     for part in completion.choice {
         match part {
             AssistantContent::Text(text_part) => {
@@ -295,14 +299,14 @@ The servers you can access are: {}
     if content.is_empty() {
         content = "-".to_string(); // Some API providers reject empty messages
     }
-    let reply = Message {
+    let mut reply = Message {
         chat: chat_id,
         sequence: last_sequence + 1,
         content,
         sent_on: SystemTime::now(),
         user_message: false,
         generation_id: completion.message_id,
-        finished: calls.is_empty(),
+        finished: true,
         reasoning,
         input_tokens: completion.usage.input_tokens as i32,
         output_tokens: completion.usage.output_tokens as i32,
@@ -310,6 +314,12 @@ The servers you can access are: {}
         model,
         compacted: false,
     };
+    for call in &calls {
+        if call.tool != "compact" && call.tool != "summary" {
+            reply.finished = false;
+            break;
+        }
+    }
     db.transaction(|db| {
         insert_into(messages::table).values(reply).execute(db)?;
         for i in &calls {
