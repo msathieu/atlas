@@ -38,7 +38,6 @@ pub struct LoginRequest {
 #[derive(Serialize)]
 pub struct LoginResponse {
     jwt: String,
-    admin: bool,
 }
 
 #[cfg(debug_assertions)]
@@ -78,7 +77,7 @@ pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), Stat
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::UNAUTHORIZED))?;
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::UNAUTHORIZED))?;
     let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
-    let response = LoginResponse { jwt, admin: user.admin };
+    let response = LoginResponse { jwt };
     Ok((sign_response(format!("login-{}", BASE64_STANDARD.encode(Sha512::digest(body))), Some(&response))?, Json(response)))
 }
 pub fn authenticate_jwt(jwt: &str, aud: &str) -> Result<(User, Option<ParsedPublicKey>), StatusCode> {

@@ -40,10 +40,10 @@
         <li><a href="/devices"><Server /><span class="hidden lg:block">Devices</span></a></li>
         <li><a href="/commands"><Code /><span class="hidden lg:block">Commands</span></a></li>
         <li><a href="/chats"><MessageSquare /><span class="hidden lg:block">Chats</span></a></li>
-        {#if localStorage.getItem("admin") === "true"}
+        {#if data.admin}
           <li><a href="/settings"><Settings /><span class="hidden lg:block">Settings</span></a></li>
         {/if}
-        <li class="mt-auto"><a href="/profile"><User /><span class="hidden lg:block">Profile</span></a></li>
+        <li class="mt-auto"><a href="/profile"><User /><span class="hidden lg:block">{data.username}</span></a></li>
         <li><button onclick={logout}><LogOut /><span class="hidden lg:block">Logout</span></button></li>
         <li>
           <div class="text-xs" class:bg-red-500={data.info.environment !== "production"}>

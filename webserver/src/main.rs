@@ -9,7 +9,7 @@ use crate::{
     info::server_info,
     settings::{get_settings, restart_system, update_setting},
     stream::{stream, stream_auth},
-    user::change_password,
+    user::{change_password, get_user_info},
 };
 use axum::{
     Router,
@@ -99,6 +99,7 @@ async fn main() {
         .route("/api/download_auth", post(download_auth))
         .route("/api/restart", post(restart_system))
         .route("/api/user/update_password", post(change_password))
+        .route("/api/user/info", get(get_user_info))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any).expose_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();

@@ -2,7 +2,6 @@
   import { goto } from "$app/navigation";
   import { verifyResponseSignature } from "$lib/auth.ts";
   import { API_HOST, bufferToBase64, encryptToServer } from "$lib/util.ts";
-  import { connectWS } from "$lib/ws.svelte";
   import { toast } from "svelte-sonner";
 
   let username = $state("");
@@ -23,9 +22,7 @@
     if (response.ok) {
       const json = await response.json();
       localStorage.setItem("jwt", json["jwt"]);
-      localStorage.setItem("admin", json["admin"]);
       localStorage.setItem("privkey", bufferToBase64(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey)));
-      await connectWS();
       await goto("/");
     } else {
       toast.error("Invalid Credentials");

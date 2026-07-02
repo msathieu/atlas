@@ -5,12 +5,14 @@ use argon2::{
     Algorithm, Argon2, Params, PasswordHash, PasswordVerifier, Version,
     password_hash::{SaltString, rand_core::OsRng},
 };
+use axum::Json;
 use axum::body::Bytes;
 use axum::extract::OriginalUri;
 use axum::http::{HeaderMap, StatusCode};
 use diesel::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use shared_server::schema::users;
+use uuid::Uuid;
 
 #[cfg(debug_assertions)]
 const MIN_PASSWORD_LENGTH: usize = 4;
@@ -22,7 +24,12 @@ pub struct ChangePasswordRequest {
     old_password: String,
     new_password: String,
 }
-
+#[derive(Serialize)]
+pub struct GetUserInfoResponse {
+    id: Uuid,
+    username: String,
+    admin: bool,
+}
 pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
@@ -42,4 +49,14 @@ pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) 
         .execute(&mut db)
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
+}
+pub async fn get_user_info(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<GetUserInfoResponse>), StatusCode> {
+    let user = authenticate(&headers)?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
+    let response = GetUserInfoResponse {
+        id: user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
+        username: user.username,
+        admin: user.admin,
+    };
+    Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
