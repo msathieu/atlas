@@ -275,6 +275,9 @@ The servers you can access are: {}
                 });
             }
             AssistantContent::Reasoning(reasoning_arg) => {
+                if reasoning_arg.content.is_empty() {
+                    continue;
+                }
                 if reasoning_arg.content.len() != 1 {
                     return Err("Invalid LLM response".into());
                 }

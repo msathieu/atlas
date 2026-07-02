@@ -1,3 +1,4 @@
+use crate::install::install_agent;
 use crate::messages::core::handle_command;
 use crate::messages::update::handle_update;
 use crate::{messages::core::handle_heartbeat, models::Setting, schema::settings};
@@ -26,6 +27,7 @@ use tokio_rustls::rustls::pki_types::{CertificateDer, ServerName};
 use tokio_rustls::rustls::{ClientConfig, RootCertStore};
 use tokio_rustls::{TlsConnector, rustls};
 
+mod install;
 mod messages;
 mod models;
 mod schema;
@@ -60,6 +62,9 @@ async fn main() {
             return;
         } else if cmd == "self-test" {
             println!("OK");
+            return;
+        } else if cmd == "install" {
+            install_agent().await.unwrap();
             return;
         }
     }

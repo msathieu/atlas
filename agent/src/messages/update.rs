@@ -13,8 +13,8 @@ use tokio_rustls::client::TlsStream;
 
 pub async fn handle_update(msg: UpdateRequest, stream: &mut TlsStream<TcpStream>) -> Result<(), Box<dyn Error>> {
     let tempfile = NamedTempFile::new()?.into_temp_path();
+    fs::set_permissions(&tempfile, Permissions::from_mode(0o700)).await?;
     fs::write(&tempfile, msg.agent).await?;
-    fs::set_permissions(&tempfile, Permissions::from_mode(0o755)).await?;
     let file = fs::read(&tempfile).await?;
     let hash = Sha512::digest(file).to_vec();
     if hash != msg.hash {

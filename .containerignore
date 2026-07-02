@@ -5,3 +5,4 @@ frontend/.svelte-kit
 target
 postgres
 .env
+.git
