@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd frontend
+export ANDROID_HOME="$HOME/Android"
+sdkmanager --licenses
 export PUBLIC_API_HOST="$1"
 encryption_pubkey=$(curl -f "https://$1/api/info" | jq -r .encryption_pubkey)
 export PUBLIC_API_ENCRYPTION_PUBKEY="$encryption_pubkey"

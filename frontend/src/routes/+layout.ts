@@ -1,7 +1,7 @@
 import { redirect } from "@sveltejs/kit";
 import type { LayoutLoad } from "./$types.ts";
 import { connectWS } from "$lib/ws.svelte.ts";
-import { API_ENCRYPTION_PUBKEY, API_HOST, API_SIGNING_PUBKEY } from "$lib/util.ts";
+import { API_ENCRYPTION_PUBKEY, API_SIGNING_PUBKEY, fetchInfo } from "$lib/util.ts";
 
 export const prerender = true;
 export const ssr = false;
@@ -10,7 +10,7 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
   if (!localStorage.getItem("jwt") && url.pathname !== "/login") {
     throw redirect(300, "/login");
   }
-  const infoRes = await fetch(`${API_HOST}/api/info`);
+  const infoRes = await fetchInfo(fetch);
   if (!infoRes.ok) {
     return { client_error: false, connected: false, info: { hostname: "Disconnected" } };
   }

@@ -1,6 +1,6 @@
 use crate::{
     JWT_KEY, get_db,
-    util::{decrypt_body, validate_timestamp},
+    util::{decrypt_body, sign_response, validate_timestamp},
 };
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use aws_lc_rs::signature::{ED25519, ParsedPublicKey, UnparsedPublicKey};
@@ -14,6 +14,7 @@ use base64::{Engine, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha512};
 use shared_server::{models::User, schema::users};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
@@ -69,8 +70,8 @@ pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) 
     let jwt = encode(&header, &claims, &key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(jwt)
 }
-pub async fn login(body: Bytes) -> Result<Json<LoginResponse>, StatusCode> {
-    let request: LoginRequest = serde_json::from_str(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), StatusCode> {
+    let request: LoginRequest = serde_json::from_str(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
     validate_timestamp(request.timestamp)?;
     let mut db = get_db()?;
     let user: User = users::table.filter(users::username.eq(request.username)).first(&mut db).or(Err(StatusCode::UNAUTHORIZED))?;
@@ -78,7 +79,7 @@ pub async fn login(body: Bytes) -> Result<Json<LoginResponse>, StatusCode> {
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::UNAUTHORIZED))?;
     let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
     let response = LoginResponse { jwt, admin: user.admin };
-    Ok(Json(response))
+    Ok((sign_response(format!("login-{}", BASE64_STANDARD.encode(Sha512::digest(body))), Some(&response))?, Json(response)))
 }
 pub fn authenticate_jwt(jwt: &str, aud: &str) -> Result<(User, Option<ParsedPublicKey>), StatusCode> {
     let key = DecodingKey::from_secret(JWT_KEY.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?);

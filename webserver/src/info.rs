@@ -1,6 +1,9 @@
-use crate::util::{get_encryption_key, get_signing_key};
+use crate::util::{get_encryption_key, get_signing_key, sign_response};
 use aws_lc_rs::{encoding::AsDer, signature::KeyPair};
-use axum::{Json, http::StatusCode};
+use axum::{
+    Json,
+    http::{HeaderMap, StatusCode},
+};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use gethostname::gethostname;
 use serde::Serialize;
@@ -17,7 +20,7 @@ pub struct APIServerInfo {
     environment: String,
 }
 
-pub async fn server_info() -> Result<Json<APIServerInfo>, StatusCode> {
+pub async fn server_info() -> Result<(HeaderMap, Json<APIServerInfo>), StatusCode> {
     let encryption_key = get_encryption_key()?;
     let encryption_pubkey = encryption_key.public_key().as_der().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let signing_key = get_signing_key()?;
@@ -35,5 +38,5 @@ pub async fn server_info() -> Result<Json<APIServerInfo>, StatusCode> {
         signing_pubkey: BASE64_STANDARD.encode(signing_pubkey.as_ref()),
         environment: environment.to_string(),
     };
-    Ok(Json(info))
+    Ok((sign_response("info".to_string(), Some(&info))?, Json(info)))
 }

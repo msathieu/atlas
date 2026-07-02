@@ -1,6 +1,15 @@
 import { redirect } from "@sveltejs/kit";
 import { API_HOST, bufferToBase64, signRequest, verifySignature } from "./util.ts";
 
+export async function verifyResponseSignature(response: Response, requestSignature: string): Promise<void> {
+  const encoder = new TextEncoder();
+  const responseHash = await crypto.subtle.digest("SHA-512", encoder.encode(await response.clone().text()));
+  const responseSignaturePlaintext = requestSignature + "-" + bufferToBase64(responseHash);
+  if (!await verifySignature(responseSignaturePlaintext, response.headers.get("X-Response-Signature") || "")) {
+    location.reload();
+    throw new Error("Invalid response signature");
+  }
+}
 export async function authenticatedFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
@@ -49,17 +58,12 @@ export async function authenticatedFetch(
   if (response.status === 401) {
     localStorage.clear();
     location.reload();
-    throw null;
+    throw new Error("Unauthorized");
   }
   if (response.status !== 200 && response.status !== 204) {
     location.reload();
-    throw null;
+    throw new Error("Bad Request");
   }
-  const responseHash = await crypto.subtle.digest("SHA-512", encoder.encode(await response.clone().text()));
-  const responseSignaturePlaintext = requestSignature + "-" + bufferToBase64(responseHash);
-  if (!await verifySignature(responseSignaturePlaintext, response.headers.get("X-Response-Signature") || "")) {
-    location.reload();
-    throw null;
-  }
+  await verifyResponseSignature(response, requestSignature);
   return response;
 }

@@ -1,5 +1,6 @@
 import { formatRelative } from "date-fns";
 import { env } from "$env/dynamic/public";
+import { verifyResponseSignature } from "./auth.ts";
 
 export const API_HOST = env.PUBLIC_API_HOST ? `https://${env.PUBLIC_API_HOST}` : "";
 export const API_ENCRYPTION_PUBKEY = env.PUBLIC_API_ENCRYPTION_PUBKEY;
@@ -8,6 +9,14 @@ export const API_SIGNING_PUBKEY = env.PUBLIC_API_SIGNING_PUBKEY;
 let encryptionPubkey = API_ENCRYPTION_PUBKEY;
 let signingPubkey = API_SIGNING_PUBKEY;
 
+export async function fetchInfo(fn?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>): Promise<Response> {
+  if (!fn) {
+    fn = fetch;
+  }
+  const infoRes = await fn(`${API_HOST}/api/info`);
+  await verifyResponseSignature(infoRes, "info");
+  return infoRes;
+}
 export function formatTime(timestamp: number): string {
   return formatRelative(timestamp * 1000, Date.now());
 }
@@ -28,7 +37,7 @@ export function base64ToBuffer(encoded: string): ArrayBuffer {
 }
 export async function encryptToServer(data: string): Promise<ArrayBuffer> {
   if (!encryptionPubkey) {
-    const infoRes = await fetch(`${API_HOST}/api/info`);
+    const infoRes = await fetchInfo();
     const info = await infoRes.json();
     encryptionPubkey = info.encryption_pubkey as string;
   }
@@ -41,7 +50,7 @@ export async function signRequest(data: string): Promise<string> {
   if (!keyStr) {
     localStorage.clear();
     location.reload();
-    throw null;
+    throw new Error("No private key in storage");
   }
   const key = await crypto.subtle.importKey("pkcs8", base64ToBuffer(keyStr), "Ed25519", false, ["sign"]);
   const encoder = new TextEncoder();
