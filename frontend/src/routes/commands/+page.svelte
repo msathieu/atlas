@@ -153,7 +153,7 @@
       }}
     >
       <fieldset class="fieldset">
-        <select class="select w-full" required bind:value={newDevice}>
+        <select id="device" class="select w-full" required bind:value={newDevice}>
           <option disabled selected value="">Choose a Device</option>
           {#each data.devices as device}
             {#if device.approved}
@@ -161,7 +161,7 @@
             {/if}
           {/each}
         </select>
-        <textarea placeholder="Lua Code" class="textarea w-full" required bind:value={newCode}></textarea>
+        <textarea id="code" placeholder="Lua Code" class="textarea w-full" required bind:value={newCode}></textarea>
         <button class="btn btn-primary">Create</button>
       </fieldset>
     </form>

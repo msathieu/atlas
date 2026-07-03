@@ -6,6 +6,7 @@ license = "Unlicense"
 publish = false
 
 [dependencies]
+argon2 = {version = "0.5.3", features = ["std"]}
 base64 = "0.22.1"
 diesel = {version = "2.2.12", features = ["postgres", "r2d2", "uuid"]}
 object = "0.39.1"

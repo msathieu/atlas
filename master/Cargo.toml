@@ -6,7 +6,6 @@ license = "Unlicense"
 publish = false
 
 [dependencies]
-argon2 = {version = "0.5.3", features = ["std"]}
 aws-lc-rs = "1.16.3"
 base64 = "0.22.1"
 diesel = {version = "2.2.12", features = ["postgres", "uuid"]}

@@ -10,6 +10,7 @@ use crate::{
     settings::{get_settings, restart_system, update_setting},
     stream::{stream, stream_auth},
     user::{change_password, get_user_info},
+    users::{create_user, delete_user, users_list},
 };
 use axum::{
     Router,
@@ -40,6 +41,7 @@ mod info;
 mod settings;
 mod stream;
 mod user;
+mod users;
 mod util;
 
 static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
@@ -100,6 +102,9 @@ async fn main() {
         .route("/api/restart", post(restart_system))
         .route("/api/user/update_password", post(change_password))
         .route("/api/user/info", get(get_user_info))
+        .route("/api/users", get(users_list))
+        .route("/api/users/{id}", delete(delete_user))
+        .route("/api/users", post(create_user))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any).expose_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();

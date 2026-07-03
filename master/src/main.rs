@@ -4,9 +4,6 @@ use crate::device::process_devices;
 use crate::llm::process_chats;
 use crate::timers::process_timers;
 use crate::tool::process_tool_calls;
-use argon2::password_hash::SaltString;
-use argon2::password_hash::rand_core::OsRng;
-use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
 use aws_lc_rs::encoding::AsDer;
 use aws_lc_rs::rsa::{KeySize, PrivateDecryptingKey};
 use aws_lc_rs::signature::Ed25519KeyPair;
@@ -21,7 +18,7 @@ use rcgen::{CertificateParams, KeyPair, PKCS_ECDSA_P521_SHA512};
 use shared_api::{CommandOrigin, print_startup};
 use shared_server::models::{Setting, User};
 use shared_server::schema::{commands, settings, users};
-use shared_server::{get_db_pool, get_valkey_client, listen_for_restarts, notify_server, wait_for_pubsub_msg};
+use shared_server::{get_db_pool, get_valkey_client, hash_password, listen_for_restarts, notify_server, wait_for_pubsub_msg};
 use std::error::Error;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -263,17 +260,14 @@ fn create_settings(db: &mut PgConnection) {
                 return Ok(());
             }
             println!("No users found, creating admin account...");
-            let salt = SaltString::generate(OsRng);
             let password: [u8; 64] = rand::random();
             let password = BASE64_STANDARD.encode(password);
-            let params = Params::new(128 * 1024, 1, 1, Some(64)).or(Err("Invalid argon2 parameters"))?;
-            let argon = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
-            let hash = argon.hash_password(password.as_bytes(), &salt).or(Err("Couldn't hash password"))?;
+            let hash = hash_password(password.clone())?;
             diesel::insert_into(users::table)
                 .values(User {
                     id: None,
                     username: "admin".to_owned(),
-                    password: hash.to_string(),
+                    password: hash,
                     admin: true,
                     jwt_counter: 0,
                 })

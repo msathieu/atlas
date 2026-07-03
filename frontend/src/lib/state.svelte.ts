@@ -3,6 +3,7 @@ import { authenticatedFetch } from "./auth.ts";
 import { API_HOST } from "./util.ts";
 
 export const wsState: { ws: WebSocket | null; connected: boolean } = $state({ ws: null, connected: false });
+export const user = $state({ username: "unknown", admin: false });
 
 export async function connectWS(fn?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
   if (!wsState.ws && localStorage.getItem("jwt")) {

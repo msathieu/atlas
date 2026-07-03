@@ -3,6 +3,7 @@
   import { authenticatedFetch } from "$lib/auth.ts";
   import { formatTime } from "$lib/util.ts";
   import { toast } from "svelte-sonner";
+  import { user } from "$lib/state.svelte.ts";
 
   let { data } = $props();
   let selectedDevice: any = $state();
@@ -119,25 +120,27 @@
         </tbody>
       </table>
       <div class="divider"></div>
-      <form method="dialog">
-        <button
-          class="btn"
-          class:btn-disabled={selectedDevice.approved}
-          onclick={async () => {
-            await approveDevice(selectedDevice.id, selectedDevice.pubkey);
-          }}
-        >
-          <ShieldCheck />
-        </button>
-        <button
-          class="btn"
-          onclick={async () => {
-            await deleteDevice(selectedDevice.id);
-          }}
-        >
-          <Trash />
-        </button>
-      </form>
+      {#if user.admin}
+        <form method="dialog">
+          <button
+            class="btn"
+            class:btn-disabled={selectedDevice.approved}
+            onclick={async () => {
+              await approveDevice(selectedDevice.id, selectedDevice.pubkey);
+            }}
+          >
+            <ShieldCheck />
+          </button>
+          <button
+            class="btn"
+            onclick={async () => {
+              await deleteDevice(selectedDevice.id);
+            }}
+          >
+            <Trash />
+          </button>
+        </form>
+      {/if}
     </div>
   {/if}
 </dialog>

@@ -1,10 +1,10 @@
 <script lang="ts">
   import "../app.css";
-  import { Code, LogOut, MessageSquare, Server, Settings, User } from "@lucide/svelte";
+  import { Code, LogOut, MessageSquare, Server, Settings, User, Users } from "@lucide/svelte";
   import { page } from "$app/state";
   import { invalidateAll } from "$app/navigation";
   import { Toaster } from "svelte-sonner";
-  import { connectWS, wsState } from "$lib/ws.svelte.js";
+  import { connectWS, user, wsState } from "$lib/state.svelte.ts";
   let { children, data } = $props();
 
   function logout() {
@@ -40,10 +40,11 @@
         <li><a href="/devices"><Server /><span class="hidden lg:block">Devices</span></a></li>
         <li><a href="/commands"><Code /><span class="hidden lg:block">Commands</span></a></li>
         <li><a href="/chats"><MessageSquare /><span class="hidden lg:block">Chats</span></a></li>
-        {#if data.admin}
+        {#if user.admin}
           <li><a href="/settings"><Settings /><span class="hidden lg:block">Settings</span></a></li>
+          <li><a href="/users"><Users /><span class="hidden lg:block">Users</span></a></li>
         {/if}
-        <li class="mt-auto"><a href="/profile"><User /><span class="hidden lg:block">{data.username}</span></a></li>
+        <li class="mt-auto"><a href="/profile"><User /><span class="hidden lg:block">{user.username}</span></a></li>
         <li><button onclick={logout}><LogOut /><span class="hidden lg:block">Logout</span></button></li>
         <li>
           <div class="text-xs" class:bg-red-500={data.info.environment !== "production"}>

@@ -1,5 +1,9 @@
 #![forbid(unsafe_code)]
 
+use argon2::{
+    Algorithm, Argon2, Params, PasswordHasher, Version,
+    password_hash::{SaltString, rand_core::OsRng},
+};
 use diesel::{
     PgConnection,
     r2d2::{ConnectionManager, Pool},
@@ -64,4 +68,11 @@ pub async fn listen_for_restarts(component: String) {
         listen_for_restarts_task(component).await.ok();
         exit(0);
     });
+}
+pub fn hash_password(password: String) -> Result<String, Box<dyn Error>> {
+    let salt = SaltString::generate(OsRng);
+    let params = Params::new(128 * 1024, 1, 1, Some(64)).or(Err("Invalid argon2 parameters"))?;
+    let argon = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+    let hash = argon.hash_password(password.as_bytes(), &salt).or(Err("Couldn't hash password"))?;
+    Ok(hash.to_string())
 }

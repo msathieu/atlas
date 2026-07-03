@@ -7,6 +7,7 @@
   let oldPassword = $state("");
   let newPassword = $state("");
   let passwordConfirmation = $state("");
+
   async function changePassword() {
     if (newPassword != passwordConfirmation) {
       alert("New password fields don't match");

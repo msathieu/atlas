@@ -63,7 +63,7 @@
 
 <h1 class="text-xl">API Certificate</h1>
 <br />
-<textarea disabled class="textarea w-3xl h-100 resize-none">{data.tlsCert}</textarea>
+<textarea id="tlsCert" disabled class="textarea w-3xl h-100 resize-none">{data.tlsCert}</textarea>
 <br />
 
 <a

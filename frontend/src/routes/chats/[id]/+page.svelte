@@ -149,6 +149,7 @@
     }}
   >
     <textarea
+      id="content"
       class="textarea w-5xl resize-none"
       placeholder="Send Message"
       disabled={disableSend()}
