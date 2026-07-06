@@ -33,7 +33,9 @@
     }
   }
   async function registerPasskey() {
-    const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST" });
+    const body = JSON.stringify({ password: prompt("Enter your password to register a new passkey:") });
+    const encryptedBody = await encryptToServer(body);
+    const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST", body: encryptedBody, headers: { "Content-Type": "application/octet-stream" } });
     const startData = await startRes.json();
     const credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(startData["publicKey"]) });
     await authenticatedFetch(`/api/passkeys/finish_registration`, {

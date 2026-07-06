@@ -3,6 +3,7 @@ use crate::{
     get_db,
     util::{decrypt_body, sign_response, validate_signature},
 };
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::{
     Json,
     body::Bytes,
@@ -25,6 +26,10 @@ use webauthn_rs::{
     prelude::{CreationChallengeResponse, PasskeyAuthentication, PasskeyRegistration, PublicKeyCredential, RegisterPublicKeyCredential, RequestChallengeResponse, Url},
 };
 
+#[derive(Deserialize)]
+pub struct StartPasskeyRegistrationRequest {
+    password: String,
+}
 #[derive(Deserialize)]
 pub struct StartPasskeyAuthenticationRequest {
     username: String,
@@ -63,6 +68,9 @@ pub fn get_webauthn() -> Result<Webauthn, StatusCode> {
 pub async fn start_passkey_registration(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreationChallengeResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
+    let request: StartPasskeyRegistrationRequest = serde_json::from_str(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
+    let hash = PasswordHash::new(&user.password).or(Err(StatusCode::FORBIDDEN))?;
+    Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::FORBIDDEN))?;
     let webauthn = get_webauthn()?;
     let (challenge, registration) = webauthn
         .start_passkey_registration(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?, &user.username, &user.username, None)
