@@ -1,9 +1,16 @@
+import { env } from "$env/dynamic/public";
 import { authenticatedFetch } from "../../lib/auth.ts";
 import type { PageLoad } from "./$types.ts";
 
 export const load: PageLoad = async ({ fetch }) => {
   const settingsRes = await authenticatedFetch("/api/settings", {}, fetch);
   const settings = await settingsRes.json();
+  let hostname = location.hostname;
+  if (env.PUBLIC_API_HOST) {
+    hostname = env.PUBLIC_API_HOST;
+  }
+  const installationScriptRes = await authenticatedFetch(`/api/agent_script?hostname=${hostname}&arch=x86_64&os=linux`, {}, fetch);
+  const installationScript = await installationScriptRes.json();
   return {
     defaultProvider: settings["llm_default_provider"],
     openrouterModel: settings["llm_openrouter_model"],
@@ -16,5 +23,6 @@ export const load: PageLoad = async ({ fetch }) => {
     mailUsername: settings["mail_username"],
     mailFrom: settings["mail_from"],
     mailTo: settings["mail_to"],
+    installationScript: installationScript["script"],
   };
 };

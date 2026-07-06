@@ -83,6 +83,11 @@
 </a>
 <br />
 
+<h1 class="text-xl">Agent Installation Script</h1>
+<br />
+<textarea id="installationScript" disabled class="textarea w-3xl h-100 resize-none">{data.installationScript}</textarea>
+<br />
+
 <button
   class="btn"
   onclick={async () => {

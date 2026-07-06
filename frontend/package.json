@@ -13,7 +13,7 @@
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^26.1.0",
-    "daisyui": "^5.6.10",
+    "daisyui": "^5.6.13",
     "date-fns": "^4.4.0",
     "dompurify": "^3.4.11",
     "dotenv": "^17.4.2",

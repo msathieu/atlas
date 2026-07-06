@@ -10,7 +10,7 @@
     "npm:@sveltejs/vite-plugin-svelte@^7.1.2": "7.1.2_svelte@5.56.4_vite@8.1.3__@types+node@26.1.0_@types+node@26.1.0",
     "npm:@tailwindcss/vite@^4.3.2": "4.3.2_vite@8.1.3__@types+node@26.1.0_@types+node@26.1.0",
     "npm:@types/node@^26.1.0": "26.1.0",
-    "npm:daisyui@^5.6.10": "5.6.10",
+    "npm:daisyui@^5.6.13": "5.6.13",
     "npm:date-fns@^4.4.0": "4.4.0",
     "npm:dompurify@^3.4.11": "3.4.11",
     "npm:dotenv@^17.4.2": "17.4.2",
@@ -689,8 +689,8 @@
         "which"
       ]
     },
-    "daisyui@5.6.10": {
-      "integrity": "sha512-vk2E+iIETWGd/jUAC0Bu6OLU4HJSSj7Q2vvsZGiJN/+vt1RK3/UEiLYC9GTldQdD3yQkjNzWb8AYYpmTenQzJg=="
+    "daisyui@5.6.13": {
+      "integrity": "sha512-0UHyNG3TzF7pDIbPcWyLKQfgtGhJcIq2x26jwsDKp7ZhL0GwaqIMZ12+TWfp8p+mE4NNc29SJk63hEXTz3MQkg=="
     },
     "date-fns@4.4.0": {
       "integrity": "sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w=="
@@ -1440,7 +1440,7 @@
         "npm:@sveltejs/vite-plugin-svelte@^7.1.2",
         "npm:@tailwindcss/vite@^4.3.2",
         "npm:@types/node@^26.1.0",
-        "npm:daisyui@^5.6.10",
+        "npm:daisyui@^5.6.13",
         "npm:date-fns@^4.4.0",
         "npm:dompurify@^3.4.11",
         "npm:dotenv@^17.4.2",

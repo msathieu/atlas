@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    agent::{download_agent, download_auth},
+    agent::{download_agent, download_auth, get_agent_script},
     auth::login,
     chat::{chats_list, create_chat, delete_chat, delete_message, get_chat, manage_tool_call_consent, send_message},
     commands::{commands_list, create_command, delete_command},
@@ -99,6 +99,7 @@ async fn main() {
         .route("/api/stream_auth", post(stream_auth))
         .route("/api/atlas-agent", get(download_agent))
         .route("/api/download_auth", post(download_auth))
+        .route("/api/agent_script", get(get_agent_script))
         .route("/api/restart", post(restart_system))
         .route("/api/user/update_password", post(change_password))
         .route("/api/user/info", get(get_user_info))
