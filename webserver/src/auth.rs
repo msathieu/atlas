@@ -41,9 +41,9 @@ pub struct LoginResponse {
 }
 
 #[cfg(debug_assertions)]
-const JWT_EXPIRY: usize = 8 * 60 * 60;
+pub const JWT_EXPIRY: usize = 8 * 60 * 60;
 #[cfg(not(debug_assertions))]
-const JWT_EXPIRY: usize = 60 * 60;
+pub const JWT_EXPIRY: usize = 60 * 60;
 
 pub fn parse_pubkey(pubkey: String) -> Result<ParsedPublicKey, StatusCode> {
     let key = UnparsedPublicKey::new(&ED25519, BASE64_STANDARD.decode(pubkey).or(Err(StatusCode::BAD_REQUEST))?)

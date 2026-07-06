@@ -27,6 +27,7 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
     let allowed_settings = [
         "allow_new_devices",
         "apiserver_host",
+        "webserver_host",
         "mail_server",
         "mail_username",
         "mail_from",
@@ -52,6 +53,7 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
     let allowed_settings = [
         "allow_new_devices",
         "apiserver_host",
+        "webserver_host",
         "mail_server",
         "mail_username",
         "mail_password",

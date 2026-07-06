@@ -135,3 +135,12 @@ pub struct PreapprovedCode {
     pub chat: Uuid,
     pub code: String,
 }
+
+#[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
+#[diesel(table_name = crate::schema::passkeys)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Passkey {
+    pub id: Vec<u8>,
+    pub uid: Uuid,
+    pub passkey: String,
+}

@@ -17,16 +17,48 @@
       body: encryptedBody,
       headers: { "Content-Type": "application/octet-stream" },
     });
+    if (!response.ok) {
+      toast.error("Invalid Credentials");
+      return;
+    }
     const bodyHash = await crypto.subtle.digest("SHA-512", encryptedBody);
     await verifyResponseSignature(response, `login-${bufferToBase64(bodyHash)}`);
-    if (response.ok) {
-      const json = await response.json();
-      localStorage.setItem("jwt", json["jwt"]);
-      localStorage.setItem("privkey", bufferToBase64(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey)));
-      await goto("/");
-    } else {
+    const json = await response.json();
+    finishAuth(json["jwt"], keyPair);
+  }
+  async function passkeyLogin() {
+    const startBody = JSON.stringify({ username });
+    const startRes = await fetch(`${API_HOST}/api/passkeys/start_authentication`, { method: "POST", body: startBody });
+    if (!startRes.ok) {
       toast.error("Invalid Credentials");
+      return;
     }
+    const encoder = new TextEncoder();
+    const startHash = await crypto.subtle.digest("SHA-512", encoder.encode(startBody));
+    await verifyResponseSignature(startRes, `passkey_start-${bufferToBase64(startHash)}`);
+    const startData = await startRes.json();
+    const credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(startData["challenge"]["publicKey"]) });
+    const keyPair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
+    const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
+    const encryptedBody = await encryptToServer(JSON.stringify({ flow_id: startData["flow_id"], credential, pubkey }));
+    const finishRes = await fetch(`${API_HOST}/api/passkeys/finish_authentication`, {
+      method: "POST",
+      body: encryptedBody,
+      headers: { "Content-Type": "application/octet-stream" },
+    });
+    if (!finishRes.ok) {
+      toast.error("Invalid Credentials");
+      return;
+    }
+    const finishHash = await crypto.subtle.digest("SHA-512", encryptedBody);
+    await verifyResponseSignature(finishRes, `passkey_finish-${bufferToBase64(finishHash)}`);
+    const json = await finishRes.json();
+    finishAuth(json["jwt"], keyPair);
+  }
+  async function finishAuth(jwt: string, keyPair: CryptoKeyPair) {
+    localStorage.setItem("jwt", jwt);
+    localStorage.setItem("privkey", bufferToBase64(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey)));
+    await goto("/");
   }
 </script>
 
@@ -43,8 +75,18 @@
     >
       <fieldset class="fieldset">
         <input id="username" type="text" placeholder="Username" class="input" required autocomplete="username" bind:value={username} />
-        <input id="password" type="password" placeholder="Password" class="input" required autocomplete="current-password" bind:value={password} />
+        <input id="password" type="password" placeholder="Password" class="input" autocomplete="current-password" bind:value={password} />
         <button class="btn btn-primary">Login</button>
+        <div class="divider"></div>
+        <button
+          class="btn btn-primary"
+          onclick={async (e) => {
+            e.preventDefault();
+            await passkeyLogin();
+          }}
+        >
+          Login With Passkey
+        </button>
       </fieldset>
     </form>
   </div>

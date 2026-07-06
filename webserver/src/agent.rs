@@ -9,10 +9,11 @@ use axum::{
     extract::{OriginalUri, Query},
     http::{HeaderMap, StatusCode},
 };
+use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 use shared_api::{SUPPORTED_ARCH, SUPPORTED_OS};
-use shared_server::binary::personalize_binary;
+use shared_server::{binary::personalize_binary, models::Setting, schema::settings};
 
 #[derive(Deserialize)]
 pub struct DownloadAuth {
@@ -22,7 +23,6 @@ pub struct DownloadAuth {
 }
 #[derive(Deserialize)]
 pub struct GetAgentScriptRequest {
-    pub hostname: String,
     pub arch: String,
     pub os: String,
 }
@@ -39,9 +39,18 @@ pub async fn get_agent_script(headers: HeaderMap, uri: OriginalUri, request: Que
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let mut db = get_db()?;
-    let agent = personalize_binary(&mut db, &request.arch, &request.os).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let agent = match personalize_binary(&mut db, &request.arch, &request.os).await {
+        Ok(agent) => agent,
+        Err(_) => {
+            let response = GetAgentScriptResponse {
+                script: "No binary found".to_string(),
+            };
+            return Ok((sign_response(signature, Some(&response))?, Json(response)));
+        }
+    };
     let hash = Sha512::digest(&agent).to_vec();
     let jwt = generate_jwt("webserver-download", &user, 10 * 60, None)?;
+    let web_host: Setting = settings::table.find("webserver_host").get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let script = format!(
         r#"curl -fO "https://{}/api/atlas-agent?auth={}&arch={}&os={}" &&\
 sha512sum -c <<< "{}  atlas-agent" &&\
@@ -49,7 +58,7 @@ chmod +x atlas-agent &&\
 ./atlas-agent install &&\
 rm atlas-agent
 "#,
-        request.hostname,
+        web_host.value,
         jwt,
         request.arch,
         request.os,

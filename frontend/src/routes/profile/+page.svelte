@@ -3,7 +3,7 @@
   import { encryptToServer } from "$lib/util";
   import { toast } from "svelte-sonner";
 
-  let dialog: any = $state();
+  let passwordDialog: any = $state();
   let oldPassword = $state("");
   let newPassword = $state("");
   let passwordConfirmation = $state("");
@@ -24,7 +24,7 @@
       "application/octet-stream",
     );
     if (response.ok) {
-      dialog.close();
+      passwordDialog.close();
       toast.success("Changed password");
       localStorage.clear();
       location.reload();
@@ -32,22 +32,31 @@
       toast.error("Request denied");
     }
   }
+  async function registerPasskey() {
+    const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST" });
+    const startData = await startRes.json();
+    const credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(startData["publicKey"]) });
+    await authenticatedFetch(`/api/passkeys/finish_registration`, {
+      method: "POST",
+      body: JSON.stringify(credential),
+    });
+  }
 </script>
 
 <button
   class="btn"
   onclick={() => {
-    dialog.showModal();
+    passwordDialog.showModal();
   }}
 >
-  Change password
+  Change Password
 </button>
-<dialog bind:this={dialog} class="modal">
+<dialog bind:this={passwordDialog} class="modal">
   <form class="modal-backdrop" method="dialog">
     <button>Close</button>
   </form>
   <div class="modal-box max-w-200">
-    <h1>Change password</h1>
+    <h1>Change Password</h1>
     <form
       onsubmit={async () => {
         await changePassword();
@@ -62,3 +71,12 @@
     </form>
   </div>
 </dialog>
+<br />
+<button
+  class="btn"
+  onclick={async () => {
+    await registerPasskey();
+  }}
+>
+  Register Passkey
+</button>

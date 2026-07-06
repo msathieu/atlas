@@ -103,6 +103,14 @@ fn create_settings(db: &mut PgConnection) {
                     })
                     .execute(db)?;
             }
+            if !does_setting_exist(db, "webserver_host")? {
+                diesel::insert_into(settings::table)
+                    .values(Setting {
+                        name: "webserver_host".to_owned(),
+                        value: "localhost".to_string(),
+                    })
+                    .execute(db)?;
+            }
             if !does_setting_exist(db, "llm_default_provider")? {
                 diesel::insert_into(settings::table)
                     .values(Setting {

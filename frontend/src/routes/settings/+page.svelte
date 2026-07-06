@@ -13,7 +13,8 @@
   let genericModel = $derived(data.genericModel);
   let genericKey = $state("");
   let allowNewDevices = $derived(data.allowNewDevices === "true");
-  let apiServerHost = $derived(data.apiserverHost);
+  let apiserverHost = $derived(data.apiserverHost);
+  let webserverHost = $derived(data.webserverHost);
   let mailServer = $derived(data.mailServer);
   let mailUsername = $derived(data.mailUsername);
   let mailPassword = $state("");
@@ -54,7 +55,8 @@
 </form>
 <br />
 
-<Setting name="apiserver_host" description="API Server Host" val={apiServerHost} />
+<Setting name="apiserver_host" description="API Server Host" val={apiserverHost} />
+<Setting name="webserver_host" description="Web Server Host" val={webserverHost} />
 <Setting name="mail_server" description="Mail Server" val={mailServer} />
 <Setting name="mail_username" description="Mail Username" val={mailUsername} />
 <Setting name="mail_password" description="Mail Password" val={mailPassword} />

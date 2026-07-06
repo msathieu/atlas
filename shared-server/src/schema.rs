@@ -81,6 +81,14 @@ diesel::table! {
 }
 
 diesel::table! {
+    passkeys (id) {
+        id -> Bytea,
+        uid -> Uuid,
+        passkey -> Varchar,
+    }
+}
+
+diesel::table! {
     preapproved_code (id) {
         id -> Uuid,
         chat -> Uuid,
@@ -124,6 +132,7 @@ diesel::joinable!(commands -> devices (device));
 diesel::joinable!(commands -> users (uid));
 diesel::joinable!(device_info -> devices (device));
 diesel::joinable!(messages -> chats (chat));
+diesel::joinable!(passkeys -> users (uid));
 diesel::joinable!(preapproved_code -> chats (chat));
 
-diesel::allow_tables_to_appear_in_same_query!(chats, commands, device_info, devices, messages, preapproved_code, settings, tool_calls, users,);
+diesel::allow_tables_to_appear_in_same_query!(chats, commands, device_info, devices, messages, passkeys, preapproved_code, settings, tool_calls, users,);
