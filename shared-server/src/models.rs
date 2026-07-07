@@ -143,4 +143,7 @@ pub struct Passkey {
     pub id: Vec<u8>,
     pub uid: Uuid,
     pub passkey: String,
+    pub created_at: SystemTime,
+    pub last_used: Option<SystemTime>,
+    pub name: String,
 }

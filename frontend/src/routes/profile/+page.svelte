@@ -1,8 +1,10 @@
 <script lang="ts">
   import { authenticatedFetch } from "$lib/auth.ts";
-  import { encryptToServer } from "$lib/util";
+  import { encryptToServer, formatTime } from "$lib/util.ts";
+  import { Trash } from "@lucide/svelte";
   import { toast } from "svelte-sonner";
 
+  let { data } = $props();
   let passwordDialog: any = $state();
   let oldPassword = $state("");
   let newPassword = $state("");
@@ -40,7 +42,12 @@
     const credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(startData["publicKey"]) });
     await authenticatedFetch(`/api/passkeys/finish_registration`, {
       method: "POST",
-      body: JSON.stringify(credential),
+      body: JSON.stringify({ credential, name: prompt("Enter a name for your passkey:") }),
+    });
+  }
+  async function deletePasskey(id: string) {
+    await authenticatedFetch(`/api/passkeys/${id}`, {
+      method: "DELETE",
     });
   }
 </script>
@@ -82,3 +89,37 @@
 >
   Register Passkey
 </button>
+<div class="divider"></div>
+<table class="border border-base-content/10 table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Created At</th>
+      <th>Last Used</th>
+      <th>Delete</th>
+    </tr>
+  </thead>
+  <tbody>
+    {#each data.passkeys as passkey}
+      <tr class="hover:bg-base-200">
+        <td>{passkey.name}</td>
+        <td>{formatTime(passkey.created_at)}</td>
+        {#if passkey.last_used}
+          <td>{formatTime(passkey.last_used)}</td>
+        {:else}
+          <td>Never</td>
+        {/if}
+        <td>
+          <button
+            class="btn"
+            onclick={async () => {
+              await deletePasskey(passkey.id);
+            }}
+          >
+            <Trash />
+          </button>
+        </td>
+      </tr>
+    {/each}
+  </tbody>
+</table>

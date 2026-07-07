@@ -7,7 +7,7 @@ use crate::{
     commands::{commands_list, create_command, delete_command},
     devices::{approve_device, delete_device, devices_list},
     info::server_info,
-    passkey::{finish_passkey_authentication, finish_passkey_registration, start_passkey_authentication, start_passkey_registration},
+    passkey::{delete_passkey, finish_passkey_authentication, finish_passkey_registration, passkeys_list, start_passkey_authentication, start_passkey_registration},
     settings::{get_settings, restart_system, update_setting},
     stream::{stream, stream_auth},
     user::{change_password, get_user_info},
@@ -112,6 +112,8 @@ async fn main() {
         .route("/api/passkeys/finish_registration", post(finish_passkey_registration))
         .route("/api/passkeys/start_authentication", post(start_passkey_authentication))
         .route("/api/passkeys/finish_authentication", post(finish_passkey_authentication))
+        .route("/api/passkeys", get(passkeys_list))
+        .route("/api/passkeys/{id}", delete(delete_passkey))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any).expose_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();

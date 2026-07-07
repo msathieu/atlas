@@ -85,6 +85,9 @@ diesel::table! {
         id -> Bytea,
         uid -> Uuid,
         passkey -> Varchar,
+        created_at -> Timestamp,
+        last_used -> Nullable<Timestamp>,
+        name -> Varchar,
     }
 }
 

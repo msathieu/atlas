@@ -95,3 +95,11 @@ CREATE TABLE preapproved_code(
     chat uuid NOT NULL REFERENCES chats ON DELETE CASCADE,
     code varchar NOT NULL
 );
+CREATE TABLE passkeys(
+  id bytea PRIMARY KEY,
+  uid uuid NOT NULL REFERENCES users ON DELETE CASCADE,
+  passkey varchar NOT NULL,
+  created_at timestamp NOT NULL,
+  last_used timestamp,
+  name varchar NOT NULL
+);

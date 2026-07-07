@@ -1,13 +1,13 @@
 use crate::{
     auth::{JWT_EXPIRY, authenticate, generate_jwt},
     get_db,
-    util::{decrypt_body, sign_response, validate_signature},
+    util::{convert_timestamp, decrypt_body, sign_response, validate_signature},
 };
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::{
     Json,
     body::Bytes,
-    extract::OriginalUri,
+    extract::{OriginalUri, Path},
     http::{HeaderMap, StatusCode},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
@@ -18,17 +18,25 @@ use sha2::{Digest, Sha512};
 use shared_server::{
     get_valkey_client,
     models::{Passkey, Setting, User},
+    notify_server,
     schema::{passkeys, settings, users},
 };
+use std::time::SystemTime;
 use uuid::Uuid;
 use webauthn_rs::{
     Webauthn, WebauthnBuilder,
     prelude::{CreationChallengeResponse, PasskeyAuthentication, PasskeyRegistration, PublicKeyCredential, RegisterPublicKeyCredential, RequestChallengeResponse, Url},
 };
+use webauthn_rs_core::proto::CredentialID;
 
 #[derive(Deserialize)]
 pub struct StartPasskeyRegistrationRequest {
     password: String,
+}
+#[derive(Deserialize)]
+pub struct FinishPasskeyRegistrationRequest {
+    name: String,
+    credential: RegisterPublicKeyCredential,
 }
 #[derive(Deserialize)]
 pub struct StartPasskeyAuthenticationRequest {
@@ -54,6 +62,13 @@ struct PasskeyAuthenticationValkey {
     authentication: PasskeyAuthentication,
     uid: Uuid,
 }
+#[derive(Serialize)]
+pub struct APIPasskey {
+    id: String,
+    created_at: u64,
+    last_used: Option<u64>,
+    name: String,
+}
 
 pub fn get_webauthn() -> Result<Webauthn, StatusCode> {
     let mut db = get_db()?;
@@ -72,8 +87,14 @@ pub async fn start_passkey_registration(headers: HeaderMap, uri: OriginalUri, bo
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::FORBIDDEN))?;
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::FORBIDDEN))?;
     let webauthn = get_webauthn()?;
+    let mut db = get_db()?;
+    let passkeys_db: Vec<Passkey> = passkeys::table
+        .filter(passkeys::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .load(&mut db)
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let credential_ids = passkeys_db.iter().map(|i| CredentialID::from(i.id.clone())).collect();
     let (challenge, registration) = webauthn
-        .start_passkey_registration(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?, &user.username, &user.username, None)
+        .start_passkey_registration(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?, &user.username, &user.username, Some(credential_ids))
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
     let key = format!("PASSKEY_REGISTRATION:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?);
@@ -84,7 +105,7 @@ pub async fn start_passkey_registration(headers: HeaderMap, uri: OriginalUri, bo
 pub async fn finish_passkey_registration(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: RegisterPublicKeyCredential = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: FinishPasskeyRegistrationRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
     let key = format!("PASSKEY_REGISTRATION:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?);
     let registration_json: Option<String> = valkey_client.get_del(key).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
@@ -93,15 +114,19 @@ pub async fn finish_passkey_registration(headers: HeaderMap, uri: OriginalUri, b
         None => return Err(StatusCode::BAD_REQUEST),
     };
     let webauthn = get_webauthn()?;
-    let passkey = webauthn.finish_passkey_registration(&request, &registration).or(Err(StatusCode::BAD_REQUEST))?;
+    let passkey = webauthn.finish_passkey_registration(&request.credential, &registration).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let passkey_json = serde_json::to_string(&passkey).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let passkey_db = Passkey {
         id: passkey.cred_id().to_vec(),
         uid: user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
         passkey: passkey_json,
+        created_at: SystemTime::now(),
+        last_used: None,
+        name: request.name,
     };
     diesel::insert_into(passkeys::table).values(passkey_db).execute(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
 pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Json<StartPasskeyAuthenticationResponse>), StatusCode> {
@@ -113,6 +138,9 @@ pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Jso
         .filter(passkeys::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .load(&mut db)
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    if passkeys_db.is_empty() {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
     let mut passkeys = vec![];
     for i in passkeys_db {
         let passkey: webauthn_rs::prelude::Passkey = serde_json::from_str(&i.passkey).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
@@ -146,14 +174,57 @@ pub async fn finish_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Js
         .or(Err(StatusCode::UNAUTHORIZED))?;
     let mut db = get_db()?;
     let user: User = users::table.find(authentication.uid).get_result(&mut db).or(Err(StatusCode::UNAUTHORIZED))?;
-    let _: Passkey = passkeys::table
+    let passkey_db: Passkey = passkeys::table
         .filter(passkeys::uid.eq(authentication.uid).and(passkeys::id.eq(result.cred_id().to_vec())))
         .first(&mut db)
         .or(Err(StatusCode::UNAUTHORIZED))?;
+    let mut passkey: webauthn_rs::prelude::Passkey = serde_json::from_str(&passkey_db.passkey).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    passkey.update_credential(&result);
+    diesel::update(passkeys::table.filter(passkeys::uid.eq(authentication.uid).and(passkeys::id.eq(passkey_db.id))))
+        .set((
+            passkeys::passkey.eq(serde_json::to_string(&passkey).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?),
+            passkeys::last_used.eq(Some(SystemTime::now())),
+        ))
+        .execute(&mut db)
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
     let response = FinishPasskeyAuthenticationResponse { jwt };
     Ok((
         sign_response(format!("passkey_finish-{}", BASE64_STANDARD.encode(Sha512::digest(body))), Some(&response))?,
         Json(response),
     ))
+}
+pub async fn passkeys_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIPasskey>>), StatusCode> {
+    let user = authenticate(&headers)?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
+    let mut db = get_db()?;
+    let passkeys: Vec<Passkey> = passkeys::table
+        .filter(passkeys::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .get_results(&mut db)
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let passkeys: Result<Vec<APIPasskey>, StatusCode> = passkeys
+        .iter()
+        .map(|passkey| {
+            Ok(APIPasskey {
+                id: hex::encode(&passkey.id),
+                created_at: convert_timestamp(passkey.created_at)?,
+                last_used: passkey.last_used.map(|timestamp| convert_timestamp(timestamp).unwrap_or(0)),
+                name: passkey.name.clone(),
+            })
+        })
+        .collect();
+    let passkeys = passkeys?;
+    Ok((sign_response(signature, Some(&passkeys))?, Json(passkeys)))
+}
+pub async fn delete_passkey(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+    let user = authenticate(&headers)?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
+    let mut db = get_db()?;
+    let credential_id = hex::decode(id).or(Err(StatusCode::BAD_REQUEST))?;
+    diesel::delete(passkeys::table.filter(passkeys::id.eq(credential_id).and(passkeys::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))))
+        .execute(&mut db)
+        .or(Err(StatusCode::NOT_FOUND))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    sign_response::<String>(signature, None)
 }
