@@ -20,7 +20,7 @@ static PUBSUB_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
 
 pub fn get_db_pool() -> Result<Pool<ConnectionManager<PgConnection>>, Box<dyn Error>> {
     let url = format!(
-        "postgres://{}:{}@{}/{}",
+        "postgres://{}:{}@{}/{}?sslmode=require",
         env::var("DATABASE_USER").unwrap_or("app".to_string()),
         env::var("DATABASE_PASSWORD").unwrap_or("".to_string()),
         env::var("DATABASE_HOST").unwrap_or("localhost".to_string()),
@@ -31,7 +31,11 @@ pub fn get_db_pool() -> Result<Pool<ConnectionManager<PgConnection>>, Box<dyn Er
     Ok(pool)
 }
 pub async fn get_valkey_client() -> Result<(redis::aio::ConnectionManager, UnboundedReceiver<PushInfo>), RedisError> {
-    let url = format!("redis://{}/?protocol=resp3", env::var("VALKEY_HOST").unwrap_or("localhost".to_string()));
+    let url = format!(
+        "redis://:{}@{}/?protocol=resp3",
+        env::var("VALKEY_PASSWORD").unwrap_or("".to_string()),
+        env::var("VALKEY_HOST").unwrap_or("localhost".to_string())
+    );
     let client = redis::Client::open(url)?;
     let mut config = ConnectionManagerConfig::new();
     config = config.set_automatic_resubscription();
