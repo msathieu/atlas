@@ -23,6 +23,7 @@ use std::error::Error;
 use std::sync::OnceLock;
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
+use webauthn_rs::fake::{FakePasskeyDistribution, WebauthnFakeCredentialGenerator};
 
 mod device;
 mod llm;
@@ -254,6 +255,15 @@ fn create_settings(db: &mut PgConnection) {
                     .values(Setting {
                         name: "web_signing_key".to_owned(),
                         value: BASE64_STANDARD.encode(web_signing_key.as_ref()),
+                    })
+                    .execute(db)?;
+            }
+            if !does_setting_exist(db, "fake_passkey_key")? {
+                let fake_passkey_key = WebauthnFakeCredentialGenerator::<FakePasskeyDistribution>::new_hmac_key()?;
+                diesel::insert_into(settings::table)
+                    .values(Setting {
+                        name: "fake_passkey_key".to_owned(),
+                        value: BASE64_STANDARD.encode(fake_passkey_key),
                     })
                     .execute(db)?;
             }
