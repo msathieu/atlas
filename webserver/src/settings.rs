@@ -37,6 +37,7 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
         "llm_generic_model",
         "llm_openrouter_model",
         "tls_cert",
+        "apk_hash",
     ];
     let mut settings = HashMap::new();
     for name in allowed_settings {
@@ -65,6 +66,7 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
         "llm_generic_model",
         "llm_openrouter_key",
         "llm_openrouter_model",
+        "apk_hash",
     ];
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);

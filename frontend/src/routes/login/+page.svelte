@@ -3,6 +3,7 @@
   import { verifyResponseSignature } from "$lib/auth.ts";
   import { API_HOST, bufferToBase64, encryptToServer } from "$lib/util.ts";
   import { toast } from "svelte-sonner";
+  import { Passkeys } from "@capawesome/capacitor-passkeys";
 
   let username = $state(localStorage.getItem("username") || "");
   let password = $state("");
@@ -37,7 +38,7 @@
     const startHash = await crypto.subtle.digest("SHA-512", encoder.encode(startBody));
     await verifyResponseSignature(startRes, `passkey_start-${bufferToBase64(startHash)}`);
     const startData = await startRes.json();
-    const credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(startData["challenge"]["publicKey"]) });
+    const credential = await Passkeys.getPasskey(startData["challenge"]["publicKey"]);
     const keyPair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
     const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
     const encryptedBody = await encryptToServer(JSON.stringify({ flow_id: startData["flow_id"], credential, pubkey }));

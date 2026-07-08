@@ -10,7 +10,7 @@ use axum::{
     extract::{OriginalUri, Path},
     http::{HeaderMap, StatusCode},
 };
-use base64::{Engine, prelude::BASE64_STANDARD};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
@@ -75,11 +75,16 @@ pub fn get_webauthn() -> Result<Webauthn, StatusCode> {
     let mut db = get_db()?;
     let web_host: Setting = settings::table.find("webserver_host").get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let url = Url::parse(&format!("https://{}", web_host.value)).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let webauthn = WebauthnBuilder::new(&web_host.value, &url)
-        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
-        .build()
-        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    Ok(webauthn)
+    let apk_hash: Setting = settings::table.find("apk_hash").get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let mut builder = WebauthnBuilder::new(&web_host.value, &url).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    if !apk_hash.value.is_empty() {
+        let apk_hash = apk_hash.value.replace(":", "");
+        let apk_hash = hex::decode(apk_hash).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        let apk_hash = URL_SAFE_NO_PAD.encode(apk_hash);
+        let url = Url::parse(&format!("android:apk-key-hash:{}", apk_hash)).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        builder = builder.append_allowed_origin(&url);
+    }
+    builder.build().or(Err(StatusCode::INTERNAL_SERVER_ERROR))
 }
 pub async fn start_passkey_registration(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreationChallengeResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;

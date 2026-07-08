@@ -20,5 +20,6 @@ export const load: PageLoad = async ({ fetch }) => {
     mailFrom: settings["mail_from"],
     mailTo: settings["mail_to"],
     installationScript: installationScript["script"],
+    "apkHash": settings["apk_hash"],
   };
 };

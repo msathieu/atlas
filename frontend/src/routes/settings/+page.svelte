@@ -20,6 +20,7 @@
   let mailPassword = $state("");
   let mailFrom = $derived(data.mailFrom);
   let mailTo = $derived(data.mailTo);
+  let apkHash = $derived(data.apkHash);
 
   let downloadLink: any = $state();
   let actuallyDownload = false;
@@ -62,6 +63,7 @@
 <Setting name="mail_password" description="Mail Password" val={mailPassword} />
 <Setting name="mail_from" description="Mail From" val={mailFrom} />
 <Setting name="mail_to" description="Mail To" val={mailTo} />
+<Setting name="apk_hash" description="APK Hash" val={apkHash} />
 
 <h1 class="text-xl">API Certificate</h1>
 <br />

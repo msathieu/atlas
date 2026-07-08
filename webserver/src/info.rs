@@ -1,13 +1,19 @@
-use crate::util::{get_encryption_key, get_signing_key, sign_response};
+use crate::{
+    get_db,
+    util::{get_encryption_key, get_signing_key, sign_response},
+};
 use aws_lc_rs::{encoding::AsDer, signature::KeyPair};
 use axum::{
     Json,
     http::{HeaderMap, StatusCode},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
+use diesel::prelude::*;
 use gethostname::gethostname;
 use serde::Serialize;
+use serde_json::json;
 use shared_api::{API_VERSION, MAGIC};
+use shared_server::{models::Setting, schema::settings};
 
 #[derive(Serialize)]
 pub struct APIServerInfo {
@@ -39,4 +45,14 @@ pub async fn server_info() -> Result<(HeaderMap, Json<APIServerInfo>), StatusCod
         environment: environment.to_string(),
     };
     Ok((sign_response("info".to_string(), Some(&info))?, Json(info)))
+}
+pub async fn assetlinks() -> Result<Json<serde_json::Value>, StatusCode> {
+    let mut db = get_db()?;
+    let apk_hash: Setting = settings::table.find("apk_hash").get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let mut fingerprints = vec![];
+    if !apk_hash.value.is_empty() {
+        fingerprints.push(apk_hash.value);
+    }
+    let assetlinks = json!([{"relation": ["delegate_permission/common.handle_all_urls", "delegate_permission/common.get_login_creds"], "target": {"namespace": "android_app", "package_name": "com.strypsteen.atlas", "sha256_cert_fingerprints": fingerprints}}]);
+    Ok(Json(assetlinks))
 }

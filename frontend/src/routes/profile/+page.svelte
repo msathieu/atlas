@@ -3,6 +3,7 @@
   import { encryptToServer, formatTime } from "$lib/util.ts";
   import { Trash } from "@lucide/svelte";
   import { toast } from "svelte-sonner";
+  import { Passkeys } from "@capawesome/capacitor-passkeys";
 
   let { data } = $props();
   let passwordDialog: any = $state();
@@ -40,7 +41,7 @@
     const encryptedBody = await encryptToServer(body);
     const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST", body: encryptedBody, headers: { "Content-Type": "application/octet-stream" } });
     const startData = await startRes.json();
-    const credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(startData["publicKey"]) });
+    const credential = await Passkeys.createPasskey(startData["publicKey"]);
     await authenticatedFetch(`/api/passkeys/finish_registration`, {
       method: "POST",
       body: JSON.stringify({ credential, name: prompt("Enter a name for your passkey:") }),

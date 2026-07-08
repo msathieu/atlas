@@ -267,6 +267,14 @@ fn create_settings(db: &mut PgConnection) {
                     })
                     .execute(db)?;
             }
+            if !does_setting_exist(db, "apk_hash")? {
+                diesel::insert_into(settings::table)
+                    .values(Setting {
+                        name: "apk_hash".to_owned(),
+                        value: "".to_owned(),
+                    })
+                    .execute(db)?;
+            }
             Ok::<(), Box<dyn Error>>(())
         })
         .unwrap();

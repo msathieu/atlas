@@ -6,7 +6,7 @@ use crate::{
     chat::{chats_list, create_chat, delete_chat, delete_message, get_chat, manage_tool_call_consent, send_message},
     commands::{commands_list, create_command, delete_command},
     devices::{approve_device, delete_device, devices_list},
-    info::server_info,
+    info::{assetlinks, server_info},
     passkey::{delete_passkey, finish_passkey_authentication, finish_passkey_registration, passkeys_list, start_passkey_authentication, start_passkey_registration},
     settings::{get_settings, restart_system, update_setting},
     stream::{stream, stream_auth},
@@ -114,6 +114,7 @@ async fn main() {
         .route("/api/passkeys/finish_authentication", post(finish_passkey_authentication))
         .route("/api/passkeys", get(passkeys_list))
         .route("/api/passkeys/{id}", delete(delete_passkey))
+        .route("/.well-known/assetlinks.json", get(assetlinks))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any).expose_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();
