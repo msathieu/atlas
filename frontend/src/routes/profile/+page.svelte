@@ -28,7 +28,8 @@
     if (response.ok) {
       passwordDialog.close();
       toast.success("Changed password");
-      localStorage.clear();
+      localStorage.removeItem("jwt");
+      localStorage.removeItem("privkey");
       location.reload();
     } else {
       toast.error("Request denied");

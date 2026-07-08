@@ -4,7 +4,7 @@
   import { API_HOST, bufferToBase64, encryptToServer } from "$lib/util.ts";
   import { toast } from "svelte-sonner";
 
-  let username = $state("");
+  let username = $state(localStorage.getItem("username") || "");
   let password = $state("");
 
   async function login() {
@@ -24,7 +24,7 @@
     const bodyHash = await crypto.subtle.digest("SHA-512", encryptedBody);
     await verifyResponseSignature(response, `login-${bufferToBase64(bodyHash)}`);
     const json = await response.json();
-    finishAuth(json["jwt"], keyPair);
+    finishAuth(username, json["jwt"], keyPair);
   }
   async function passkeyLogin() {
     const startBody = JSON.stringify({ username });
@@ -53,9 +53,10 @@
     const finishHash = await crypto.subtle.digest("SHA-512", encryptedBody);
     await verifyResponseSignature(finishRes, `passkey_finish-${bufferToBase64(finishHash)}`);
     const json = await finishRes.json();
-    finishAuth(json["jwt"], keyPair);
+    finishAuth(username, json["jwt"], keyPair);
   }
-  async function finishAuth(jwt: string, keyPair: CryptoKeyPair) {
+  async function finishAuth(username: string, jwt: string, keyPair: CryptoKeyPair) {
+    localStorage.setItem("username", username);
     localStorage.setItem("jwt", jwt);
     localStorage.setItem("privkey", bufferToBase64(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey)));
     await goto("/");

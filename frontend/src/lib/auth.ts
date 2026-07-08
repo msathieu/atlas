@@ -56,7 +56,8 @@ export async function authenticatedFetch(
   init["headers"].append("X-Request-Signature", requestSignature);
   const response = await fn(url, init);
   if (response.status === 401) {
-    localStorage.clear();
+    localStorage.removeItem("jwt");
+    localStorage.removeItem("privkey");
     location.reload();
     throw new Error("Unauthorized");
   }

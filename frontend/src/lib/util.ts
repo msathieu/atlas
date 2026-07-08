@@ -48,7 +48,7 @@ export async function encryptToServer(data: string): Promise<ArrayBuffer> {
 export async function signRequest(data: string): Promise<string> {
   const keyStr = localStorage.getItem("privkey");
   if (!keyStr) {
-    localStorage.clear();
+    localStorage.removeItem("jwt");
     location.reload();
     throw new Error("No private key in storage");
   }
