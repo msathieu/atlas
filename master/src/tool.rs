@@ -6,7 +6,7 @@ use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, Pool},
 };
-use rig_core::{tool::ToolDyn, tools::ThinkTool};
+use rig_core::tool::{ToolDyn, builtin::ThinkTool};
 use shared_server::{
     models::{Chat, ToolCall},
     notify_server,

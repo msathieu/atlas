@@ -1,7 +1,4 @@
-use rig_core::{
-    completion::ToolDefinition,
-    tool::{Tool, ToolError},
-};
+use rig_core::tool::{Tool, ToolError};
 use serde::Deserialize;
 use serde_json::json;
 use std::time::Duration;
@@ -20,18 +17,17 @@ impl Tool for SleepTool {
     type Args = SleepArgs;
     type Output = String;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: self.name(),
-            description: "Sleep for a certain time".into(),
-            parameters: json!({
-              "type": "object",
-              "properties": {
-                "seconds": {"type": "number", "description": "The amount of seconds to sleep for"},
-              },
-              "required": ["seconds"]
-            }),
-        }
+    fn description(&self) -> String {
+        "Sleep for a certain time".into()
+    }
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+        "type": "object",
+            "properties": {
+              "seconds": {"type": "number", "description": "The amount of seconds to sleep for"},
+            },
+            "required": ["seconds"]
+          })
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         sleep(Duration::from_secs(args.seconds)).await;

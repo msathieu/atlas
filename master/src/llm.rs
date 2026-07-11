@@ -14,7 +14,7 @@ use rig_core::{
     completion::Completion,
     message::{AssistantContent, ReasoningContent, ToolFunction, ToolResult, ToolResultContent, UserContent},
     providers::{openai, openrouter},
-    tools::ThinkTool,
+    tool::builtin::ThinkTool,
 };
 use shared_api::ChatType;
 use shared_server::{

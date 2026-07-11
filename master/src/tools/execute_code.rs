@@ -1,9 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
-use rig_core::{
-    completion::ToolDefinition,
-    tool::{Tool, ToolError},
-};
+use rig_core::tool::{Tool, ToolError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use shared_api::CommandOrigin;
@@ -99,23 +96,22 @@ impl Tool for ExecuteCodeTool {
     type Args = ExecuteCodeArgs;
     type Output = ExecuteCodeOutput;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: self.name(),
-            description: "Execute code on a server. You will only receive the results of this code after it has finished executing, so avoid sleeping. This tool requires approval unless preapproved code is used."
-                .into(),
-            parameters: json!({
-              "type": "object",
-              "properties": {
-                "device": {"type": "string", "description": "The server to execute code on"},
-                "code": {"type": "string", "description": "The code to execute. This must be Lua 5.5 code, if you want to retrieve information, ensure it is printed to stdout or stderr. Do not include this field if using preapproved code"},
-                "preapproved_code_id": {"type": "string", "description": "The ID of previously approved code, this field is mutually exclusive with code"},
-                "return_stdout": {"type": "boolean", "description": "Include stdout in the tool response"},
-                "return_stderr": {"type": "boolean", "description": "Include stderr in the tool response"}
-              },
-              "required": ["device", "return_stdout", "return_stderr"]
-            }),
-        }
+    fn description(&self) -> String {
+        "Execute code on a server. You will only receive the results of this code after it has finished executing, so avoid sleeping. This tool requires approval unless preapproved code is used."
+            .into()
+    }
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+          "type": "object",
+          "properties": {
+            "device": {"type": "string", "description": "The server to execute code on"},
+            "code": {"type": "string", "description": "The code to execute. This must be Lua 5.5 code, if you want to retrieve information, ensure it is printed to stdout or stderr. Do not include this field if using preapproved code"},
+            "preapproved_code_id": {"type": "string", "description": "The ID of previously approved code, this field is mutually exclusive with code"},
+            "return_stdout": {"type": "boolean", "description": "Include stdout in the tool response"},
+            "return_stderr": {"type": "boolean", "description": "Include stderr in the tool response"}
+          },
+          "required": ["device", "return_stdout", "return_stderr"]
+        })
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         self.call_internal(args).await.map_err(|e| ToolError::ToolCallError(e.to_string().into()))

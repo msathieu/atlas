@@ -5,10 +5,7 @@ use lettre::{
     message::{Mailbox, header::ContentType},
     transport::smtp::authentication::Credentials,
 };
-use rig_core::{
-    completion::ToolDefinition,
-    tool::{Tool, ToolError},
-};
+use rig_core::tool::{Tool, ToolError};
 use serde::Deserialize;
 use serde_json::json;
 use shared_server::{models::Setting, schema::settings};
@@ -27,19 +24,18 @@ impl Tool for EmailTool {
     type Args = EmailArgs;
     type Output = String;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: self.name(),
-            description: "Send an email to the user".into(),
-            parameters: json!({
-              "type": "object",
-              "properties": {
-                "subject": {"type": "string", "description": "The subject of the mail"},
-                "body": {"type": "string", "description": "The body of the mail"}
-              },
-              "required": ["subject", "body"]
-            }),
-        }
+    fn description(&self) -> String {
+        "Send an email to the user".into()
+    }
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+        "type": "object",
+            "properties": {
+              "subject": {"type": "string", "description": "The subject of the mail"},
+              "body": {"type": "string", "description": "The body of the mail"}
+            },
+            "required": ["subject", "body"]
+          })
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let pool = DB_POOL.get().ok_or(ToolError::ToolCallError("Database connection failed".into()))?;

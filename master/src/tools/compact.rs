@@ -1,9 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
-use rig_core::{
-    completion::ToolDefinition,
-    tool::{Tool, ToolError},
-};
+use rig_core::tool::{Tool, ToolError};
 use serde::Deserialize;
 use serde_json::json;
 use shared_server::schema::messages;
@@ -25,18 +22,17 @@ impl Tool for CompactTool {
     type Args = CompactArgs;
     type Output = String;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: self.name(),
-            description: "Remove the previous N messages from context. This should be used to reduce context length for repetitive messages".into(),
-            parameters: json!({
-              "type": "object",
-              "properties": {
-                "message_count": {"type": "number", "description": "The number of messages to remove from context. This does not include the current message. Ensure this isn't so large as to remove important context."},
-              },
-              "required": ["message_count"]
-            }),
-        }
+    fn description(&self) -> String {
+        "Remove the previous N messages from context. This should be used to reduce context length for repetitive messages".into()
+    }
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+          "type": "object",
+          "properties": {
+            "message_count": {"type": "number", "description": "The number of messages to remove from context. This does not include the current message. Ensure this isn't so large as to remove important context."},
+          },
+          "required": ["message_count"]
+        })
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let pool = DB_POOL.get().ok_or(ToolError::ToolCallError("Database connection failed".into()))?;

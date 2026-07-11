@@ -1,9 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
-use rig_core::{
-    completion::ToolDefinition,
-    tool::{Tool, ToolError},
-};
+use rig_core::tool::{Tool, ToolError};
 use serde::Deserialize;
 use serde_json::json;
 use shared_server::{models::PreapprovedCode, schema::preapproved_code};
@@ -24,18 +21,17 @@ impl Tool for PreapproveCodeTool {
     type Args = PreapproveCodeArgs;
     type Output = String;
 
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: self.name(),
-            description: "Preapprove code so it can be executed later without prompting the user. This tool requires approval".into(),
-            parameters: json!({
-              "type": "object",
-              "properties": {
-                "code": {"type": "string", "description": "The code to preapprove. Reference the execute_code tool for instructions"},
-              },
-              "required": ["code"]
-            }),
-        }
+    fn description(&self) -> String {
+        "Preapprove code so it can be executed later without prompting the user. This tool requires approval".into()
+    }
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+          "type": "object",
+          "properties": {
+            "code": {"type": "string", "description": "The code to preapprove. Reference the execute_code tool for instructions"},
+          },
+          "required": ["code"]
+        })
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let pool = DB_POOL.get().ok_or(ToolError::ToolCallError("Database connection failed".into()))?;
