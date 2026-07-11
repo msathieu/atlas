@@ -1,6 +1,7 @@
 use crate::install::install_agent;
 use crate::messages::core::handle_command;
 use crate::messages::update::handle_update;
+use crate::supervise::supervise_agent;
 use crate::{messages::core::handle_heartbeat, models::Setting, schema::settings};
 use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair};
 use base64::Engine;
@@ -31,6 +32,7 @@ mod install;
 mod messages;
 mod models;
 mod schema;
+mod supervise;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
@@ -66,6 +68,12 @@ async fn main() {
         } else if cmd == "install" {
             install_agent().await.unwrap();
             return;
+        } else if cmd == "supervise" {
+            supervise_agent().await.unwrap();
+            return;
+        } else {
+            println!("Unknown command: {}", cmd);
+            exit(1);
         }
     }
     print_startup("agent", env!("CARGO_PKG_VERSION"));

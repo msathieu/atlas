@@ -170,7 +170,6 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
     device.arch = handshake_request.arch;
     device.os = handshake_request.os;
     device.version = handshake_request.version;
-    device.hostname = handshake_request.hostname;
     device.last_connection = SystemTime::now();
     device.ip = ip;
     device.agent_hash = handshake_request.agent_hash;

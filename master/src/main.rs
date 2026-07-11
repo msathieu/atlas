@@ -43,6 +43,7 @@ async fn main() {
     dotenvy::dotenv().ok();
     notify_server("MASTER:RESTART").await.unwrap();
     listen_for_restarts("MASTER".to_string()).await;
+    rustls::crypto::aws_lc_rs::default_provider().install_default().unwrap();
     let pool = get_db_pool().unwrap();
     {
         let mut db = pool.get().unwrap();
@@ -56,24 +57,30 @@ async fn main() {
     let timers_pool = pool.clone();
     let container_pool = pool.clone();
     DB_POOL.set(pool).unwrap();
-    tokio::spawn(async { tasks_loop_wrapper(device_pool, "MASTER:DEVICES", process_devices).await });
-    tokio::spawn(async { tasks_loop_wrapper(llm_pool, "MASTER:LLM", process_chats).await });
-    tokio::spawn(async { tasks_loop_wrapper(tool_pool, "MASTER:TOOLS", process_tool_calls).await });
-    tokio::spawn(async { tasks_loop_wrapper(timers_pool, "MASTER:TIMERS", process_timers).await });
-    tokio::spawn(async { tasks_loop_wrapper(container_pool, "MASTER:CONTAINERS", process_containers).await });
+    tokio::spawn(async { tasks_loop_wrapper(device_pool, "MASTER:DEVICES", process_devices, Duration::from_secs(300)).await });
+    tokio::spawn(async { tasks_loop_wrapper(llm_pool, "MASTER:LLM", process_chats, Duration::from_secs(300)).await });
+    tokio::spawn(async { tasks_loop_wrapper(tool_pool, "MASTER:TOOLS", process_tool_calls, Duration::from_secs(300)).await });
+    tokio::spawn(async { tasks_loop_wrapper(timers_pool, "MASTER:TIMERS", process_timers, Duration::from_secs(300)).await });
+    tokio::spawn(async { tasks_loop_wrapper(container_pool, "MASTER:CONTAINERS", process_containers, Duration::from_secs(10)).await });
     loop {
         sleep(Duration::from_hours(24)).await;
     }
 }
-async fn tasks_loop_wrapper<T: Future<Output = Result<(), Box<dyn Error>>>>(pool: Pool<ConnectionManager<PgConnection>>, sub_channel: &str, func: fn(Pool<ConnectionManager<PgConnection>>) -> T) {
+async fn tasks_loop_wrapper<T: Future<Output = Result<(), Box<dyn Error>>>>(
+    pool: Pool<ConnectionManager<PgConnection>>,
+    sub_channel: &str,
+    func: fn(Pool<ConnectionManager<PgConnection>>) -> T,
+    interval: Duration,
+) {
     loop {
-        tasks_loop(pool.clone(), sub_channel, func).await.ok();
+        tasks_loop(pool.clone(), sub_channel, func, interval).await.ok();
     }
 }
 async fn tasks_loop<T: Future<Output = Result<(), Box<dyn Error>>>>(
     pool: Pool<ConnectionManager<PgConnection>>,
     sub_channel: &str,
     func: fn(Pool<ConnectionManager<PgConnection>>) -> T,
+    interval: Duration,
 ) -> Result<(), Box<dyn Error>> {
     let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
     pubsub_client.subscribe(sub_channel).await?;
@@ -81,7 +88,7 @@ async fn tasks_loop<T: Future<Output = Result<(), Box<dyn Error>>>>(
         if let Err(e) = func(pool.clone()).await {
             println!("Error while running tasks: {}", e)
         }
-        timeout(Duration::from_secs(300), async { wait_for_pubsub_msg(&mut receiver).await }).await.ok();
+        timeout(interval, async { wait_for_pubsub_msg(&mut receiver).await }).await.ok();
     }
 }
 fn does_setting_exist(db: &mut PgConnection, name: &str) -> Result<bool, Box<dyn Error>> {
@@ -276,6 +283,14 @@ fn create_settings(db: &mut PgConnection) {
                     .values(Setting {
                         name: "apk_hash".to_owned(),
                         value: "".to_owned(),
+                    })
+                    .execute(db)?;
+            }
+            if !does_setting_exist(db, "k8s_storageclass")? {
+                diesel::insert_into(settings::table)
+                    .values(Setting {
+                        name: "k8s_storageclass".to_owned(),
+                        value: "ceph-block".to_owned(),
                     })
                     .execute(db)?;
             }

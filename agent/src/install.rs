@@ -14,7 +14,9 @@ use tokio::{
 pub async fn install_agent() -> Result<(), Box<dyn Error>> {
     if env::consts::OS == "linux" {
         let agent = fs::read(current_exe()?).await?;
-        let mut destination = File::create("/usr/local/bin/atlas-agent").await?;
+        let path = "/usr/local/bin/atlas-agent";
+        fs::remove_file(path).await.ok();
+        let mut destination = File::create(path).await?;
         destination.set_permissions(Permissions::from_mode(0o700)).await?;
         destination.write_all(&agent).await?;
         destination.flush().await?;

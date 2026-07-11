@@ -17,6 +17,7 @@
           diesel-cli
           git
           jq
+          kubectl
           lua5_5
           openjdk
           openssl
