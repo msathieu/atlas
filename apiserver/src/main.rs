@@ -137,6 +137,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
                 last_connection: SystemTime::now(),
                 ip,
                 agent_hash: handshake_request.agent_hash,
+                container_id: None,
             })
             .get_result(&mut db)?;
         handshake_response.device_id = device.id.ok_or("Invalid database result")?.to_string();

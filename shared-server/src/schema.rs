@@ -37,6 +37,26 @@ diesel::table! {
 }
 
 diesel::table! {
+    containers (id) {
+        id -> Uuid,
+        uid -> Uuid,
+        origin -> Int4,
+        state -> Int4,
+        created_at -> Timestamp,
+        image -> Varchar,
+        requested_state -> Int4,
+    }
+}
+
+diesel::table! {
+    development_environments (id) {
+        id -> Uuid,
+        repo -> Varchar,
+        branch -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
     device_info (device, info_type) {
         device -> Uuid,
         info_type -> Varchar,
@@ -59,6 +79,7 @@ diesel::table! {
         last_connection -> Timestamp,
         ip -> Varchar,
         agent_hash -> Bytea,
+        container_id -> Nullable<Uuid>,
     }
 }
 
@@ -133,9 +154,25 @@ diesel::table! {
 diesel::joinable!(chats -> users (uid));
 diesel::joinable!(commands -> devices (device));
 diesel::joinable!(commands -> users (uid));
+diesel::joinable!(containers -> users (uid));
+diesel::joinable!(development_environments -> containers (id));
 diesel::joinable!(device_info -> devices (device));
+diesel::joinable!(devices -> containers (container_id));
 diesel::joinable!(messages -> chats (chat));
 diesel::joinable!(passkeys -> users (uid));
 diesel::joinable!(preapproved_code -> chats (chat));
 
-diesel::allow_tables_to_appear_in_same_query!(chats, commands, device_info, devices, messages, passkeys, preapproved_code, settings, tool_calls, users,);
+diesel::allow_tables_to_appear_in_same_query!(
+    chats,
+    commands,
+    containers,
+    development_environments,
+    device_info,
+    devices,
+    messages,
+    passkeys,
+    preapproved_code,
+    settings,
+    tool_calls,
+    users,
+);

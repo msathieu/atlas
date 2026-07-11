@@ -38,6 +38,19 @@ pub enum ChatType {
     Interactive = 0,
     NonInteractive = 1,
 }
+#[derive(PartialEq, TryFromPrimitive)]
+#[repr(u32)]
+pub enum ContainerOrigin {
+    DevelopmentEnvironment = 0,
+}
+#[derive(PartialEq, TryFromPrimitive)]
+#[repr(u32)]
+pub enum ContainerState {
+    NonExistent = 0,
+    Stopped = 1,
+    Started = 2,
+    Running = 3,
+}
 
 pub fn print_startup(component: &str, version: &str) {
     println!("--------------------------------------------------");

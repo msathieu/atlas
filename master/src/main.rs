@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+use crate::containers::process_containers;
 use crate::device::process_devices;
 use crate::llm::process_chats;
 use crate::timers::process_timers;
@@ -25,6 +26,7 @@ use std::time::Duration;
 use tokio::time::{sleep, timeout};
 use webauthn_rs::fake::{FakePasskeyDistribution, WebauthnFakeCredentialGenerator};
 
+mod containers;
 mod device;
 mod llm;
 mod lua;
@@ -52,11 +54,13 @@ async fn main() {
     let llm_pool = pool.clone();
     let tool_pool = pool.clone();
     let timers_pool = pool.clone();
+    let container_pool = pool.clone();
     DB_POOL.set(pool).unwrap();
     tokio::spawn(async { tasks_loop_wrapper(device_pool, "MASTER:DEVICES", process_devices).await });
     tokio::spawn(async { tasks_loop_wrapper(llm_pool, "MASTER:LLM", process_chats).await });
     tokio::spawn(async { tasks_loop_wrapper(tool_pool, "MASTER:TOOLS", process_tool_calls).await });
     tokio::spawn(async { tasks_loop_wrapper(timers_pool, "MASTER:TIMERS", process_timers).await });
+    tokio::spawn(async { tasks_loop_wrapper(container_pool, "MASTER:CONTAINERS", process_containers).await });
     loop {
         sleep(Duration::from_hours(24)).await;
     }

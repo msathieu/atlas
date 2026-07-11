@@ -42,6 +42,7 @@ pub struct Device {
     pub last_connection: SystemTime,
     pub ip: String,
     pub agent_hash: Vec<u8>,
+    pub container_id: Option<Uuid>,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
@@ -146,4 +147,27 @@ pub struct Passkey {
     pub created_at: SystemTime,
     pub last_used: Option<SystemTime>,
     pub name: String,
+}
+
+#[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
+#[diesel(table_name = crate::schema::containers)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Container {
+    #[diesel(deserialize_as = Uuid)]
+    pub id: Option<Uuid>,
+    pub uid: Uuid,
+    pub origin: i32,
+    pub state: i32,
+    pub created_at: SystemTime,
+    pub image: String,
+    pub requested_state: i32,
+}
+
+#[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
+#[diesel(table_name = crate::schema::development_environments)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct DevelopmentEnvironment {
+    pub id: Uuid,
+    pub repo: String,
+    pub branch: Option<String>,
 }

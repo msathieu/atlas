@@ -9,7 +9,8 @@ CREATE TABLE devices(
     first_connection timestamp NOT NULL,
     last_connection timestamp NOT NULL,
     ip varchar NOT NULL,
-    agent_hash bytea NOT NULL
+    agent_hash bytea NOT NULL,
+    container_id uuid REFERENCES containers ON DELETE CASCADE,
 );
 CREATE TABLE settings(
     name varchar PRIMARY KEY,
@@ -96,10 +97,24 @@ CREATE TABLE preapproved_code(
     code varchar NOT NULL
 );
 CREATE TABLE passkeys(
-  id bytea PRIMARY KEY,
-  uid uuid NOT NULL REFERENCES users ON DELETE CASCADE,
-  passkey varchar NOT NULL,
-  created_at timestamp NOT NULL,
-  last_used timestamp,
-  name varchar NOT NULL
+    id bytea PRIMARY KEY,
+    uid uuid NOT NULL REFERENCES users ON DELETE CASCADE,
+    passkey varchar NOT NULL,
+    created_at timestamp NOT NULL,
+    last_used timestamp,
+    name varchar NOT NULL
+);
+CREATE TABLE containers(
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    uid uuid NOT NULL REFERENCES users ON DELETE CASCADE,
+    origin integer NOT NULL,
+    state integer NOT NULL,
+    created_at timestamp NOT NULL,
+    image varchar NOT NULL,
+    requested_state integer NOT NULL,
+);
+CREATE TABLE development_environments(
+    id uuid PRIMARY KEY REFERENCES containers ON DELETE CASCADE,
+    repo varchar NOT NULL,
+    branch varchar
 );
