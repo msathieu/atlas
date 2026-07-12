@@ -1,0 +1,15 @@
+[package]
+name = "devproxy"
+version.workspace = true
+edition = "2024"
+license = "Unlicense"
+publish = false
+
+[dependencies]
+async-trait = "0.1.89"
+diesel = {version = "2.2.12", features = ["postgres", "uuid"]}
+dotenvy = "0.15.7"
+pingora = {version = "0.8.1", features = ["proxy"]}
+shared-api = {path = "../shared-api"}
+shared-server = {path = "../shared-server"}
+uuid = "1.23.4"

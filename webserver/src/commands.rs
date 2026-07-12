@@ -54,6 +54,7 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
                 CommandOrigin::SystemIdentification => "System Identification",
                 CommandOrigin::UserRequested => "User",
                 CommandOrigin::LLMTool => "LLM Tool",
+                CommandOrigin::SystemInitiated => "System Initiated",
             };
             Ok(APICommand {
                 id: command.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,

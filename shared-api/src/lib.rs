@@ -31,6 +31,7 @@ pub enum CommandOrigin {
     SystemIdentification = 0,
     UserRequested = 1,
     LLMTool = 2,
+    SystemInitiated = 3,
 }
 #[derive(PartialEq, TryFromPrimitive)]
 #[repr(u32)]

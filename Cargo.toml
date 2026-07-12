@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["agent", "apiserver", "master", "shared-api", "shared-server", "webserver"]
+members = ["agent", "apiserver", "devproxy", "master", "shared-api", "shared-server", "webserver"]
 
 [workspace.package]
 version = "2026.7.6"

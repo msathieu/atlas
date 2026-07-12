@@ -1,20 +1,28 @@
+use crate::lua::LUA_DEVELOPMENT_ENVIRONMENT;
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use diesel::prelude::*;
 use diesel::{
     PgConnection,
     r2d2::{ConnectionManager, Pool},
 };
-use k8s_openapi::api::core::v1::{PersistentVolumeClaim, PersistentVolumeClaimSpec, PersistentVolumeClaimVolumeSource, Pod, PodSpec, Volume, VolumeMount, VolumeResourceRequirements};
+use k8s_openapi::api::core::v1::{
+    PersistentVolumeClaim, PersistentVolumeClaimSpec, PersistentVolumeClaimVolumeSource, Pod, PodSpec, SecurityContext, Service, ServicePort, ServiceSpec, Volume, VolumeMount,
+    VolumeResourceRequirements,
+};
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use kube::api::{AttachParams, DeleteParams, PostParams};
 use kube::{Api, Client};
-use shared_api::ContainerState;
+use shared_api::{CommandOrigin, ContainerOrigin, ContainerState};
 use shared_server::binary::personalize_binary;
-use shared_server::models::{Container, Setting};
+use shared_server::models::{Command, Container, Device, Setting};
 use shared_server::notify_server;
-use shared_server::schema::{containers, settings};
+use shared_server::schema::{commands, containers, devices, settings};
 use std::collections::BTreeMap;
 use std::error::Error;
-use tokio::io::AsyncWriteExt;
+use std::time::{Duration, SystemTime};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::time::sleep;
 
 pub async fn process_containers(pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
     let mut db = pool.get()?;
@@ -52,12 +60,13 @@ async fn process_container(container: Container, pool: Pool<ConnectionManager<Pg
     let container_id = container.id.ok_or("Invalid container")?;
     let container_name = format!("atlas-{}", container_id);
     let pvc_name = format!("atlas-state-{}", container_id);
+    let service_name = format!("atlas-dev-{}", container_id);
     let namespace = "atlas";
     if container.state == ContainerState::NonExistent as i32
         && (container.requested_state == ContainerState::Stopped as i32 || container.requested_state == ContainerState::Started as i32 || container.requested_state == ContainerState::Running as i32)
     {
         let storageclass: Setting = settings::table.find("k8s_storageclass").first(&mut db).unwrap();
-        let pvc_api = Api::namespaced(client, namespace);
+        let pvc_api = Api::namespaced(client.clone(), namespace);
         let mut pvc = PersistentVolumeClaim::default();
         pvc.metadata.name = Some(pvc_name);
         let mut resources = BTreeMap::new();
@@ -75,11 +84,28 @@ async fn process_container(container: Container, pool: Pool<ConnectionManager<Pg
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::Stopped as i32))
             .execute(&mut db)?;
+        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
+            let service_api = Api::namespaced(client, namespace);
+            let mut service = Service::default();
+            service.metadata.name = Some(service_name);
+            let mut selector = BTreeMap::new();
+            selector.insert("app".to_string(), container_name);
+            service.spec = Some(ServiceSpec {
+                selector: Some(selector),
+                ports: Some(vec![ServicePort { port: 9000, ..Default::default() }]),
+                ..Default::default()
+            });
+            service_api.create(&PostParams::default(), &service).await?;
+        }
         notify_server("WEB:REFRESH").await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Stopped as i32 && container.requested_state == ContainerState::NonExistent as i32 {
-        let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client, namespace);
+        let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
         pvc_api.delete(&pvc_name, &DeleteParams::default()).await?;
+        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
+            let service_api: Api<Service> = Api::namespaced(client, namespace);
+            service_api.delete(&service_name, &DeleteParams::default()).await?;
+        }
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::NonExistent as i32))
             .execute(&mut db)?;
@@ -88,7 +114,13 @@ async fn process_container(container: Container, pool: Pool<ConnectionManager<Pg
     } else if container.state == ContainerState::Stopped as i32 && (container.requested_state == ContainerState::Started as i32 || container.requested_state == ContainerState::Running as i32) {
         let pod_api = Api::namespaced(client, namespace);
         let mut pod = Pod::default();
-        pod.metadata.name = Some(container_name);
+        pod.metadata.name = Some(container_name.clone());
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), container_name);
+        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
+            labels.insert("atlas-type".to_string(), "development-environment".to_string());
+        }
+        pod.metadata.labels = Some(labels);
         let volume = Volume {
             name: "state".to_string(),
             persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
@@ -107,6 +139,11 @@ async fn process_container(container: Container, pool: Pool<ConnectionManager<Pg
             image: Some(container.image),
             command: Some(vec!["/usr/bin/sleep".to_string(), "infinity".to_string()]),
             volume_mounts: Some(vec![volume_mount]),
+            security_context: Some(SecurityContext {
+                run_as_user: Some(0),
+                run_as_group: Some(0),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         pod.spec = Some(PodSpec {
@@ -162,9 +199,39 @@ async fn process_container(container: Container, pool: Pool<ConnectionManager<Pg
             .await?;
         process.take_status().ok_or("Invalid process")?.await;
         process.join().await?;
+        sleep(Duration::from_secs(5)).await;
+        let mut process = pod_api.exec(&container_name, vec!["/usr/local/bin/atlas-agent", "pubkey"], &AttachParams::default()).await?;
+        process.take_status().ok_or("Invalid process")?.await;
+        let mut pubkey = String::new();
+        process.stdout().ok_or("Invalid process")?.read_to_string(&mut pubkey).await?;
+        process.join().await?;
+        let pubkey = BASE64_STANDARD.decode(pubkey.trim())?;
+        let device: Device = devices::table.filter(devices::hostname.eq(container_name).and(devices::pubkey.eq(pubkey))).first(&mut db)?;
+        diesel::update(devices::table.find(device.id.ok_or("Invalid device")?))
+            .set((devices::container_id.eq(container_id), devices::approved.eq(true)))
+            .execute(&mut db)?;
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::Running as i32))
             .execute(&mut db)?;
+        let command = Command {
+            id: None,
+            device: device.id.ok_or("Invalid device")?,
+            uid: None,
+            code: LUA_DEVELOPMENT_ENVIRONMENT.to_string(),
+            completed: false,
+            status_code: 0,
+            stdout: "".to_owned(),
+            stderr: "".to_owned(),
+            requested_timestamp: SystemTime::now(),
+            completed_timestamp: None,
+            origin: CommandOrigin::SystemInitiated as i32,
+            device_info_type: None,
+            chat_id: None,
+            chat_sequence: None,
+            chat_tool_call_id: None,
+            initiated: false,
+        };
+        diesel::insert_into(commands::table).values(command).execute(&mut db)?;
         notify_server("WEB:REFRESH").await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Running as i32
@@ -172,7 +239,11 @@ async fn process_container(container: Container, pool: Pool<ConnectionManager<Pg
             || container.requested_state == ContainerState::Stopped as i32
             || container.requested_state == ContainerState::NonExistent as i32)
     {
-        // TODO: Remove the device
+        let pod_api: Api<Pod> = Api::namespaced(client, namespace);
+        let mut process = pod_api.exec(&container_name, vec!["/usr/bin/killall", "-9", "atlas-agent"], &AttachParams::default()).await?;
+        process.take_status().ok_or("Invalid process")?.await;
+        process.join().await?;
+        diesel::delete(devices::table.filter(devices::container_id.eq(container_id))).execute(&mut db)?;
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::Started as i32))
             .execute(&mut db)?;

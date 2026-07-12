@@ -13,9 +13,9 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use shared_api::{ContainerOrigin, ContainerState};
 use shared_server::{
-    models::{Container, DevelopmentEnvironment},
+    models::{Container, DevelopmentEnvironment, Setting},
     notify_server,
-    schema::{containers, development_environments},
+    schema::{containers, development_environments, settings},
 };
 use std::{error::Error, time::SystemTime};
 use uuid::Uuid;
@@ -81,6 +81,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateDevelopmentEnvironmentRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
+    let image: Setting = settings::table.find("development_environment_image").first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut container = Container {
         id: None,
         created_at: SystemTime::now(),
@@ -88,7 +89,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
         origin: ContainerOrigin::DevelopmentEnvironment as i32,
         state: ContainerState::NonExistent as i32,
         requested_state: ContainerState::Running as i32,
-        image: "registry.fedoraproject.org/fedora-toolbox:44".to_string(),
+        image: image.value,
     };
     let mut id = Uuid::nil();
     db.transaction(|db| {

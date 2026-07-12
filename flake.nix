@@ -13,6 +13,7 @@
         packages = with pkgs; [
           apksigner
           cargo-deny
+          cmake
           deno
           diesel-cli
           git

@@ -12,7 +12,7 @@ RUN dnf install -y cargo libpq-devel openssl-devel protobuf-compiler unzip
 RUN curl -fL https://deno.land/install.sh | sh
 COPY . /build
 WORKDIR /build
-RUN cargo build --release -p apiserver -p master -p webserver
+RUN cargo build --release -p apiserver -p devproxy -p master -p webserver
 WORKDIR /build/frontend
 RUN ~/.deno/bin/deno install
 RUN ~/.deno/bin/deno task build
@@ -21,6 +21,7 @@ RUN dnf up -y
 RUN dnf install -y libpq tini
 COPY --from=agent-x86_64-linux-builder /build/target/release/agent agent-x86_64-linux
 COPY --from=builder /build/target/release/apiserver .
+COPY --from=builder /build/target/release/devproxy .
 COPY --from=builder /build/target/release/master .
 COPY --from=builder /build/target/release/webserver .
 COPY --from=builder /build/frontend/build /frontend

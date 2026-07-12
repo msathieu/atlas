@@ -71,6 +71,13 @@ async fn main() {
         } else if cmd == "supervise" {
             supervise_agent().await.unwrap();
             return;
+        } else if cmd == "pubkey" {
+            let mut db = SqliteConnection::establish(DATABASE_URL).unwrap();
+            let keypair = settings::table.find("keypair").first::<Setting>(&mut db).unwrap().value;
+            let keypair = BASE64_STANDARD.decode(keypair).unwrap();
+            let keypair = Ed25519KeyPair::from_pkcs8(&keypair).unwrap();
+            println!("{}", BASE64_STANDARD.encode(keypair.public_key()));
+            return;
         } else {
             println!("Unknown command: {}", cmd);
             exit(1);

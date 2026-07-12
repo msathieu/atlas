@@ -294,6 +294,14 @@ fn create_settings(db: &mut PgConnection) {
                     })
                     .execute(db)?;
             }
+            if !does_setting_exist(db, "development_environment_image")? {
+                diesel::insert_into(settings::table)
+                    .values(Setting {
+                        name: "development_environment_image".to_owned(),
+                        value: "ghcr.io/coder/code-server:4.128.0-trixie".to_owned(),
+                    })
+                    .execute(db)?;
+            }
             Ok::<(), Box<dyn Error>>(())
         })
         .unwrap();
