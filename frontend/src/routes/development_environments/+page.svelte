@@ -1,7 +1,7 @@
 <script lang="ts">
   import { authenticatedFetch } from "$lib/auth";
   import { formatTime } from "$lib/util.ts";
-  import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Trash } from "@lucide/svelte";
+  import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, Trash } from "@lucide/svelte";
 
   let { data } = $props();
   let selectedEnvironment: any = $state();
@@ -25,6 +25,16 @@
       method: "DELETE",
     });
   }
+  async function startEnvironment(id: string) {
+    await authenticatedFetch(`/api/development_environments/${id}/start`, {
+      method: "POST",
+    });
+  }
+  async function stopEnvironment(id: string) {
+    await authenticatedFetch(`/api/development_environments/${id}/stop`, {
+      method: "POST",
+    });
+  }
   async function openDevelopmentEnvironment(id: string) {
     const response = await authenticatedFetch(`/api/development_environments/${id}/open`, {
       method: "POST",
@@ -46,7 +56,7 @@
       <th>Repo</th>
       <th>Branch</th>
       <th>Created At</th>
-      <th>Open</th>
+      <th>Actions</th>
     </tr>
   </thead>
   <tbody>
@@ -63,8 +73,10 @@
             <Loader />
           {:else if environment.state === "Running"}
             <Play />
-          {:else if environment.state === "Stopped"}
+          {:else if environment.state === "Started"}
             <Pause />
+          {:else if environment.state === "Stopped"}
+            <Power />
           {:else if environment.state === "Non-Existent"}
             <Trash />
           {:else}
@@ -85,6 +97,26 @@
               }}
             >
               <ExternalLink />
+            </button>
+            <button
+              class="btn"
+              onclick={async (e) => {
+                e.stopPropagation();
+                await stopEnvironment(environment.id);
+              }}
+            >
+              <Power />
+            </button>
+          {/if}
+          {#if environment.state === "Stopped"}
+            <button
+              class="btn"
+              onclick={async (e) => {
+                e.stopPropagation();
+                await startEnvironment(environment.id);
+              }}
+            >
+              <Play />
             </button>
           {/if}
         </td>

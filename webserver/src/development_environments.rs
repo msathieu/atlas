@@ -49,19 +49,15 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let mut db = get_db()?;
-    let environments: Vec<DevelopmentEnvironment> = development_environments::table
+    let environments: Vec<(DevelopmentEnvironment, Container)> = development_environments::table
         .inner_join(containers::table.on(development_environments::id.eq(containers::id)))
         .filter(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-        .select(DevelopmentEnvironment::as_select())
+        .select((DevelopmentEnvironment::as_select(), Container::as_select()))
         .get_results(&mut db)
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let environments: Result<Vec<APIDevelopmentEnvironment>, StatusCode> = environments
         .iter()
-        .map(|environment| {
-            let container = containers::table
-                .find(environment.id)
-                .first::<shared_server::models::Container>(&mut db)
-                .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        .map(|(environment, container)| {
             let state = match ContainerState::try_from(container.state as u32).or(Err(StatusCode::INTERNAL_SERVER_ERROR))? {
                 ContainerState::NonExistent => "Non-Existent",
                 ContainerState::Started => "Started",
@@ -137,7 +133,45 @@ pub async fn delete_development_environment(headers: HeaderMap, Path(id): Path<U
     )
     .set(containers::requested_state.eq(ContainerState::NonExistent as i32))
     .execute(&mut db)
-    .or(Err(StatusCode::NOT_FOUND))?;
+    .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    sign_response::<String>(signature, None)
+}
+pub async fn start_development_environment(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+    let user = authenticate(&headers)?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
+    let mut db = get_db()?;
+    diesel::update(
+        containers::table.filter(
+            containers::id
+                .eq(id)
+                .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+                .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
+        ),
+    )
+    .set(containers::requested_state.eq(ContainerState::Running as i32))
+    .execute(&mut db)
+    .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    sign_response::<String>(signature, None)
+}
+pub async fn stop_development_environment(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+    let user = authenticate(&headers)?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
+    let mut db = get_db()?;
+    diesel::update(
+        containers::table.filter(
+            containers::id
+                .eq(id)
+                .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+                .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
+        ),
+    )
+    .set(containers::requested_state.eq(ContainerState::Stopped as i32))
+    .execute(&mut db)
+    .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
