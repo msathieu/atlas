@@ -22,7 +22,7 @@ pub struct ExecuteCodeTool {
 }
 #[derive(Deserialize)]
 pub struct ExecuteCodeArgs {
-    device: String,
+    device: Uuid,
     code: Option<String>,
     preapproved_code_id: Option<String>,
     return_stdout: bool,
@@ -53,10 +53,9 @@ impl ExecuteCodeTool {
             }
             code = preapproved_code.code;
         }
-        let device_uuid = Uuid::parse_str(&args.device)?;
         let command = Command {
             id: None,
-            device: device_uuid,
+            device: args.device,
             uid: Some(self.user),
             code,
             completed: true,
@@ -77,7 +76,7 @@ impl ExecuteCodeTool {
         let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
         pubsub_client.subscribe(format!("MASTER:CMD:{}", cmd_id)).await?;
         diesel::update(commands::table.find(cmd_id)).set(commands::completed.eq(false)).execute(&mut db)?;
-        notify_server(&format!("API:DEVICE:{}", device_uuid)).await?;
+        notify_server(&format!("API:DEVICE:{}", args.device)).await?;
         wait_for_pubsub_msg(&mut receiver).await;
         let cmd: Command = commands::table.find(cmd_id).get_result(&mut db)?;
         diesel::delete(commands::table.find(cmd_id)).execute(&mut db)?;

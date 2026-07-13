@@ -5,7 +5,7 @@ use crate::{
     auth::login,
     chat::{chats_list, create_chat, delete_chat, delete_message, get_chat, manage_tool_call_consent, send_message},
     commands::{commands_list, create_command, delete_command},
-    development_environments::{create_development_environment, delete_development_environment, development_environments_list},
+    development_environments::{create_development_environment, delete_development_environment, development_environments_list, open_development_environment},
     devices::{approve_device, delete_device, devices_list},
     info::{assetlinks, server_info},
     passkey::{delete_passkey, finish_passkey_authentication, finish_passkey_registration, passkeys_list, start_passkey_authentication, start_passkey_registration},
@@ -120,6 +120,7 @@ async fn main() {
         .route("/api/development_environments", get(development_environments_list))
         .route("/api/development_environments", post(create_development_environment))
         .route("/api/development_environments/{id}", delete(delete_development_environment))
+        .route("/api/development_environments/{id}/open", post(open_development_environment))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any).expose_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();

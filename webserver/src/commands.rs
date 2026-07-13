@@ -104,19 +104,13 @@ pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -
     };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
-pub async fn delete_command(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+pub async fn delete_command(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
-    diesel::delete(
-        commands::table.filter(
-            commands::id
-                .eq(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?)
-                .and(commands::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)),
-        ),
-    )
-    .execute(&mut db)
-    .or(Err(StatusCode::NOT_FOUND))?;
+    diesel::delete(commands::table.filter(commands::id.eq(id).and(commands::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))))
+        .execute(&mut db)
+        .or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server(&format!("MASTER:CMD:{}", id)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)

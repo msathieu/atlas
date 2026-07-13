@@ -1,26 +1,47 @@
 #![forbid(unsafe_code)]
 
+use crate::{
+    models::{Setting, User},
+    schema::{settings, users},
+};
 use argon2::{
     Algorithm, Argon2, Params, PasswordHasher, Version,
     password_hash::{SaltString, rand_core::OsRng},
 };
+use aws_lc_rs::signature::{ED25519, ParsedPublicKey, UnparsedPublicKey};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use diesel::{
     PgConnection,
     r2d2::{ConnectionManager, Pool},
 };
+use diesel::{prelude::*, r2d2::PooledConnection};
+use jsonwebtoken::{DecodingKey, Validation, decode};
 use rand::random_range;
 use redis::{AsyncCommands, PushInfo, PushKind, RedisError, aio::ConnectionManagerConfig};
+use serde::{Deserialize, Serialize};
 use std::{env, error::Error, process::exit, sync::OnceLock, time::Duration};
 use tokio::{
     sync::mpsc::{UnboundedReceiver, unbounded_channel},
     time::sleep,
 };
+use uuid::Uuid;
 
 pub mod binary;
 pub mod models;
 pub mod schema;
 
+#[derive(Clone, Deserialize, Serialize)]
+pub struct Claims {
+    pub aud: String,
+    pub sub: Uuid,
+    pub nbf: usize,
+    pub exp: usize,
+    pub counter: usize,
+    pub pubkey: Option<String>,
+}
+
 static PUBSUB_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
+static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 
 pub fn get_db_pool() -> Result<Pool<ConnectionManager<PgConnection>>, Box<dyn Error>> {
     let url = format!(
@@ -87,4 +108,30 @@ pub fn hash_password(password: String) -> Result<String, Box<dyn Error>> {
     let argon = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let hash = argon.hash_password(password.as_bytes(), &salt).or(Err("Couldn't hash password"))?;
     Ok(hash.to_string())
+}
+pub fn parse_pubkey(pubkey: String) -> Result<ParsedPublicKey, Box<dyn Error>> {
+    let key = UnparsedPublicKey::new(&ED25519, BASE64_STANDARD.decode(pubkey)?).parse()?;
+    Ok(key)
+}
+pub fn authenticate_jwt(jwt: &str, aud: &str, db: &mut PooledConnection<ConnectionManager<PgConnection>>) -> Result<(User, Option<ParsedPublicKey>), Box<dyn Error>> {
+    if JWT_KEY.get().is_none() {
+        let jwt_secret: Setting = settings::table.find("jwt_secret").first(db)?;
+        let jwt_secret = BASE64_STANDARD.decode(jwt_secret.value)?;
+        JWT_KEY.set(jwt_secret).ok();
+    }
+    let key = DecodingKey::from_secret(JWT_KEY.get().ok_or("Invalid JWT key")?);
+    let mut validation = Validation::new(jsonwebtoken::Algorithm::HS512);
+    validation.validate_nbf = true;
+    validation.set_audience(&[aud]);
+    validation.set_required_spec_claims(&["aud", "sub", "nbf", "exp", "counter"]);
+    let token = decode::<Claims>(jwt, &key, &validation)?;
+    let user: User = users::table.find(token.claims.sub).first(db)?;
+    if user.jwt_counter as usize != token.claims.counter {
+        return Err("Wrong JWT counter".into());
+    }
+    let mut pubkey = None;
+    if let Some(pubkey_claim) = token.claims.pubkey {
+        pubkey = Some(parse_pubkey(pubkey_claim)?);
+    }
+    Ok((user, pubkey))
 }

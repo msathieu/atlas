@@ -1,5 +1,5 @@
 use crate::{
-    auth::{authenticate, authenticate_jwt, generate_jwt},
+    auth::{authenticate, generate_jwt},
     get_db,
     util::{sign_response, validate_signature},
 };
@@ -13,7 +13,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 use shared_api::{SUPPORTED_ARCH, SUPPORTED_OS};
-use shared_server::{binary::personalize_binary, models::Setting, schema::settings};
+use shared_server::{authenticate_jwt, binary::personalize_binary, models::Setting, schema::settings};
 
 #[derive(Deserialize)]
 pub struct DownloadAuth {
@@ -68,14 +68,14 @@ rm atlas-agent
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
 pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, StatusCode> {
-    authenticate_jwt(&query.auth, "webserver-download")?;
+    let mut db = get_db()?;
+    authenticate_jwt(&query.auth, "webserver-download", &mut db).or(Err(StatusCode::UNAUTHORIZED))?;
     if !SUPPORTED_ARCH.contains(&query.arch.as_str()) {
         return Err(StatusCode::BAD_REQUEST);
     }
     if !SUPPORTED_OS.contains(&query.os.as_str()) {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let mut db = get_db()?;
     let binary = personalize_binary(&mut db, &query.arch, &query.os).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(binary)
 }

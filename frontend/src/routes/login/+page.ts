@@ -3,6 +3,6 @@ import type { PageLoad } from "./$types.ts";
 
 export const load: PageLoad = () => {
   if (localStorage.getItem("jwt")) {
-    throw redirect(300, "/");
+    throw redirect(307, "/");
   }
 };

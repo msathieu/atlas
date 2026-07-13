@@ -48,13 +48,11 @@ pub async fn users_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Re
     let users = users?;
     Ok((sign_response(signature, Some(&users))?, Json(users)))
 }
-pub async fn delete_user(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+pub async fn delete_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     require_admin(&headers)?;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
-    diesel::delete(users::table.find(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?))
-        .execute(&mut db)
-        .or(Err(StatusCode::NOT_FOUND))?;
+    diesel::delete(users::table.find(id)).execute(&mut db).or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }

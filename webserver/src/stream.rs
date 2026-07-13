@@ -1,5 +1,6 @@
 use crate::{
-    auth::{authenticate, authenticate_jwt, generate_jwt},
+    auth::{authenticate, generate_jwt},
+    get_db,
     util::{sign_response, validate_signature},
 };
 use axum::{
@@ -10,7 +11,7 @@ use axum::{
     response::Response,
 };
 use serde::{Deserialize, Serialize};
-use shared_server::{get_valkey_client, wait_for_pubsub_msg};
+use shared_server::{authenticate_jwt, get_valkey_client, wait_for_pubsub_msg};
 use std::{error::Error, time::Duration};
 use tokio::time::timeout;
 
@@ -31,7 +32,11 @@ pub async fn stream_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
 pub async fn stream(query: Query<StreamAuth>, socket: WebSocketUpgrade) -> Response {
-    if authenticate_jwt(&query.auth, "webserver-stream").is_err() {
+    let mut db = match get_db() {
+        Ok(db) => db,
+        Err(_) => return Response::new("Internal Server Error".into()),
+    };
+    if authenticate_jwt(&query.auth, "webserver-stream", &mut db).is_err() {
         return Response::new("Unauthorized".into());
     }
     socket.on_upgrade(stream_wrapper)

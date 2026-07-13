@@ -138,32 +138,22 @@ pub async fn create_chat(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
     };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
-pub async fn delete_chat(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+pub async fn delete_chat(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
-    diesel::delete(
-        chats::table.filter(
-            chats::id
-                .eq(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?)
-                .and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)),
-        ),
-    )
-    .execute(&mut db)
-    .or(Err(StatusCode::NOT_FOUND))?;
+    diesel::delete(chats::table.filter(chats::id.eq(id).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))))
+        .execute(&mut db)
+        .or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
-pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<APIChatDetailed>), StatusCode> {
+pub async fn get_chat(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<APIChatDetailed>), StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let mut db = get_db()?;
     let chat: Chat = chats::table
-        .filter(
-            chats::id
-                .eq(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?)
-                .and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)),
-        )
+        .filter(chats::id.eq(id).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
         .get_result(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
     let messages: Vec<Message> = messages::table
@@ -214,17 +204,13 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<String>, uri: OriginalU
     };
     Ok((sign_response(signature, Some(&chat))?, Json(chat)))
 }
-pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+pub async fn send_message(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: SendMessageRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let chat: Chat = chats::table
-        .filter(
-            chats::id
-                .eq(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?)
-                .and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)),
-        )
+        .filter(chats::id.eq(id).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
         .get_result(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
     let chat_id = chat.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -271,24 +257,23 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<String>, uri: Origi
     notify_server("MASTER:LLM").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
-pub async fn manage_tool_call_consent(headers: HeaderMap, Path((id, seq, call_id)): Path<(String, i32, String)>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+pub async fn manage_tool_call_consent(headers: HeaderMap, Path((chat_id, seq, call_id)): Path<(Uuid, i32, String)>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: ManageToolCallConsentRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
-    let chat_uuid = Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?;
     let _chat: Chat = chats::table
-        .filter(chats::id.eq(chat_uuid).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
+        .filter(chats::id.eq(chat_id).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
         .get_result(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
     if request.approved {
-        diesel::update(tool_calls::table.filter(tool_calls::chat.eq(chat_uuid).and(tool_calls::sequence.eq(seq)).and(tool_calls::call_id.eq(call_id))))
+        diesel::update(tool_calls::table.filter(tool_calls::chat.eq(chat_id).and(tool_calls::sequence.eq(seq)).and(tool_calls::call_id.eq(call_id))))
             .set(tool_calls::user_consented.eq(true))
             .execute(&mut db)
             .or(Err(StatusCode::NOT_FOUND))?;
         notify_server("MASTER:TOOLS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     } else {
-        diesel::update(tool_calls::table.filter(tool_calls::chat.eq(chat_uuid).and(tool_calls::sequence.eq(seq)).and(tool_calls::call_id.eq(call_id))))
+        diesel::update(tool_calls::table.filter(tool_calls::chat.eq(chat_id).and(tool_calls::sequence.eq(seq)).and(tool_calls::call_id.eq(call_id))))
             .set((
                 tool_calls::user_consented.eq(false),
                 tool_calls::response.eq(format!("User has rejected the tool call: {}", request.rejection_reason)),
@@ -300,16 +285,15 @@ pub async fn manage_tool_call_consent(headers: HeaderMap, Path((id, seq, call_id
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
-pub async fn delete_message(headers: HeaderMap, Path((id, seq)): Path<(String, i32)>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+pub async fn delete_message(headers: HeaderMap, Path((id, seq)): Path<(Uuid, i32)>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
-    let chat_uuid = Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?;
     let _chat: Chat = chats::table
-        .filter(chats::id.eq(chat_uuid).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
+        .filter(chats::id.eq(id).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
         .get_result(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
-    diesel::delete(messages::table.filter(messages::chat.eq(chat_uuid).and(messages::sequence.eq(seq))))
+    diesel::delete(messages::table.filter(messages::chat.eq(id).and(messages::sequence.eq(seq))))
         .execute(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

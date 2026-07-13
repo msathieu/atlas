@@ -1,7 +1,7 @@
 <script lang="ts">
   import { authenticatedFetch } from "$lib/auth";
   import { formatTime } from "$lib/util.ts";
-  import { CircleQuestionMark, Loader, Pause, Play, Plus, Trash } from "@lucide/svelte";
+  import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Trash } from "@lucide/svelte";
 
   let { data } = $props();
   let selectedEnvironment: any = $state();
@@ -23,6 +23,17 @@
       method: "DELETE",
     });
   }
+  async function openDevelopmentEnvironment(id: string) {
+    const response = await authenticatedFetch(`/api/development_environments/${id}/open`, {
+      method: "POST",
+    });
+    const data = await response.json();
+    const url = new URL(data.url);
+    if (url.protocol !== "https:") {
+      throw new Error("Invalid protocol");
+    }
+    window.open(data.url, "_blank", "noopener");
+  }
 </script>
 
 <table class="border border-base-content/10 table">
@@ -32,6 +43,7 @@
       <th>Repo</th>
       <th>Branch</th>
       <th>Created At</th>
+      <th>Open</th>
     </tr>
   </thead>
   <tbody>
@@ -59,6 +71,19 @@
         <td>{environment.repo}</td>
         <td>{environment.branch}</td>
         <td>{formatTime(environment.created_at)}</td>
+        <td>
+          {#if environment.state === "Running"}
+            <button
+              class="btn"
+              onclick={async (e) => {
+                e.stopPropagation();
+                await openDevelopmentEnvironment(environment.id);
+              }}
+            >
+              <ExternalLink />
+            </button>
+          {/if}
+        </td>
       </tr>
     {/each}
   </tbody>

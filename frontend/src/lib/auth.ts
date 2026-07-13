@@ -27,7 +27,7 @@ export async function authenticatedFetch(
   }
   const jwt = localStorage.getItem("jwt");
   if (!jwt) {
-    throw redirect(300, "/login");
+    throw redirect(307, "/login");
   }
   const url = API_HOST + input;
   init["headers"] = new Headers({

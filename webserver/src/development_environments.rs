@@ -1,5 +1,5 @@
 use crate::{
-    auth::authenticate,
+    auth::{authenticate, generate_jwt},
     get_db,
     util::{convert_timestamp, sign_response, validate_signature},
 };
@@ -37,6 +37,10 @@ pub struct CreateDevelopmentEnvironmentRequest {
 #[derive(Serialize)]
 pub struct CreateDevelopmentEnvironmentResponse {
     id: Uuid,
+}
+#[derive(Serialize)]
+pub struct OpenDevelopmentEnvironmentResponse {
+    url: String,
 }
 
 pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIDevelopmentEnvironment>>), StatusCode> {
@@ -106,14 +110,14 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let response = CreateDevelopmentEnvironmentResponse { id };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
-pub async fn delete_development_environment(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+pub async fn delete_development_environment(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
     diesel::update(
         containers::table.filter(
             containers::id
-                .eq(Uuid::parse_str(&id).or(Err(StatusCode::BAD_REQUEST))?)
+                .eq(id)
                 .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
                 .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
         ),
@@ -124,4 +128,23 @@ pub async fn delete_development_environment(headers: HeaderMap, Path(id): Path<S
     notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
+}
+pub async fn open_development_environment(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<OpenDevelopmentEnvironmentResponse>), StatusCode> {
+    let user = authenticate(&headers)?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
+    let mut db = get_db()?;
+    containers::table
+        .filter(
+            containers::uid
+                .eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)
+                .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32))
+                .and(containers::id.eq(id)),
+        )
+        .first::<Container>(&mut db)
+        .or(Err(StatusCode::NOT_FOUND))?;
+    let webserver: Setting = settings::table.find("webserver_host").first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let jwt = generate_jwt(&format!("devproxy-{}", id), &user, 24 * 60 * 60, None)?;
+    let url = format!("https://{}.dev.{}/setup?jwt={}", id, webserver.value, jwt);
+    let response = OpenDevelopmentEnvironmentResponse { url };
+    Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
