@@ -101,7 +101,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         let mut pvc = PersistentVolumeClaim::default();
         pvc.metadata.name = Some(pvc_name);
         let mut resources = BTreeMap::new();
-        resources.insert("storage".to_string(), Quantity("10Gi".to_string()));
+        resources.insert("storage".to_string(), Quantity("25Gi".to_string()));
         pvc.spec = Some(PersistentVolumeClaimSpec {
             access_modes: Some(vec!["ReadWriteOncePod".to_string()]),
             storage_class_name: Some(storageclass.value),

@@ -1,4 +1,3 @@
-import { redirect } from "@sveltejs/kit";
 import { API_HOST, bufferToBase64, signRequest, verifySignature } from "./util.ts";
 
 export async function verifyResponseSignature(response: Response, requestSignature: string): Promise<void> {
@@ -27,7 +26,7 @@ export async function authenticatedFetch(
   }
   const jwt = localStorage.getItem("jwt");
   if (!jwt) {
-    throw redirect(307, "/login");
+    throw new Error("Unauthorized");
   }
   const url = API_HOST + input;
   init["headers"] = new Headers({
@@ -62,7 +61,6 @@ export async function authenticatedFetch(
     throw new Error("Unauthorized");
   }
   if (response.status !== 200 && response.status !== 204) {
-    location.reload();
     throw new Error("Bad Request");
   }
   await verifyResponseSignature(response, requestSignature);

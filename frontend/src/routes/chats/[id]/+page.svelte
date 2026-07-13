@@ -110,7 +110,8 @@
                       <td>
                         <form
                           class="inline"
-                          onsubmit={async () => {
+                          onsubmit={async (e) => {
+                            e.preventDefault();
                             await manageToolCallConsent(message.sequence, call.call_id, true);
                           }}
                         >
@@ -118,7 +119,8 @@
                         </form>
                         <form
                           class="inline"
-                          onsubmit={async () => {
+                          onsubmit={async (e) => {
+                            e.preventDefault();
                             await manageToolCallConsent(message.sequence, call.call_id, false);
                           }}
                         >
@@ -144,7 +146,8 @@
 <div class="fixed bottom-0 footer footer-center">
   <form
     class="inline"
-    onsubmit={async () => {
+    onsubmit={async (e) => {
+      e.preventDefault();
       await sendMessage();
     }}
   >

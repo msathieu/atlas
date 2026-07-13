@@ -1,57 +1,57 @@
 <script lang="ts">
-  import { authenticatedFetch } from "$lib/auth.ts";
-  import { encryptToServer, formatTime } from "$lib/util.ts";
-  import { Trash } from "@lucide/svelte";
-  import { toast } from "svelte-sonner";
-  import { Passkeys } from "@capawesome/capacitor-passkeys";
+import { authenticatedFetch } from "$lib/auth.ts";
+import { encryptToServer, formatTime } from "$lib/util.ts";
+import { Trash } from "@lucide/svelte";
+import { toast } from "svelte-sonner";
+import { Passkeys } from "@capawesome/capacitor-passkeys";
 
-  let { data } = $props();
-  let passwordDialog: any = $state();
-  let oldPassword = $state("");
-  let newPassword = $state("");
-  let passwordConfirmation = $state("");
+let { data } = $props();
+let passwordDialog: any = $state();
+let oldPassword = $state("");
+let newPassword = $state("");
+let passwordConfirmation = $state("");
 
-  async function changePassword() {
-    if (newPassword != passwordConfirmation) {
-      alert("New password fields don't match");
-      return;
-    }
-    const body = JSON.stringify({ old_password: oldPassword, new_password: newPassword });
-    const response = await authenticatedFetch(
-      `/api/user/update_password`,
-      {
-        method: "POST",
-        body: await encryptToServer(body),
-      },
-      undefined,
-      "application/octet-stream",
-    );
-    if (response.ok) {
-      passwordDialog.close();
-      toast.success("Changed password");
-      localStorage.removeItem("jwt");
-      localStorage.removeItem("privkey");
-      location.reload();
-    } else {
-      toast.error("Request denied");
-    }
+async function changePassword() {
+  if (newPassword != passwordConfirmation) {
+    alert("New password fields don't match");
+    return;
   }
-  async function registerPasskey() {
-    const body = JSON.stringify({ password: prompt("Enter your password to register a new passkey:") });
-    const encryptedBody = await encryptToServer(body);
-    const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST", body: encryptedBody, headers: { "Content-Type": "application/octet-stream" } });
-    const startData = await startRes.json();
-    const credential = await Passkeys.createPasskey(startData["publicKey"]);
-    await authenticatedFetch(`/api/passkeys/finish_registration`, {
+  const body = JSON.stringify({ old_password: oldPassword, new_password: newPassword });
+  const response = await authenticatedFetch(
+    `/api/user/update_password`,
+    {
       method: "POST",
-      body: JSON.stringify({ credential, name: prompt("Enter a name for your passkey:") }),
-    });
+      body: await encryptToServer(body),
+    },
+    undefined,
+    "application/octet-stream",
+  );
+  if (response.ok) {
+    passwordDialog.close();
+    toast.success("Changed password");
+    localStorage.removeItem("jwt");
+    localStorage.removeItem("privkey");
+    location.reload();
+  } else {
+    toast.error("Request denied");
   }
-  async function deletePasskey(id: string) {
-    await authenticatedFetch(`/api/passkeys/${id}`, {
-      method: "DELETE",
-    });
-  }
+}
+async function registerPasskey() {
+  const body = JSON.stringify({ password: prompt("Enter your password to register a new passkey:") });
+  const encryptedBody = await encryptToServer(body);
+  const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST", body: encryptedBody, headers: { "Content-Type": "application/octet-stream" } });
+  const startData = await startRes.json();
+  const credential = await Passkeys.createPasskey(startData["publicKey"]);
+  await authenticatedFetch(`/api/passkeys/finish_registration`, {
+    method: "POST",
+    body: JSON.stringify({ credential, name: prompt("Enter a name for your passkey:") }),
+  });
+}
+async function deletePasskey(id: string) {
+  await authenticatedFetch(`/api/passkeys/${id}`, {
+    method: "DELETE",
+  });
+}
 </script>
 
 <button
@@ -69,7 +69,8 @@
   <div class="modal-box max-w-200">
     <h1>Change Password</h1>
     <form
-      onsubmit={async () => {
+      onsubmit={async (e) => {
+        e.preventDefault();
         await changePassword();
       }}
     >

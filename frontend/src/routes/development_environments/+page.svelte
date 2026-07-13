@@ -1,51 +1,51 @@
 <script lang="ts">
-  import { authenticatedFetch } from "$lib/auth";
-  import { formatTime } from "$lib/util.ts";
-  import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, Trash } from "@lucide/svelte";
+import { authenticatedFetch } from "$lib/auth";
+import { formatTime } from "$lib/util.ts";
+import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, Trash } from "@lucide/svelte";
 
-  let { data } = $props();
-  let selectedEnvironment: any = $state();
-  let dialog: any = $state();
-  let creationDialog: any = $state();
-  let newName = $state("");
-  let newRepo = $state("");
-  let newBranch = $state("");
+let { data } = $props();
+let selectedEnvironment: any = $state();
+let dialog: any = $state();
+let creationDialog: any = $state();
+let newName = $state("");
+let newRepo = $state("");
+let newBranch = $state("");
 
-  async function createEnvironment() {
-    await authenticatedFetch(`/api/development_environments`, {
-      method: "POST",
-      body: JSON.stringify({ name: newName, repo: newRepo, branch: newBranch }),
-    });
-    newName = "";
-    newRepo = "";
-    newBranch = "";
+async function createEnvironment() {
+  await authenticatedFetch(`/api/development_environments`, {
+    method: "POST",
+    body: JSON.stringify({ name: newName, repo: newRepo, branch: newBranch }),
+  });
+  newName = "";
+  newRepo = "";
+  newBranch = "";
+}
+async function deleteEnvironment(id: string) {
+  await authenticatedFetch(`/api/development_environments/${id}`, {
+    method: "DELETE",
+  });
+}
+async function startEnvironment(id: string) {
+  await authenticatedFetch(`/api/development_environments/${id}/start`, {
+    method: "POST",
+  });
+}
+async function stopEnvironment(id: string) {
+  await authenticatedFetch(`/api/development_environments/${id}/stop`, {
+    method: "POST",
+  });
+}
+async function openDevelopmentEnvironment(id: string) {
+  const response = await authenticatedFetch(`/api/development_environments/${id}/open`, {
+    method: "POST",
+  });
+  const data = await response.json();
+  const url = new URL(data.url);
+  if (url.protocol !== "https:") {
+    throw new Error("Invalid protocol");
   }
-  async function deleteEnvironment(id: string) {
-    await authenticatedFetch(`/api/development_environments/${id}`, {
-      method: "DELETE",
-    });
-  }
-  async function startEnvironment(id: string) {
-    await authenticatedFetch(`/api/development_environments/${id}/start`, {
-      method: "POST",
-    });
-  }
-  async function stopEnvironment(id: string) {
-    await authenticatedFetch(`/api/development_environments/${id}/stop`, {
-      method: "POST",
-    });
-  }
-  async function openDevelopmentEnvironment(id: string) {
-    const response = await authenticatedFetch(`/api/development_environments/${id}/open`, {
-      method: "POST",
-    });
-    const data = await response.json();
-    const url = new URL(data.url);
-    if (url.protocol !== "https:") {
-      throw new Error("Invalid protocol");
-    }
-    window.open(data.url, "_blank", "noopener");
-  }
+  window.open(data.url, "_blank", "noopener");
+}
 </script>
 
 <table class="border border-base-content/10 table">
@@ -88,7 +88,7 @@
         <td>{environment.branch}</td>
         <td>{formatTime(environment.created_at)}</td>
         <td>
-          {#if environment.state === "Running"}
+          {#if !environment.pending && environment.state === "Running"}
             <button
               class="btn"
               onclick={async (e) => {
@@ -108,7 +108,7 @@
               <Power />
             </button>
           {/if}
-          {#if environment.state === "Stopped"}
+          {#if !environment.pending && environment.state === "Stopped"}
             <button
               class="btn"
               onclick={async (e) => {

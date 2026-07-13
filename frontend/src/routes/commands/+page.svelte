@@ -1,33 +1,33 @@
 <script lang="ts">
-  import { authenticatedFetch } from "$lib/auth";
-  import { formatTime, getHostnameForDevice } from "$lib/util.ts";
-  import { Check, Loader, Plus, Trash, X } from "@lucide/svelte";
-  import DOMPurify from "dompurify";
-  import hljs from "highlight.js/lib/core";
-  import lua from "highlight.js/lib/languages/lua";
-  import "highlight.js/styles/github-dark.css";
-  hljs.registerLanguage("lua", lua);
+import { authenticatedFetch } from "$lib/auth";
+import { formatTime, getHostnameForDevice } from "$lib/util.ts";
+import { Check, Loader, Plus, Trash, X } from "@lucide/svelte";
+import DOMPurify from "dompurify";
+import hljs from "highlight.js/lib/core";
+import lua from "highlight.js/lib/languages/lua";
+import "highlight.js/styles/github-dark.css";
+hljs.registerLanguage("lua", lua);
 
-  let { data } = $props();
-  let selectedCommand: any = $state();
-  let dialog: any = $state();
-  let creationDialog: any = $state();
-  let newDevice = $state("");
-  let newCode = $state("");
+let { data } = $props();
+let selectedCommand: any = $state();
+let dialog: any = $state();
+let creationDialog: any = $state();
+let newDevice = $state("");
+let newCode = $state("");
 
-  async function createCommand() {
-    await authenticatedFetch(`/api/commands`, {
-      method: "POST",
-      body: JSON.stringify({ device: newDevice, code: newCode }),
-    });
-    newDevice = "";
-    newCode = "";
-  }
-  async function deleteCommand(id: string) {
-    await authenticatedFetch(`/api/commands/${id}`, {
-      method: "DELETE",
-    });
-  }
+async function createCommand() {
+  await authenticatedFetch(`/api/commands`, {
+    method: "POST",
+    body: JSON.stringify({ device: newDevice, code: newCode }),
+  });
+  newDevice = "";
+  newCode = "";
+}
+async function deleteCommand(id: string) {
+  await authenticatedFetch(`/api/commands/${id}`, {
+    method: "DELETE",
+  });
+}
 </script>
 
 <table class="border border-base-content/10 table">

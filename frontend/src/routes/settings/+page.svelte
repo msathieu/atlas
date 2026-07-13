@@ -1,41 +1,41 @@
 <script lang="ts">
-  import { authenticatedFetch } from "$lib/auth.ts";
-  import { updateSetting } from "$lib/settings.ts";
-  import { API_HOST } from "$lib/util.ts";
-  import { Check } from "@lucide/svelte";
-  import Setting from "./Setting.svelte";
+import { authenticatedFetch } from "$lib/auth.ts";
+import { updateSetting } from "$lib/settings.ts";
+import { API_HOST } from "$lib/util.ts";
+import { Check } from "@lucide/svelte";
+import Setting from "./Setting.svelte";
 
-  let { data } = $props();
-  let defaultProvider = $derived(data.defaultProvider);
-  let openrouterModel = $derived(data.openrouterModel);
-  let openrouterKey = $state("");
-  let genericEndpoint = $derived(data.genericEndpoint);
-  let genericModel = $derived(data.genericModel);
-  let genericKey = $state("");
-  let allowNewDevices = $derived(data.allowNewDevices === "true");
-  let apiserverHost = $derived(data.apiserverHost);
-  let webserverHost = $derived(data.webserverHost);
-  let mailServer = $derived(data.mailServer);
-  let mailUsername = $derived(data.mailUsername);
-  let mailPassword = $state("");
-  let mailFrom = $derived(data.mailFrom);
-  let mailTo = $derived(data.mailTo);
-  let apkHash = $derived(data.apkHash);
-  let k8sStorageClass = $derived(data.k8sStorageClass);
-  let developmentEnvironmentImage = $derived(data.developmentEnvironmentImage);
-  let downloadLink: any = $state();
-  let actuallyDownload = false;
+let { data } = $props();
+let defaultProvider = $derived(data.defaultProvider);
+let openrouterModel = $derived(data.openrouterModel);
+let openrouterKey = $state("");
+let genericEndpoint = $derived(data.genericEndpoint);
+let genericModel = $derived(data.genericModel);
+let genericKey = $state("");
+let allowNewDevices = $derived(data.allowNewDevices === "true");
+let apiserverHost = $derived(data.apiserverHost);
+let webserverHost = $derived(data.webserverHost);
+let mailServer = $derived(data.mailServer);
+let mailUsername = $derived(data.mailUsername);
+let mailPassword = $state("");
+let mailFrom = $derived(data.mailFrom);
+let mailTo = $derived(data.mailTo);
+let apkHash = $derived(data.apkHash);
+let k8sStorageClass = $derived(data.k8sStorageClass);
+let developmentEnvironmentImage = $derived(data.developmentEnvironmentImage);
+let downloadLink: any = $state();
+let actuallyDownload = false;
 
-  async function requestDownloadLink() {
-    const res = await authenticatedFetch("/api/download_auth", { method: "POST" });
-    const downloadAuth = await res.json();
-    downloadLink.href = `${API_HOST}/api/atlas-agent?auth=${downloadAuth.jwt}&arch=x86_64&os=linux`;
-    actuallyDownload = true;
-    downloadLink.click();
-  }
-  async function restart() {
-    await authenticatedFetch("/api/restart", { method: "POST" });
-  }
+async function requestDownloadLink() {
+  const res = await authenticatedFetch("/api/download_auth", { method: "POST" });
+  const downloadAuth = await res.json();
+  downloadLink.href = `${API_HOST}/api/atlas-agent?auth=${downloadAuth.jwt}&arch=x86_64&os=linux`;
+  actuallyDownload = true;
+  downloadLink.click();
+}
+async function restart() {
+  await authenticatedFetch("/api/restart", { method: "POST" });
+}
 </script>
 
 <Setting name="llm_default_provider" description="Default LLM Provider" val={defaultProvider} />
@@ -48,7 +48,8 @@
 <h1 class="text-xl">Allow New Devices</h1>
 <br />
 <form
-  onsubmit={async () => {
+  onsubmit={async (e) => {
+    e.preventDefault();
     await updateSetting("allow_new_devices", String(allowNewDevices));
   }}
 >

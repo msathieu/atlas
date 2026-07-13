@@ -1,42 +1,42 @@
 <script lang="ts">
-  import { Check, Plus, Trash, X } from "@lucide/svelte";
-  import { authenticatedFetch } from "$lib/auth.ts";
-  import { encryptToServer } from "$lib/util.ts";
+import { Check, Plus, Trash, X } from "@lucide/svelte";
+import { authenticatedFetch } from "$lib/auth.ts";
+import { encryptToServer } from "$lib/util.ts";
 
-  let { data } = $props();
-  let selectedUser: any = $state();
-  let dialog: any = $state();
-  let creationDialog: any = $state();
-  let newUsername = $state("");
-  let newPassword = $state("");
-  let newPasswordConfirmation = $state("");
-  let newAdmin = $state(false);
+let { data } = $props();
+let selectedUser: any = $state();
+let dialog: any = $state();
+let creationDialog: any = $state();
+let newUsername = $state("");
+let newPassword = $state("");
+let newPasswordConfirmation = $state("");
+let newAdmin = $state(false);
 
-  async function createUser() {
-    if (newPassword != newPasswordConfirmation) {
-      alert("Password fields don't match");
-      return;
-    }
-    const body = JSON.stringify({ username: newUsername, password: newPassword, admin: newAdmin });
-    await authenticatedFetch(
-      `/api/users`,
-      {
-        method: "POST",
-        body: await encryptToServer(body),
-      },
-      undefined,
-      "application/octet-stream",
-    );
-    newUsername = "";
-    newPassword = "";
-    newPasswordConfirmation = "";
-    newAdmin = false;
+async function createUser() {
+  if (newPassword != newPasswordConfirmation) {
+    alert("Password fields don't match");
+    return;
   }
-  async function deleteUser(id: string) {
-    await authenticatedFetch(`/api/users/${id}`, {
-      method: "DELETE",
-    });
-  }
+  const body = JSON.stringify({ username: newUsername, password: newPassword, admin: newAdmin });
+  await authenticatedFetch(
+    `/api/users`,
+    {
+      method: "POST",
+      body: await encryptToServer(body),
+    },
+    undefined,
+    "application/octet-stream",
+  );
+  newUsername = "";
+  newPassword = "";
+  newPasswordConfirmation = "";
+  newAdmin = false;
+}
+async function deleteUser(id: string) {
+  await authenticatedFetch(`/api/users/${id}`, {
+    method: "DELETE",
+  });
+}
 </script>
 
 <table class="border border-base-content/10 table">

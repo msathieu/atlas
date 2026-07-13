@@ -1,21 +1,21 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { authenticatedFetch } from "$lib/auth";
-  import { formatTime } from "$lib/util.ts";
-  import { Bot, MessageCircle, Plus, Trash } from "@lucide/svelte";
-  let { data } = $props();
+import { goto } from "$app/navigation";
+import { authenticatedFetch } from "$lib/auth";
+import { formatTime } from "$lib/util.ts";
+import { Bot, MessageCircle, Plus, Trash } from "@lucide/svelte";
+let { data } = $props();
 
-  async function createChat(chat_type: string) {
-    await authenticatedFetch(`/api/chats`, {
-      method: "POST",
-      body: JSON.stringify({ chat_type }),
-    });
-  }
-  async function deleteChat(id: string) {
-    await authenticatedFetch(`/api/chats/${id}`, {
-      method: "DELETE",
-    });
-  }
+async function createChat(chat_type: string) {
+  await authenticatedFetch(`/api/chats`, {
+    method: "POST",
+    body: JSON.stringify({ chat_type }),
+  });
+}
+async function deleteChat(id: string) {
+  await authenticatedFetch(`/api/chats/${id}`, {
+    method: "DELETE",
+  });
+}
 </script>
 
 <table class="border border-base-content/10 table">

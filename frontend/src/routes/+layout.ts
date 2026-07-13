@@ -9,7 +9,7 @@ export const ssr = false;
 
 export const load: LayoutLoad = async ({ fetch, url }) => {
   if (!localStorage.getItem("jwt") && url.pathname !== "/login") {
-    throw redirect(307, "/login");
+    throw redirect(307, `/login?redirect=${encodeURIComponent(url.pathname)}`);
   }
   const infoRes = await fetchInfo(fetch);
   if (!infoRes.ok) {

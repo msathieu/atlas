@@ -1,23 +1,23 @@
 <script lang="ts">
-  import "../app.css";
-  import { Code, LogOut, MessageSquare, Package, Server, Settings, User, Users } from "@lucide/svelte";
-  import { page } from "$app/state";
-  import { invalidateAll } from "$app/navigation";
-  import { Toaster } from "svelte-sonner";
-  import { connectWS, user, wsState } from "$lib/state.svelte.ts";
-  let { children, data } = $props();
+import "../app.css";
+import { Code, LogOut, MessageSquare, Package, Server, Settings, User, Users } from "@lucide/svelte";
+import { page } from "$app/state";
+import { invalidateAll } from "$app/navigation";
+import { Toaster } from "svelte-sonner";
+import { connectWS, user, wsState } from "$lib/state.svelte.ts";
+let { children, data } = $props();
 
-  function logout() {
-    localStorage.clear();
-    location.reload();
-  }
+function logout() {
+  localStorage.clear();
+  location.reload();
+}
 
-  setInterval(async () => {
-    await invalidateAll();
-  }, 600000);
-  setInterval(async () => {
-    await connectWS();
-  }, 5000);
+setInterval(async () => {
+  await invalidateAll();
+}, 600000);
+setInterval(async () => {
+  await connectWS();
+}, 5000);
 </script>
 
 <div class="drawer drawer-open h-screen">
@@ -25,7 +25,7 @@
   <div class="drawer-content p-10 overflow-auto">
     {#if data.client_error}
       <p>Incorrect client for this server, reload the page or reinstall the client.</p>
-    {:else}
+    {:else if page.url.pathname === "/login" || localStorage.getItem("jwt")}
       {@render children()}
     {/if}
   </div>
@@ -50,7 +50,8 @@
         <li>
           <div class="text-xs" class:bg-red-500={data.info.environment !== "production"}>
             <div class:status-success={data.connected && wsState.connected} class:status-error={!data.connected || !wsState.connected} class="status"></div>
-            <span class="hidden lg:block">{data.info.hostname}
+            <span class="hidden lg:block">
+              {data.info.hostname}
               <br />
               {data.info.version || "Unknown version"}
             </span>

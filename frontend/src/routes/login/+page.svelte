@@ -1,67 +1,74 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { verifyResponseSignature } from "$lib/auth.ts";
-  import { API_HOST, bufferToBase64, encryptToServer } from "$lib/util.ts";
-  import { toast } from "svelte-sonner";
-  import { Passkeys } from "@capawesome/capacitor-passkeys";
+import { goto } from "$app/navigation";
+import { verifyResponseSignature } from "$lib/auth.ts";
+import { API_HOST, bufferToBase64, encryptToServer } from "$lib/util.ts";
+import { toast } from "svelte-sonner";
+import { Passkeys } from "@capawesome/capacitor-passkeys";
+import { page } from "$app/state";
 
-  let username = $state(localStorage.getItem("username") || "");
-  let password = $state("");
+let username = $state(localStorage.getItem("username") || "");
+let password = $state("");
+let redirect = page.url.searchParams.get("redirect");
 
-  async function login() {
-    const keyPair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
-    const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
-    const body = JSON.stringify({ username, password, pubkey, timestamp: Math.floor(Date.now() / 1000) });
-    const encryptedBody = await encryptToServer(body);
-    const response = await fetch(`${API_HOST}/api/login`, {
-      method: "POST",
-      body: encryptedBody,
-      headers: { "Content-Type": "application/octet-stream" },
-    });
-    if (!response.ok) {
-      toast.error("Invalid Credentials");
-      return;
-    }
-    const bodyHash = await crypto.subtle.digest("SHA-512", encryptedBody);
-    await verifyResponseSignature(response, `login-${bufferToBase64(bodyHash)}`);
-    const json = await response.json();
-    finishAuth(username, json["jwt"], keyPair);
+async function login() {
+  const keyPair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
+  const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
+  const body = JSON.stringify({ username, password, pubkey, timestamp: Math.floor(Date.now() / 1000) });
+  const encryptedBody = await encryptToServer(body);
+  const response = await fetch(`${API_HOST}/api/login`, {
+    method: "POST",
+    body: encryptedBody,
+    headers: { "Content-Type": "application/octet-stream" },
+  });
+  if (!response.ok) {
+    toast.error("Invalid Credentials");
+    return;
   }
-  async function passkeyLogin() {
-    const startBody = JSON.stringify({ username });
-    const startRes = await fetch(`${API_HOST}/api/passkeys/start_authentication`, { method: "POST", body: startBody });
-    if (!startRes.ok) {
-      toast.error("Invalid Credentials");
-      return;
-    }
-    const encoder = new TextEncoder();
-    const startHash = await crypto.subtle.digest("SHA-512", encoder.encode(startBody));
-    await verifyResponseSignature(startRes, `passkey_start-${bufferToBase64(startHash)}`);
-    const startData = await startRes.json();
-    const credential = await Passkeys.getPasskey(startData["challenge"]["publicKey"]);
-    const keyPair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
-    const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
-    const encryptedBody = await encryptToServer(JSON.stringify({ flow_id: startData["flow_id"], credential, pubkey }));
-    const finishRes = await fetch(`${API_HOST}/api/passkeys/finish_authentication`, {
-      method: "POST",
-      body: encryptedBody,
-      headers: { "Content-Type": "application/octet-stream" },
-    });
-    if (!finishRes.ok) {
-      toast.error("Invalid Credentials");
-      return;
-    }
-    const finishHash = await crypto.subtle.digest("SHA-512", encryptedBody);
-    await verifyResponseSignature(finishRes, `passkey_finish-${bufferToBase64(finishHash)}`);
-    const json = await finishRes.json();
-    finishAuth(username, json["jwt"], keyPair);
+  const bodyHash = await crypto.subtle.digest("SHA-512", encryptedBody);
+  await verifyResponseSignature(response, `login-${bufferToBase64(bodyHash)}`);
+  const json = await response.json();
+  finishAuth(username, json["jwt"], keyPair);
+}
+async function passkeyLogin() {
+  const startBody = JSON.stringify({ username });
+  const startRes = await fetch(`${API_HOST}/api/passkeys/start_authentication`, { method: "POST", body: startBody });
+  if (!startRes.ok) {
+    toast.error("Invalid Credentials");
+    return;
   }
-  async function finishAuth(username: string, jwt: string, keyPair: CryptoKeyPair) {
-    localStorage.setItem("username", username);
-    localStorage.setItem("jwt", jwt);
-    localStorage.setItem("privkey", bufferToBase64(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey)));
+  const encoder = new TextEncoder();
+  const startHash = await crypto.subtle.digest("SHA-512", encoder.encode(startBody));
+  await verifyResponseSignature(startRes, `passkey_start-${bufferToBase64(startHash)}`);
+  const startData = await startRes.json();
+  const credential = await Passkeys.getPasskey(startData["challenge"]["publicKey"]);
+  const keyPair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
+  const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
+  const encryptedBody = await encryptToServer(JSON.stringify({ flow_id: startData["flow_id"], credential, pubkey }));
+  const finishRes = await fetch(`${API_HOST}/api/passkeys/finish_authentication`, {
+    method: "POST",
+    body: encryptedBody,
+    headers: { "Content-Type": "application/octet-stream" },
+  });
+  if (!finishRes.ok) {
+    toast.error("Invalid Credentials");
+    return;
+  }
+  const finishHash = await crypto.subtle.digest("SHA-512", encryptedBody);
+  await verifyResponseSignature(finishRes, `passkey_finish-${bufferToBase64(finishHash)}`);
+  const json = await finishRes.json();
+  finishAuth(username, json["jwt"], keyPair);
+}
+async function finishAuth(username: string, jwt: string, keyPair: CryptoKeyPair) {
+  localStorage.setItem("username", username);
+  localStorage.setItem("jwt", jwt);
+  localStorage.setItem("privkey", bufferToBase64(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey)));
+  if (!redirect) {
     await goto("/");
+    return;
   }
+  let target = new URL(redirect, page.url.origin);
+  await goto(target.pathname);
+}
 </script>
 
 <div class="flex" style="height: 90%">
@@ -71,7 +78,8 @@
     </h1>
     <br />
     <form
-      onsubmit={async () => {
+      onsubmit={async (e) => {
+        e.preventDefault();
         await login();
       }}
     >

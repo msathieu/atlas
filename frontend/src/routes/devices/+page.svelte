@@ -1,29 +1,29 @@
 <script lang="ts">
-  import { Check, ShieldCheck, ShieldQuestionMark, Trash, Unplug } from "@lucide/svelte";
-  import { authenticatedFetch } from "$lib/auth.ts";
-  import { formatTime } from "$lib/util.ts";
-  import { toast } from "svelte-sonner";
-  import { user } from "$lib/state.svelte.ts";
+import { Check, ShieldCheck, ShieldQuestionMark, Trash, Unplug } from "@lucide/svelte";
+import { authenticatedFetch } from "$lib/auth.ts";
+import { formatTime } from "$lib/util.ts";
+import { toast } from "svelte-sonner";
+import { user } from "$lib/state.svelte.ts";
 
-  let { data } = $props();
-  let selectedDevice: any = $state();
-  let dialog: any = $state();
+let { data } = $props();
+let selectedDevice: any = $state();
+let dialog: any = $state();
 
-  async function approveDevice(id: string, expected_pubkey: string) {
-    const pubkey = prompt("Enter public key");
-    if (pubkey === expected_pubkey) {
-      await authenticatedFetch(`/api/devices/${id}/approve`, {
-        method: "POST",
-      });
-    } else {
-      toast.error("Invalid Public Key");
-    }
-  }
-  async function deleteDevice(id: string) {
-    await authenticatedFetch(`/api/devices/${id}`, {
-      method: "DELETE",
+async function approveDevice(id: string, expected_pubkey: string) {
+  const pubkey = prompt("Enter public key");
+  if (pubkey === expected_pubkey) {
+    await authenticatedFetch(`/api/devices/${id}/approve`, {
+      method: "POST",
     });
+  } else {
+    toast.error("Invalid Public Key");
   }
+}
+async function deleteDevice(id: string) {
+  await authenticatedFetch(`/api/devices/${id}`, {
+    method: "DELETE",
+  });
+}
 </script>
 
 <table class="border border-base-content/10 table">

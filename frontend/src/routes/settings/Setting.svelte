@@ -1,14 +1,15 @@
 <script lang="ts">
-  import { Check } from "@lucide/svelte";
-  import { updateSetting } from "$lib/settings.ts";
+import { Check } from "@lucide/svelte";
+import { updateSetting } from "$lib/settings.ts";
 
-  let { name, description, val } = $props();
+let { name, description, val } = $props();
 </script>
 
 <h1 class="text-xl">{description}</h1>
 <br />
 <form
-  onsubmit={async () => {
+  onsubmit={async (e) => {
+    e.preventDefault();
     await updateSetting(name, val);
   }}
 >
