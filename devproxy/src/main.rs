@@ -1,15 +1,22 @@
 use async_trait::async_trait;
 use diesel::prelude::*;
-use pingora::prelude::*;
+use pingora::{prelude::*, server::ShutdownWatch, services::background::BackgroundService};
 use shared_api::print_startup;
-use shared_server::{get_db_pool, models::Setting, schema::settings};
-use std::sync::OnceLock;
+use shared_server::{get_db_pool, listen_for_restarts, models::Setting, schema::settings};
+use std::{net::ToSocketAddrs, sync::OnceLock};
 use uuid::Uuid;
 
 struct DevProxy;
+struct RestartService;
 
 static WEBSERVER_HOST: OnceLock<String> = OnceLock::new();
 
+#[async_trait]
+impl BackgroundService for RestartService {
+    async fn start(&self, mut _shutdown: ShutdownWatch) {
+        listen_for_restarts("DEVPROXY".to_string()).await;
+    }
+}
 #[async_trait]
 impl ProxyHttp for DevProxy {
     type CTX = Uuid;
@@ -17,7 +24,13 @@ impl ProxyHttp for DevProxy {
         Uuid::nil()
     }
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> Result<Box<HttpPeer>> {
-        let upstream = HttpPeer::new(format!("atlas-dev-{}.atlas.svc.cluster.local:9000", ctx), false, "".to_string());
+        let domain_name = format!("atlas-dev-{}.atlas.svc.cluster.local:9000", ctx);
+        let address = domain_name
+            .to_socket_addrs()
+            .or(Err(Error::new_down(InvalidHTTPHeader)))?
+            .next()
+            .ok_or(Error::new_down(InvalidHTTPHeader))?;
+        let upstream = HttpPeer::new(address, false, "".to_string());
         Ok(Box::new(upstream))
     }
     async fn request_filter(&self, session: &mut Session, ctx: &mut Self::CTX) -> Result<bool> {
@@ -41,6 +54,8 @@ fn main() {
     server.bootstrap();
     let mut proxy = http_proxy_service(&server.configuration, DevProxy);
     proxy.add_tcp("0.0.0.0:8001");
+    let restart_service = background_service("restart", RestartService);
     server.add_service(proxy);
+    server.add_service(restart_service);
     server.run_forever();
 }

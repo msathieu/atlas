@@ -8,9 +8,13 @@ use diesel::{
     PgConnection,
     r2d2::{ConnectionManager, Pool},
 };
+use rand::random_range;
 use redis::{AsyncCommands, PushInfo, PushKind, RedisError, aio::ConnectionManagerConfig};
-use std::{env, error::Error, process::exit, sync::OnceLock};
-use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
+use std::{env, error::Error, process::exit, sync::OnceLock, time::Duration};
+use tokio::{
+    sync::mpsc::{UnboundedReceiver, unbounded_channel},
+    time::sleep,
+};
 
 pub mod binary;
 pub mod models;
@@ -69,7 +73,11 @@ async fn listen_for_restarts_task(component: String) -> Result<(), RedisError> {
 }
 pub async fn listen_for_restarts(component: String) {
     tokio::spawn(async move {
-        listen_for_restarts_task(component).await.ok();
+        listen_for_restarts_task(component.clone()).await.ok();
+        if component != "MASTER" {
+            let sleep_secs = random_range(15..60);
+            sleep(Duration::from_secs(sleep_secs)).await;
+        }
         exit(0);
     });
 }
