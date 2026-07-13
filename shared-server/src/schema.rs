@@ -51,8 +51,10 @@ diesel::table! {
 diesel::table! {
     development_environments (id) {
         id -> Uuid,
-        repo -> Varchar,
+        name -> Varchar,
+        repo -> Nullable<Varchar>,
         branch -> Nullable<Varchar>,
+        code_server_password -> Nullable<Uuid>,
     }
 }
 
@@ -155,6 +157,7 @@ diesel::joinable!(chats -> users (uid));
 diesel::joinable!(commands -> devices (device));
 diesel::joinable!(commands -> users (uid));
 diesel::joinable!(containers -> users (uid));
+diesel::joinable!(development_environments -> commands (code_server_password));
 diesel::joinable!(development_environments -> containers (id));
 diesel::joinable!(device_info -> devices (device));
 diesel::joinable!(devices -> containers (container_id));

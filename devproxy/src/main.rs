@@ -1,13 +1,18 @@
 #![forbid(unsafe_code)]
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, Pool},
 };
-use pingora::{prelude::*, server::ShutdownWatch, services::background::BackgroundService};
+use pingora::{http::Method, prelude::*, server::ShutdownWatch, services::background::BackgroundService};
 use shared_api::print_startup;
-use shared_server::{authenticate_jwt, get_db_pool, listen_for_restarts, models::Setting, schema::settings};
+use shared_server::{
+    authenticate_jwt, get_db_pool, listen_for_restarts,
+    models::{Command, DevelopmentEnvironment, Setting},
+    schema::{commands, development_environments, settings},
+};
 use std::{net::ToSocketAddrs, sync::OnceLock};
 use uuid::Uuid;
 
@@ -22,6 +27,18 @@ impl BackgroundService for RestartService {
     async fn start(&self, mut _shutdown: ShutdownWatch) {
         listen_for_restarts("DEVPROXY".to_string()).await;
     }
+}
+fn get_login_body(id: Uuid) -> Result<String> {
+    let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().or(Err(Error::new(InternalError)))?;
+    let development_environment: DevelopmentEnvironment = development_environments::table.find(id).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+    let command: Command = commands::table
+        .find(development_environment.code_server_password.ok_or(Error::new(InternalError))?)
+        .first(&mut db)
+        .or(Err(Error::new(InternalError)))?;
+    if command.stdout.is_empty() {
+        return Err(Error::new(InternalError));
+    }
+    Ok(format!("password={}", command.stdout))
 }
 #[async_trait]
 impl ProxyHttp for DevProxy {
@@ -80,6 +97,22 @@ impl ProxyHttp for DevProxy {
         }
         *ctx = uuid;
         Ok(false)
+    }
+    async fn upstream_request_filter(&self, session: &mut Session, upstream_request: &mut RequestHeader, ctx: &mut Self::CTX) -> Result<()> {
+        let uri = &session.req_header().uri;
+        if uri.path() == "/login" {
+            upstream_request.set_method(Method::POST);
+            upstream_request.insert_header("Content-Type", "application/x-www-form-urlencoded").or(Err(Error::new(InternalError)))?;
+            upstream_request.insert_header("Content-Length", get_login_body(*ctx)?.len()).or(Err(Error::new(InternalError)))?;
+        }
+        Ok(())
+    }
+    async fn request_body_filter(&self, session: &mut Session, body: &mut Option<Bytes>, end_of_stream: bool, ctx: &mut Self::CTX) -> Result<()> {
+        let uri = &session.req_header().uri;
+        if uri.path() == "/login" && end_of_stream {
+            *body = Some(Bytes::from(get_login_body(*ctx)?));
+        }
+        Ok(())
     }
 }
 

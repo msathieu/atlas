@@ -23,7 +23,8 @@ use uuid::Uuid;
 #[derive(Serialize)]
 pub struct APIDevelopmentEnvironment {
     id: Uuid,
-    repo: String,
+    name: String,
+    repo: Option<String>,
     branch: Option<String>,
     created_at: u64,
     state: String,
@@ -31,6 +32,7 @@ pub struct APIDevelopmentEnvironment {
 }
 #[derive(Deserialize)]
 pub struct CreateDevelopmentEnvironmentRequest {
+    name: String,
     repo: String,
     branch: String,
 }
@@ -69,6 +71,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
             .to_string();
             Ok(APIDevelopmentEnvironment {
                 id: environment.id,
+                name: environment.name.clone(),
                 repo: environment.repo.clone(),
                 branch: environment.branch.clone(),
                 created_at: convert_timestamp(container.created_at)?,
@@ -84,6 +87,9 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateDevelopmentEnvironmentRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
+    if request.name.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
     let mut db = get_db()?;
     let image: Setting = settings::table.find("development_environment_image").first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut container = Container {
@@ -98,9 +104,16 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let mut id = Uuid::nil();
     db.transaction(|db| {
         container = diesel::insert_into(containers::table).values(container).get_result(db)?;
+        let repo = if request.repo.is_empty() { None } else { Some(request.repo) };
         let branch = if request.branch.is_empty() { None } else { Some(request.branch) };
         id = container.id.ok_or("Missing ID")?;
-        let development_environment = DevelopmentEnvironment { id, repo: request.repo, branch };
+        let development_environment = DevelopmentEnvironment {
+            id,
+            name: request.name,
+            repo,
+            branch,
+            code_server_password: None,
+        };
         diesel::insert_into(development_environments::table).values(development_environment).execute(db)?;
         Ok::<(), Box<dyn Error>>(())
     })

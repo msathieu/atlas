@@ -7,14 +7,16 @@
   let selectedEnvironment: any = $state();
   let dialog: any = $state();
   let creationDialog: any = $state();
+  let newName = $state("");
   let newRepo = $state("");
   let newBranch = $state("");
 
   async function createEnvironment() {
     await authenticatedFetch(`/api/development_environments`, {
       method: "POST",
-      body: JSON.stringify({ repo: newRepo, branch: newBranch }),
+      body: JSON.stringify({ name: newName, repo: newRepo, branch: newBranch }),
     });
+    newName = "";
     newRepo = "";
     newBranch = "";
   }
@@ -40,6 +42,7 @@
   <thead>
     <tr>
       <th>State</th>
+      <th>Name</th>
       <th>Repo</th>
       <th>Branch</th>
       <th>Created At</th>
@@ -68,6 +71,7 @@
             <CircleQuestionMark />
           {/if}
         </td>
+        <td>{environment.name}</td>
         <td>{environment.repo}</td>
         <td>{environment.branch}</td>
         <td>{formatTime(environment.created_at)}</td>
@@ -110,6 +114,10 @@
           <tr>
             <td>ID</td>
             <td>{selectedEnvironment.id}</td>
+          </tr>
+          <tr>
+            <td>Name</td>
+            <td>{selectedEnvironment.name}</td>
           </tr>
           <tr>
             <td>Repo</td>
@@ -161,7 +169,8 @@
       }}
     >
       <fieldset class="fieldset">
-        <input id="repo" type="text" placeholder="Repository" class="input" required bind:value={newRepo} />
+        <input id="name" type="text" placeholder="Name" class="input" required bind:value={newName} />
+        <input id="repo" type="text" placeholder="Repository" class="input" bind:value={newRepo} />
         <input id="branch" type="text" placeholder="Branch" class="input" bind:value={newBranch} />
         <button class="btn btn-primary">Create</button>
       </fieldset>

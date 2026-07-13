@@ -22,5 +22,6 @@ export const load: PageLoad = async ({ fetch }) => {
     installationScript: installationScript["script"],
     apkHash: settings["apk_hash"],
     k8sStorageClass: settings["k8s_storageclass"],
+    developmentEnvironmentImage: settings["development_environment_image"],
   };
 };

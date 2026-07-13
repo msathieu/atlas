@@ -7,7 +7,7 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
 };
 use k8s_openapi::api::core::v1::{
-    PersistentVolumeClaim, PersistentVolumeClaimSpec, PersistentVolumeClaimVolumeSource, Pod, PodSpec, SecurityContext, Service, ServicePort, ServiceSpec, Volume, VolumeMount,
+    LocalObjectReference, PersistentVolumeClaim, PersistentVolumeClaimSpec, PersistentVolumeClaimVolumeSource, Pod, PodSpec, SecurityContext, Service, ServicePort, ServiceSpec, Volume, VolumeMount,
     VolumeResourceRequirements,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
@@ -17,7 +17,7 @@ use shared_api::{CommandOrigin, ContainerOrigin, ContainerState};
 use shared_server::binary::personalize_binary;
 use shared_server::models::{Command, Container, Device, Setting};
 use shared_server::notify_server;
-use shared_server::schema::{commands, containers, devices, settings};
+use shared_server::schema::{commands, containers, development_environments, devices, settings};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::time::{Duration, SystemTime};
@@ -146,10 +146,12 @@ async fn process_container(container: Container, pool: Pool<ConnectionManager<Pg
             }),
             ..Default::default()
         };
+        let pull_secret = LocalObjectReference { name: "atlas-image-pull".to_string() };
         pod.spec = Some(PodSpec {
             share_process_namespace: Some(true),
             volumes: Some(vec![volume]),
             containers: vec![k8s_container],
+            image_pull_secrets: Some(vec![pull_secret]),
             ..Default::default()
         });
         pod_api.create(&PostParams::default(), &pod).await?;
@@ -193,7 +195,7 @@ async fn process_container(container: Container, pool: Pool<ConnectionManager<Pg
         let mut process = pod_api
             .exec(
                 &container_name,
-                vec!["/usr/bin/sh", "-c", "/usr/local/bin/atlas-agent supervise > /var/log/atlas.log 2>&1 &"],
+                vec!["/usr/bin/sh", "-c", "cd / && /usr/local/bin/atlas-agent supervise > /var/log/atlas.log 2>&1 &"],
                 &AttachParams::default(),
             )
             .await?;
@@ -213,10 +215,10 @@ async fn process_container(container: Container, pool: Pool<ConnectionManager<Pg
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::Running as i32))
             .execute(&mut db)?;
-        let command = Command {
+        let mut command = Command {
             id: None,
             device: device.id.ok_or("Invalid device")?,
-            uid: None,
+            uid: Some(container.uid),
             code: LUA_DEVELOPMENT_ENVIRONMENT.to_string(),
             completed: false,
             status_code: 0,
@@ -231,7 +233,10 @@ async fn process_container(container: Container, pool: Pool<ConnectionManager<Pg
             chat_tool_call_id: None,
             initiated: false,
         };
-        diesel::insert_into(commands::table).values(command).execute(&mut db)?;
+        command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
+        diesel::update(development_environments::table.find(container_id))
+            .set(development_environments::code_server_password.eq(command.id.ok_or("Invalid command")?))
+            .execute(&mut db)?;
         notify_server("WEB:REFRESH").await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Running as i32

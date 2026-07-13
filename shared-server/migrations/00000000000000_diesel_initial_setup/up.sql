@@ -115,6 +115,8 @@ CREATE TABLE commands(
 );
 CREATE TABLE development_environments(
     id uuid PRIMARY KEY REFERENCES containers ON DELETE CASCADE,
-    repo varchar NOT NULL,
-    branch varchar
+    name varchar NOT NULL,
+    repo varchar,
+    branch varchar,
+    code_server_password uuid REFERENCES commands ON DELETE CASCADE
 );

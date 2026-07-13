@@ -22,6 +22,7 @@
   let mailTo = $derived(data.mailTo);
   let apkHash = $derived(data.apkHash);
   let k8sStorageClass = $derived(data.k8sStorageClass);
+  let developmentEnvironmentImage = $derived(data.developmentEnvironmentImage);
   let downloadLink: any = $state();
   let actuallyDownload = false;
 
@@ -65,6 +66,7 @@
 <Setting name="mail_to" description="Mail To" val={mailTo} />
 <Setting name="apk_hash" description="APK Hash" val={apkHash} />
 <Setting name="k8s_storageclass" description="Kubernetes Storage Class" val={k8sStorageClass} />
+<Setting name="development_environment_image" description="Development Environment Image" val={developmentEnvironmentImage} />
 
 <h1 class="text-xl">API Certificate</h1>
 <br />
