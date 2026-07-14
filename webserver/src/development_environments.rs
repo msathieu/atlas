@@ -13,9 +13,9 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use shared_api::{ContainerOrigin, ContainerState};
 use shared_server::{
-    models::{Container, DevelopmentEnvironment, Setting},
+    models::{Command, Container, DevelopmentEnvironment, Setting},
     notify_server,
-    schema::{containers, development_environments, settings},
+    schema::{commands, containers, development_environments, settings},
 };
 use std::{error::Error, time::SystemTime};
 use uuid::Uuid;
@@ -43,6 +43,7 @@ pub struct CreateDevelopmentEnvironmentResponse {
 #[derive(Serialize)]
 pub struct OpenDevelopmentEnvironmentResponse {
     url: String,
+    ready: bool,
 }
 
 pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIDevelopmentEnvironment>>), StatusCode> {
@@ -180,18 +181,31 @@ pub async fn open_development_environment(headers: HeaderMap, Path(id): Path<Uui
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db()?;
-    containers::table
+    let container: Container = containers::table
         .filter(
             containers::uid
                 .eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)
                 .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32))
                 .and(containers::id.eq(id)),
         )
-        .first::<Container>(&mut db)
+        .first(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
+    let mut ready = true;
+    if container.state != ContainerState::Running as i32 {
+        ready = false;
+    }
+    let development_environment: DevelopmentEnvironment = development_environments::table.find(id).first(&mut db).or(Err(StatusCode::NOT_FOUND))?;
+    if let Some(code_server_password) = development_environment.code_server_password {
+        let command: Command = commands::table.find(code_server_password).first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        if command.stdout.is_empty() {
+            ready = false;
+        }
+    } else {
+        ready = false;
+    }
     let webserver: Setting = settings::table.find("webserver_host").first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let jwt = generate_jwt(&format!("devproxy-{}", id), &user, 24 * 60 * 60, None)?;
+    let jwt = generate_jwt(&format!("devproxy-{}", id), &user, 12 * 60 * 60, None)?;
     let url = format!("https://{}.dev.{}/setup?jwt={}", id, webserver.value, jwt);
-    let response = OpenDevelopmentEnvironmentResponse { url };
+    let response = OpenDevelopmentEnvironmentResponse { url, ready };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
