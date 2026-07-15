@@ -29,7 +29,7 @@ setInterval(async () => {
       {@render children()}
     {/if}
   </div>
-  {#if page.url.pathname !== "/login" && !data.client_error}
+  {#if page.url.pathname !== "/login" && !page.url.pathname.startsWith("/embed/") && !data.client_error}
     <div class="drawer-side">
       <ul class="menu bg-base-200 min-h-full">
         <li>

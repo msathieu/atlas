@@ -23,6 +23,7 @@ let mailTo = $derived(data.mailTo);
 let apkHash = $derived(data.apkHash);
 let k8sStorageClass = $derived(data.k8sStorageClass);
 let developmentEnvironmentImage = $derived(data.developmentEnvironmentImage);
+let codeServerSettings = $derived(data.codeServerSettings);
 let downloadLink: any = $state();
 let actuallyDownload = false;
 
@@ -38,12 +39,12 @@ async function restart() {
 }
 </script>
 
-<Setting name="llm_default_provider" description="Default LLM Provider" val={defaultProvider} />
-<Setting name="llm_openrouter_model" description="Openrouter Model" val={openrouterModel} />
-<Setting name="llm_openrouter_key" description="Openrouter API Key" val={openrouterKey} />
-<Setting name="llm_generic_endpoint" description="Generic LLM Endpoint" val={genericEndpoint} />
-<Setting name="llm_generic_model" description="Generic LLM Model" val={genericModel} />
-<Setting name="llm_generic_key" description="Generic LLM API Key" val={genericKey} />
+<Setting name="llm_default_provider" description="Default LLM Provider" val={defaultProvider} type="text" />
+<Setting name="llm_openrouter_model" description="Openrouter Model" val={openrouterModel} type="text" />
+<Setting name="llm_openrouter_key" description="Openrouter API Key" val={openrouterKey} type="text" />
+<Setting name="llm_generic_endpoint" description="Generic LLM Endpoint" val={genericEndpoint} type="text" />
+<Setting name="llm_generic_model" description="Generic LLM Model" val={genericModel} type="text" />
+<Setting name="llm_generic_key" description="Generic LLM API Key" val={genericKey} type="text" />
 
 <h1 class="text-xl">Allow New Devices</h1>
 <br />
@@ -58,16 +59,17 @@ async function restart() {
 </form>
 <br />
 
-<Setting name="apiserver_host" description="API Server Host" val={apiserverHost} />
-<Setting name="webserver_host" description="Web Server Host" val={webserverHost} />
-<Setting name="mail_server" description="Mail Server" val={mailServer} />
-<Setting name="mail_username" description="Mail Username" val={mailUsername} />
-<Setting name="mail_password" description="Mail Password" val={mailPassword} />
-<Setting name="mail_from" description="Mail From" val={mailFrom} />
-<Setting name="mail_to" description="Mail To" val={mailTo} />
-<Setting name="apk_hash" description="APK Hash" val={apkHash} />
-<Setting name="k8s_storageclass" description="Kubernetes Storage Class" val={k8sStorageClass} />
-<Setting name="development_environment_image" description="Development Environment Image" val={developmentEnvironmentImage} />
+<Setting name="apiserver_host" description="API Server Host" val={apiserverHost} type="text" />
+<Setting name="webserver_host" description="Web Server Host" val={webserverHost} type="text" />
+<Setting name="mail_server" description="Mail Server" val={mailServer} type="text" />
+<Setting name="mail_username" description="Mail Username" val={mailUsername} type="text" />
+<Setting name="mail_password" description="Mail Password" val={mailPassword} type="text" />
+<Setting name="mail_from" description="Mail From" val={mailFrom} type="text" />
+<Setting name="mail_to" description="Mail To" val={mailTo} type="text" />
+<Setting name="apk_hash" description="APK Hash" val={apkHash} type="text" />
+<Setting name="k8s_storageclass" description="Kubernetes Storage Class" val={k8sStorageClass} type="text" />
+<Setting name="development_environment_image" description="Development Environment Image" val={developmentEnvironmentImage} type="text" />
+<Setting name="code_server_settings" description="Code Server Settings" val={codeServerSettings} type="textarea" />
 
 <h1 class="text-xl">API Certificate</h1>
 <br />

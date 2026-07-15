@@ -2,7 +2,7 @@
 import { Check } from "@lucide/svelte";
 import { updateSetting } from "$lib/settings.ts";
 
-let { name, description, val } = $props();
+let { name, description, val, type } = $props();
 </script>
 
 <h1 class="text-xl">{description}</h1>
@@ -13,7 +13,11 @@ let { name, description, val } = $props();
     await updateSetting(name, val);
   }}
 >
-  <input id={name} type="text" placeholder={description} class="input" bind:value={val} />
+  {#if type === "textarea"}
+    <textarea id={name} placeholder={description} class="textarea w-3xl h-100" bind:value={val}></textarea>
+  {:else}
+    <input id={name} type="text" placeholder={description} class="input" bind:value={val} />
+  {/if}
   <button class="btn"><Check /></button>
 </form>
 <br />

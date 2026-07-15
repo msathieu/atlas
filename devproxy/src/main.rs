@@ -7,9 +7,10 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
 };
 use pingora::{http::Method, prelude::*, server::ShutdownWatch, services::background::BackgroundService};
+use redis::AsyncTypedCommands;
 use shared_api::{ContainerState, print_startup};
 use shared_server::{
-    authenticate_jwt, get_db_pool, listen_for_restarts,
+    authenticate_jwt, get_db_pool, get_valkey_client, listen_for_restarts,
     models::{Command, Container, DevelopmentEnvironment, Setting},
     schema::{commands, containers, development_environments, settings},
 };
@@ -20,6 +21,7 @@ struct DevProxy;
 struct RestartService;
 
 static DB_POOL: OnceLock<Pool<ConnectionManager<PgConnection>>> = OnceLock::new();
+static VALKEY_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
 
 #[async_trait]
 impl BackgroundService for RestartService {
@@ -91,13 +93,25 @@ impl ProxyHttp for DevProxy {
             if !authenticated || container.state != ContainerState::Running as i32 {
                 let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
                 response
-                    .insert_header("Location", format!("https://{}/development_environments/{}", webserver_host.value, uuid))
+                    .insert_header("Location", format!("https://{}/embed/development_environments/{}", webserver_host.value, uuid))
                     .or(Err(Error::new(InternalError)))?;
                 session.write_response_header(Box::new(response), false).await.or(Err(Error::new(InternalError)))?;
                 return Ok(true);
             }
         }
         *ctx = uuid;
+        if VALKEY_POOL.get().is_none() {
+            let client = get_valkey_client().await.or(Err(Error::new(InternalError)))?;
+            VALKEY_POOL.set(client.0).ok();
+        }
+        let key = format!("DEVELOPMENT_ENVIRONMENT:{}", uuid);
+        VALKEY_POOL
+            .get()
+            .ok_or(Error::new(InternalError))?
+            .clone()
+            .set_ex(key, true, 4 * 60 * 60)
+            .await
+            .or(Err(Error::new(InternalError)))?;
         Ok(false)
     }
     async fn upstream_request_filter(&self, session: &mut Session, upstream_request: &mut RequestHeader, ctx: &mut Self::CTX) -> Result<()> {

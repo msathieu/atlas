@@ -10,9 +10,11 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use diesel::prelude::*;
+use redis::AsyncTypedCommands;
 use serde::{Deserialize, Serialize};
 use shared_api::{ContainerOrigin, ContainerState};
 use shared_server::{
+    get_valkey_client,
     models::{Command, Container, DevelopmentEnvironment, Setting},
     notify_server,
     schema::{commands, containers, development_environments, settings},
@@ -95,7 +97,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
         uid: user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
         origin: ContainerOrigin::DevelopmentEnvironment as i32,
         state: ContainerState::NonExistent as i32,
-        requested_state: ContainerState::Running as i32,
+        requested_state: ContainerState::Stopped as i32,
         image: image.value,
     };
     let mut id = Uuid::nil();
@@ -143,6 +145,14 @@ pub async fn start_development_environment(headers: HeaderMap, Path(id): Path<Uu
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db()?;
+    let key = format!("DEVELOPMENT_ENVIRONMENT:{}", id);
+    get_valkey_client()
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
+        .0
+        .set_ex(key, true, 4 * 60 * 60)
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     diesel::update(
         containers::table.filter(
             containers::id

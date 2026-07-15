@@ -10,15 +10,19 @@ export const load: PageLoad = async ({ fetch, params }) => {
       if (environment.state === "Running") {
         const urlRes = await authenticatedFetch(`/api/development_environments/${params.id}/open`, {
           method: "POST",
-        });
+        }, fetch);
         const data = await urlRes.json();
         if (data.ready) {
-          window.location.href = data.url;
+          const url = new URL(data.url);
+          if (url.protocol !== "https:") {
+            throw new Error("Invalid protocol");
+          }
+          globalThis.location.href = url.href;
         }
       } else if (!environment.pending) {
         await authenticatedFetch(`/api/development_environments/${params.id}/start`, {
           method: "POST",
-        });
+        }, fetch);
       }
       return;
     }

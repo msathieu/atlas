@@ -13,11 +13,12 @@ use k8s_openapi::api::core::v1::{
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use kube::api::{AttachParams, DeleteParams, PostParams};
 use kube::{Api, Client};
+use redis::AsyncCommands;
 use shared_api::{CommandOrigin, ContainerOrigin, ContainerState};
 use shared_server::binary::personalize_binary;
 use shared_server::models::{Command, Container, DevelopmentEnvironment, Device, Setting};
-use shared_server::notify_server;
 use shared_server::schema::{commands, containers, development_environments, devices, settings};
+use shared_server::{get_valkey_client, notify_server};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::time::{Duration, SystemTime};
@@ -68,6 +69,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
     let container_id = container.id.ok_or("Invalid container")?;
     let container_name = format!("atlas-{}", container_id);
     let pvc_name = format!("atlas-state-{}", container_id);
+    let nix_pvc_name = format!("atlas-nix-{}", container_id);
     let service_name = format!("atlas-dev-{}", container_id);
     let namespace = "atlas";
     if container.state == ContainerState::Running as i32 || container.state == ContainerState::Started as i32 {
@@ -82,6 +84,13 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 }
             }
             None => {
+                request_stop = true;
+            }
+        }
+        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
+            let key = format!("DEVELOPMENT_ENVIRONMENT:{}", container_id);
+            let exists: usize = get_valkey_client().await?.0.exists(key).await?;
+            if exists == 0 {
                 request_stop = true;
             }
         }
@@ -127,6 +136,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 ..Default::default()
             });
             service_api.create(&PostParams::default(), &service).await?;
+            pvc.metadata.name = Some(nix_pvc_name);
+            pvc_api.create(&PostParams::default(), &pvc).await?;
         }
         notify_server("WEB:REFRESH").await?;
         notify_server("MASTER:CONTAINERS").await?;
@@ -139,6 +150,9 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             let service_api: Api<Service> = Api::namespaced(client, namespace);
             if service_api.get_opt(&service_name).await?.is_some() {
                 service_api.delete(&service_name, &DeleteParams::default()).await?;
+            }
+            if pvc_api.get_opt(&nix_pvc_name).await?.is_some() {
+                pvc_api.delete(&nix_pvc_name, &DeleteParams::default()).await?;
             }
         }
         diesel::update(containers::table.find(container_id))
@@ -164,11 +178,32 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             }),
             ..Default::default()
         };
+        let mut volumes = vec![volume];
+        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
+            let nix_volume = Volume {
+                name: "nix".to_string(),
+                persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
+                    claim_name: nix_pvc_name,
+                    read_only: None,
+                }),
+                ..Default::default()
+            };
+            volumes.push(nix_volume);
+        }
         let volume_mount = VolumeMount {
             name: "state".to_string(),
             mount_path: "/state".to_string(),
             ..Default::default()
         };
+        let mut volume_mounts = vec![volume_mount];
+        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
+            let nix_volume_mount = VolumeMount {
+                name: "nix".to_string(),
+                mount_path: "/nix".to_string(),
+                ..Default::default()
+            };
+            volume_mounts.push(nix_volume_mount);
+        }
         let mut envs = vec![];
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db)?;
@@ -177,12 +212,18 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value: Some(format!("Atlas - {}", development_environment.name)),
                 value_from: None,
             });
+            let code_server_settings: Setting = settings::table.find("code_server_settings").first(&mut db)?;
+            envs.push(EnvVar {
+                name: "CODE_SERVER_SETTINGS".to_string(),
+                value: Some(code_server_settings.value),
+                value_from: None,
+            });
         }
         let k8s_container = k8s_openapi::api::core::v1::Container {
             name: "main".to_string(),
             image: Some(container.image),
             command: Some(vec!["/usr/bin/sleep".to_string(), "infinity".to_string()]),
-            volume_mounts: Some(vec![volume_mount]),
+            volume_mounts: Some(volume_mounts),
             security_context: Some(SecurityContext {
                 run_as_user: Some(0),
                 run_as_group: Some(0),
@@ -194,7 +235,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         let pull_secret = LocalObjectReference { name: "atlas-image-pull".to_string() };
         pod.spec = Some(PodSpec {
             share_process_namespace: Some(true),
-            volumes: Some(vec![volume]),
+            volumes: Some(volumes),
             containers: vec![k8s_container],
             image_pull_secrets: Some(vec![pull_secret]),
             ..Default::default()

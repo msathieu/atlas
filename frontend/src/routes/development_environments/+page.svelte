@@ -36,15 +36,7 @@ async function stopEnvironment(id: string) {
   });
 }
 async function openDevelopmentEnvironment(id: string) {
-  const response = await authenticatedFetch(`/api/development_environments/${id}/open`, {
-    method: "POST",
-  });
-  const data = await response.json();
-  const url = new URL(data.url);
-  if (url.protocol !== "https:") {
-    throw new Error("Invalid protocol");
-  }
-  window.open(data.url, "_blank", "noopener");
+  globalThis.open(`/embed/development_environments/${id}`, "_blank", "noopener");
 }
 </script>
 
