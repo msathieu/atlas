@@ -89,7 +89,7 @@ pub fn get_webauthn() -> Result<Webauthn, StatusCode> {
 pub async fn start_passkey_registration(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreationChallengeResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: StartPasskeyRegistrationRequest = serde_json::from_str(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: StartPasskeyRegistrationRequest = serde_json::from_slice(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::FORBIDDEN))?;
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::FORBIDDEN))?;
     let webauthn = get_webauthn()?;
@@ -111,7 +111,7 @@ pub async fn start_passkey_registration(headers: HeaderMap, uri: OriginalUri, bo
 pub async fn finish_passkey_registration(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: FinishPasskeyRegistrationRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: FinishPasskeyRegistrationRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
     let key = format!("PASSKEY_REGISTRATION:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?);
     let registration_json: Option<String> = valkey_client.get_del(key).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
@@ -137,7 +137,7 @@ pub async fn finish_passkey_registration(headers: HeaderMap, uri: OriginalUri, b
 }
 pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Json<StartPasskeyAuthenticationResponse>), StatusCode> {
     let webauthn = get_webauthn()?;
-    let request: StartPasskeyAuthenticationRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: StartPasskeyAuthenticationRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let user_option: Option<User> = users::table
         .filter(users::username.eq(&request.username))
@@ -189,7 +189,7 @@ pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Jso
     ))
 }
 pub async fn finish_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Json<FinishPasskeyAuthenticationResponse>), StatusCode> {
-    let request: FinishPasskeyAuthenticationRequest = serde_json::from_str(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: FinishPasskeyAuthenticationRequest = serde_json::from_slice(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
     let webauthn = get_webauthn()?;
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
     let key = format!("PASSKEY_AUTHENTICATION:{}", request.flow_id);

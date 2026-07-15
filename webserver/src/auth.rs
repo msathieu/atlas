@@ -54,7 +54,7 @@ pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) 
     Ok(jwt)
 }
 pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), StatusCode> {
-    let request: LoginRequest = serde_json::from_str(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: LoginRequest = serde_json::from_slice(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
     validate_timestamp(request.timestamp)?;
     let mut db = get_db()?;
     let user: User = users::table.filter(users::username.eq(request.username)).first(&mut db).or(Err(StatusCode::UNAUTHORIZED))?;

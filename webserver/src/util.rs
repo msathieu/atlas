@@ -49,13 +49,12 @@ pub fn get_signing_key() -> Result<Ed25519KeyPair, StatusCode> {
     let key = Ed25519KeyPair::from_pkcs8(SIGNING_KEY.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(key)
 }
-pub fn decrypt_body(body: Bytes) -> Result<String, StatusCode> {
+pub fn decrypt_body(body: Bytes) -> Result<Vec<u8>, StatusCode> {
     let key = get_encryption_key()?;
     let key = OaepPrivateDecryptingKey::new(key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut decrypted = vec![0; key.min_output_size()];
     let decrypted = key.decrypt(&OAEP_SHA512_MGF1SHA512, &body, &mut decrypted, None).or(Err(StatusCode::BAD_REQUEST))?;
-    let decrypted = String::from_utf8(decrypted.to_owned()).or(Err(StatusCode::BAD_REQUEST))?;
-    Ok(decrypted)
+    Ok(decrypted.to_vec())
 }
 pub async fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, method: &str) -> Result<String, StatusCode> {
     let signature = headers.get("X-Request-Signature").ok_or(StatusCode::UNAUTHORIZED)?;

@@ -85,7 +85,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
 pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateDevelopmentEnvironmentResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: CreateDevelopmentEnvironmentRequest = serde_json::from_str(&String::from_utf8(body.to_vec()).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: CreateDevelopmentEnvironmentRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     if request.name.is_empty() {
         return Err(StatusCode::BAD_REQUEST);
     }

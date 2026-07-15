@@ -121,6 +121,19 @@ impl ProxyHttp for DevProxy {
             upstream_request.insert_header("Content-Type", "application/x-www-form-urlencoded").or(Err(Error::new(InternalError)))?;
             upstream_request.insert_header("Content-Length", get_login_body(*ctx)?.len()).or(Err(Error::new(InternalError)))?;
         }
+        if let Some(cookie_header) = session.get_header("Cookie") {
+            let mut new_cookie_header = String::new();
+            for header in cookie_header.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?.split(";") {
+                let header = header.trim();
+                if !header.starts_with("atlas_jwt=") {
+                    if !new_cookie_header.is_empty() {
+                        new_cookie_header.push_str("; ");
+                    }
+                    new_cookie_header.push_str(header);
+                }
+            }
+            upstream_request.insert_header("Cookie", new_cookie_header).or(Err(Error::new(InternalError)))?;
+        }
         Ok(())
     }
     async fn request_body_filter(&self, session: &mut Session, body: &mut Option<Bytes>, end_of_stream: bool, ctx: &mut Self::CTX) -> Result<()> {

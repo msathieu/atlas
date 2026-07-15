@@ -59,7 +59,7 @@ pub async fn delete_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: Original
 pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateUserResponse>), StatusCode> {
     require_admin(&headers)?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: CreateUserRequest = serde_json::from_str(&decrypt_body(body).or(Err(StatusCode::BAD_REQUEST))?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: CreateUserRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     if request.username.is_empty() || request.password.is_empty() || request.password.len() < MIN_PASSWORD_LENGTH {
         return Err(StatusCode::BAD_REQUEST);
     }
