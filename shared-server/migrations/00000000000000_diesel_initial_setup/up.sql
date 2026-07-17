@@ -119,5 +119,6 @@ CREATE TABLE development_environments(
     repo varchar,
     branch varchar,
     code_server_password uuid REFERENCES commands ON DELETE CASCADE,
-    nested_containers boolean NOT NULL
+    nested_containers boolean NOT NULL,
+    ssh_key varchar NOT NULL
 );

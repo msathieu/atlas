@@ -19,6 +19,7 @@ use shared_server::{
     notify_server,
     schema::{commands, containers, development_environments, settings},
 };
+use ssh_key::{Algorithm::Ed25519, LineEnding, PrivateKey, rand_core::OsRng};
 use std::{error::Error, time::SystemTime};
 use uuid::Uuid;
 
@@ -32,6 +33,7 @@ pub struct APIDevelopmentEnvironment {
     state: String,
     pending: bool,
     nested_containers: bool,
+    ssh_key: String,
 }
 #[derive(Deserialize)]
 pub struct CreateDevelopmentEnvironmentRequest {
@@ -70,6 +72,8 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
                 ContainerState::Stopped => "Stopped",
             }
             .to_string();
+            let private_key = PrivateKey::from_openssh(&environment.ssh_key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+            let pubkey = private_key.public_key().to_openssh().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
             Ok(APIDevelopmentEnvironment {
                 id: environment.id,
                 name: environment.name.clone(),
@@ -79,6 +83,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
                 state,
                 pending: container.requested_state != container.state,
                 nested_containers: environment.nested_containers,
+                ssh_key: pubkey,
             })
         })
         .collect();
@@ -107,10 +112,12 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
         image: image.value,
     };
     let mut id = Uuid::nil();
+    let repo = if request.repo.is_empty() { None } else { Some(request.repo) };
+    let branch = if request.branch.is_empty() { None } else { Some(request.branch) };
+    let ssh_key = PrivateKey::random(&mut OsRng, Ed25519).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let ssh_key_exported = ssh_key.to_openssh(LineEnding::LF).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     db.transaction(|db| {
         container = diesel::insert_into(containers::table).values(container).get_result(db)?;
-        let repo = if request.repo.is_empty() { None } else { Some(request.repo) };
-        let branch = if request.branch.is_empty() { None } else { Some(request.branch) };
         id = container.id.ok_or("Missing ID")?;
         let development_environment = DevelopmentEnvironment {
             id,
@@ -119,6 +126,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
             branch,
             code_server_password: None,
             nested_containers: request.nested_containers,
+            ssh_key: ssh_key_exported.to_string(),
         };
         diesel::insert_into(development_environments::table).values(development_environment).execute(db)?;
         Ok::<(), Box<dyn Error>>(())

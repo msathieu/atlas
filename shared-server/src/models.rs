@@ -173,4 +173,5 @@ pub struct DevelopmentEnvironment {
     pub branch: Option<String>,
     pub code_server_password: Option<Uuid>,
     pub nested_containers: bool,
+    pub ssh_key: String,
 }

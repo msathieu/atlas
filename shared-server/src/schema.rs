@@ -56,6 +56,7 @@ diesel::table! {
         branch -> Nullable<Varchar>,
         code_server_password -> Nullable<Uuid>,
         nested_containers -> Bool,
+        ssh_key -> Varchar,
     }
 }
 

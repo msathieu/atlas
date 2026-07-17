@@ -170,6 +170,10 @@ async function openDevelopmentEnvironment(id: string) {
             <td>Nested Containers</td>
             <td>{selectedEnvironment.nested_containers}</td>
           </tr>
+          <tr>
+            <td>SSH Public Key</td>
+            <td>{selectedEnvironment.ssh_key}</td>
+          </tr>
         </tbody>
       </table>
       <div class="divider"></div>
