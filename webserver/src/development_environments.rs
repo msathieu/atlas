@@ -31,12 +31,14 @@ pub struct APIDevelopmentEnvironment {
     created_at: u64,
     state: String,
     pending: bool,
+    nested_containers: bool,
 }
 #[derive(Deserialize)]
 pub struct CreateDevelopmentEnvironmentRequest {
     name: String,
     repo: String,
     branch: String,
+    nested_containers: bool,
 }
 #[derive(Serialize)]
 pub struct CreateDevelopmentEnvironmentResponse {
@@ -76,6 +78,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
                 created_at: convert_timestamp(container.created_at)?,
                 state,
                 pending: container.requested_state != container.state,
+                nested_containers: environment.nested_containers,
             })
         })
         .collect();
@@ -88,6 +91,9 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let request: CreateDevelopmentEnvironmentRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     if request.name.is_empty() {
         return Err(StatusCode::BAD_REQUEST);
+    }
+    if request.nested_containers && !user.admin {
+        return Err(StatusCode::FORBIDDEN);
     }
     let mut db = get_db()?;
     let image: Setting = settings::table.find("development_environment_image").first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
@@ -112,6 +118,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
             repo,
             branch,
             code_server_password: None,
+            nested_containers: request.nested_containers,
         };
         diesel::insert_into(development_environments::table).values(development_environment).execute(db)?;
         Ok::<(), Box<dyn Error>>(())

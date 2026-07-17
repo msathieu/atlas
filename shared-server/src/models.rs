@@ -172,4 +172,5 @@ pub struct DevelopmentEnvironment {
     pub repo: Option<String>,
     pub branch: Option<String>,
     pub code_server_password: Option<Uuid>,
+    pub nested_containers: bool,
 }

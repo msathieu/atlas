@@ -55,6 +55,7 @@ diesel::table! {
         repo -> Nullable<Varchar>,
         branch -> Nullable<Varchar>,
         code_server_password -> Nullable<Uuid>,
+        nested_containers -> Bool,
     }
 }
 

@@ -1,14 +1,14 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@capacitor/android@^8.4.1": "8.4.1_@capacitor+core@8.4.1",
-    "npm:@capacitor/cli@^8.4.1": "8.4.1",
-    "npm:@capacitor/core@^8.4.1": "8.4.1",
-    "npm:@capawesome/capacitor-passkeys@^0.0.1": "0.0.1_@capacitor+core@8.4.1",
-    "npm:@lucide/svelte@^1.24.0": "1.24.0_svelte@5.56.4",
-    "npm:@sveltejs/adapter-static@^3.0.10": "3.0.10_@sveltejs+kit@2.69.3__@sveltejs+vite-plugin-svelte@7.2.0___svelte@5.56.4___vite@8.1.4____@types+node@26.1.1___@types+node@26.1.1__svelte@5.56.4__typescript@6.0.3__vite@8.1.4___@types+node@26.1.1_@sveltejs+vite-plugin-svelte@7.2.0__svelte@5.56.4__vite@8.1.4___@types+node@26.1.1__@types+node@26.1.1_svelte@5.56.4_typescript@6.0.3_vite@8.1.4__@types+node@26.1.1",
-    "npm:@sveltejs/kit@^2.69.3": "2.69.3_@sveltejs+vite-plugin-svelte@7.2.0__svelte@5.56.4__vite@8.1.4___@types+node@26.1.1__@types+node@26.1.1_svelte@5.56.4_typescript@6.0.3_vite@8.1.4__@types+node@26.1.1",
-    "npm:@sveltejs/vite-plugin-svelte@^7.2.0": "7.2.0_svelte@5.56.4_vite@8.1.4__@types+node@26.1.1_@types+node@26.1.1",
+    "npm:@capacitor/android@^8.4.2": "8.4.2_@capacitor+core@8.4.2",
+    "npm:@capacitor/cli@^8.4.2": "8.4.2",
+    "npm:@capacitor/core@^8.4.2": "8.4.2",
+    "npm:@capawesome/capacitor-passkeys@~0.1.1": "0.1.1_@capacitor+core@8.4.2",
+    "npm:@lucide/svelte@^1.24.0": "1.24.0_svelte@5.56.5",
+    "npm:@sveltejs/adapter-static@^3.0.10": "3.0.10_@sveltejs+kit@2.69.3__@sveltejs+vite-plugin-svelte@7.2.0___svelte@5.56.5___vite@8.1.4____@types+node@26.1.1__svelte@5.56.5__typescript@6.0.3__vite@8.1.4___@types+node@26.1.1_svelte@5.56.5",
+    "npm:@sveltejs/kit@^2.69.3": "2.69.3_@sveltejs+vite-plugin-svelte@7.2.0__svelte@5.56.5__vite@8.1.4___@types+node@26.1.1_svelte@5.56.5_typescript@6.0.3_vite@8.1.4__@types+node@26.1.1",
+    "npm:@sveltejs/vite-plugin-svelte@^7.2.0": "7.2.0_svelte@5.56.5_vite@8.1.4__@types+node@26.1.1",
     "npm:@tailwindcss/vite@^4.3.2": "4.3.2_vite@8.1.4__@types+node@26.1.1_@types+node@26.1.1",
     "npm:@types/node@^26.1.1": "26.1.1",
     "npm:daisyui@^5.6.18": "5.6.18",
@@ -18,22 +18,22 @@
     "npm:highlight.js@^11.11.1": "11.11.1",
     "npm:marked@^18.0.6": "18.0.6",
     "npm:rollup-plugin-license@^3.7.1": "3.7.1_rollup@4.62.2",
-    "npm:svelte-check@^4.7.2": "4.7.2_svelte@5.56.4_typescript@6.0.3",
-    "npm:svelte-sonner@^1.1.1": "1.1.1_svelte@5.56.4",
-    "npm:svelte@^5.56.4": "5.56.4",
+    "npm:svelte-check@^4.7.3": "4.7.3_svelte@5.56.5_typescript@6.0.3",
+    "npm:svelte-sonner@^1.1.1": "1.1.1_svelte@5.56.5",
+    "npm:svelte@^5.56.5": "5.56.5",
     "npm:tailwindcss@^4.3.2": "4.3.2",
     "npm:typescript@^6.0.3": "6.0.3",
     "npm:vite@^8.1.4": "8.1.4_@types+node@26.1.1"
   },
   "npm": {
-    "@capacitor/android@8.4.1_@capacitor+core@8.4.1": {
-      "integrity": "sha512-igtDCJ7QQn0P2qHFD9p4KXaa6V1b2PRNt+MxjVwtjTm/BJvqmiazOJq6rPjwFSZnfHm6iFoZk8TfzHd44pyBGw==",
+    "@capacitor/android@8.4.2_@capacitor+core@8.4.2": {
+      "integrity": "sha512-bzf8XZ9C+ePgOQ+e+T0fnhHGH4aCNY494vvSQIF5w4AY07RwEmkFqZs1678DDSMH0hLSQpxEwXGFNUVcXO6bBA==",
       "dependencies": [
         "@capacitor/core"
       ]
     },
-    "@capacitor/cli@8.4.1": {
-      "integrity": "sha512-t7F2s7fFHCq113xgrggrmK6ctV0/8E5YfLNVLfPHp4GCTDO+tly9fZvWPf2/sOI8lMm18dLT43qbXLRTz/OZgw==",
+    "@capacitor/cli@8.4.2": {
+      "integrity": "sha512-hE4HmpMdr5T8eQ++kGa1BKkdG2JLEvo1y1cj1kmFK78VB9dBp538oe1EZvzwupNGOl0ZueALotzL5wcXRD9w1Q==",
       "dependencies": [
         "@ionic/cli-framework-output",
         "@ionic/utils-subprocess",
@@ -55,14 +55,14 @@
       ],
       "bin": true
     },
-    "@capacitor/core@8.4.1": {
-      "integrity": "sha512-xqhOGLbTAYeOWK+IDUNSjQJAPapQjRHrIcgk9PYp52or9zFTaaMko31uNi16N6W+CRJ8VrRram6fOYILkBG2Hg==",
+    "@capacitor/core@8.4.2": {
+      "integrity": "sha512-fQPRb3JXRaU2pnufDUvqOjhsrYxDQeFRZyaj/sHydIUxD2NxOGHKMpmKUdI+U4OOmKuGZyvRpi7TSJU+7Bjbmg==",
       "dependencies": [
         "tslib"
       ]
     },
-    "@capawesome/capacitor-passkeys@0.0.1_@capacitor+core@8.4.1": {
-      "integrity": "sha512-xTdDfctxRqGjO5f9qLzpnbMQiEtj/lUAPilRUnweT+BNG68k8BglBKkLtFpaRtr9wKwnzz2SeKyhxj9eeu46rg==",
+    "@capawesome/capacitor-passkeys@0.1.1_@capacitor+core@8.4.2": {
+      "integrity": "sha512-ZebJ/yp1PHlSr02RIZgaPJX3eTok9J+WJHpX44ijG4C12MZlu8QLA3Zzl7XgP8sLAMMZ/sxzchUTPPXJaMrnAw==",
       "dependencies": [
         "@capacitor/core"
       ]
@@ -195,7 +195,7 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "@lucide/svelte@1.24.0_svelte@5.56.4": {
+    "@lucide/svelte@1.24.0_svelte@5.56.5": {
       "integrity": "sha512-yXwewA7ANQ5hfaSDrvsecosWjZn5RglzeXUZRSnxeANBskpNwblOkEJTqD0ujDdNKIKL8E9eVc2U/P3ziJr7OA==",
       "dependencies": [
         "svelte"
@@ -431,13 +431,13 @@
         "acorn"
       ]
     },
-    "@sveltejs/adapter-static@3.0.10_@sveltejs+kit@2.69.3__@sveltejs+vite-plugin-svelte@7.2.0___svelte@5.56.4___vite@8.1.4____@types+node@26.1.1___@types+node@26.1.1__svelte@5.56.4__typescript@6.0.3__vite@8.1.4___@types+node@26.1.1_@sveltejs+vite-plugin-svelte@7.2.0__svelte@5.56.4__vite@8.1.4___@types+node@26.1.1__@types+node@26.1.1_svelte@5.56.4_typescript@6.0.3_vite@8.1.4__@types+node@26.1.1": {
+    "@sveltejs/adapter-static@3.0.10_@sveltejs+kit@2.69.3__@sveltejs+vite-plugin-svelte@7.2.0___svelte@5.56.5___vite@8.1.4____@types+node@26.1.1__svelte@5.56.5__typescript@6.0.3__vite@8.1.4___@types+node@26.1.1_svelte@5.56.5": {
       "integrity": "sha512-7D9lYFWJmB7zxZyTE/qxjksvMqzMuYrrsyh1f4AlZqeZeACPRySjbC3aFiY55wb1tWUaKOQG9PVbm74JcN2Iew==",
       "dependencies": [
         "@sveltejs/kit"
       ]
     },
-    "@sveltejs/kit@2.69.3_@sveltejs+vite-plugin-svelte@7.2.0__svelte@5.56.4__vite@8.1.4___@types+node@26.1.1__@types+node@26.1.1_svelte@5.56.4_typescript@6.0.3_vite@8.1.4__@types+node@26.1.1": {
+    "@sveltejs/kit@2.69.3_@sveltejs+vite-plugin-svelte@7.2.0__svelte@5.56.5__vite@8.1.4___@types+node@26.1.1_svelte@5.56.5_typescript@6.0.3_vite@8.1.4__@types+node@26.1.1": {
       "integrity": "sha512-cphwqMRcE19/9VkrIPr5qZhQ0SptSSDfDzRUpYHu9OJDFGuYBFyJzK+KQA27wB4YG32O/yF2QjBkDmTyo0vtCw==",
       "dependencies": [
         "@standard-schema/spec",
@@ -465,7 +465,7 @@
     "@sveltejs/load-config@0.2.0": {
       "integrity": "sha512-1LgZ/qUqSoq+QorD83lk2hka79Px0wXNW2q5V1nZlxGhQgw1jrsIbVz5YiCeucVLo4XvFLjXukUaQjIiqowkcg=="
     },
-    "@sveltejs/vite-plugin-svelte@7.2.0_svelte@5.56.4_vite@8.1.4__@types+node@26.1.1_@types+node@26.1.1": {
+    "@sveltejs/vite-plugin-svelte@7.2.0_svelte@5.56.5_vite@8.1.4__@types+node@26.1.1": {
       "integrity": "sha512-1SpkuMSRLfugrVX+IrKfE1RUegzo8AQzKQ6qQPfVzbcWi5IhuTPaKb5ZrLpucleFznkc4/RTeSPoRnGWFxX+EQ==",
       "dependencies": [
         "deepmerge",
@@ -1148,7 +1148,7 @@
       ],
       "bin": true
     },
-    "runed@0.28.0_svelte@5.56.4": {
+    "runed@0.28.0_svelte@5.56.5": {
       "integrity": "sha512-k2xx7RuO9hWcdd9f+8JoBeqWtYrm5CALfgpkg2YDB80ds/QE4w0qqu34A7fqiAwiBBSBQOid7TLxwxVC27ymWQ==",
       "dependencies": [
         "esm-env",
@@ -1269,8 +1269,8 @@
         "ansi-regex"
       ]
     },
-    "svelte-check@4.7.2_svelte@5.56.4_typescript@6.0.3": {
-      "integrity": "sha512-GoS4XJdGswlq0rIT1vtFLzJY1bvHtY37McY9H9Gkm1Ggw/ICdZYn8J/Z8Yi0BEL0i3R4+jtaWVePjyppMlij/A==",
+    "svelte-check@4.7.3_svelte@5.56.5_typescript@6.0.3": {
+      "integrity": "sha512-DHdTCGX62R0fCxBEaT+USdASAnoaRBaaNczkRJl0K7o3WyoCeVUbVxo6fKqpOll/B+WMWCsiFK0eFrJSNBKZIg==",
       "dependencies": [
         "@jridgewell/trace-mapping",
         "@sveltejs/load-config",
@@ -1283,15 +1283,15 @@
       ],
       "bin": true
     },
-    "svelte-sonner@1.1.1_svelte@5.56.4": {
+    "svelte-sonner@1.1.1_svelte@5.56.5": {
       "integrity": "sha512-5cd3p7wa4cq0NsqslMwdlPb7x1JglEZ/GKrLePWNr5bCxR1nagAVrY01FRFrXfUGs41miLt3C327+8XJo5BzZw==",
       "dependencies": [
         "runed",
         "svelte"
       ]
     },
-    "svelte@5.56.4": {
-      "integrity": "sha512-/d0QHehmRuJW8gVz395MTkPcPozxzdjBMBE8oEYGz8O3b9KTMzzQ9ZHJQLuFKOHOPQbU6kx/X4iid/EBBzH7iw==",
+    "svelte@5.56.5": {
+      "integrity": "sha512-P03YJmUy2JoOxYHb4Ka3oFat1hq2ko2it1MOItSjsJ4B6WgZPLc3+RyyU+57OGWhs3Ieq74EJpZtSnNXdAGgDw==",
       "dependencies": [
         "@jridgewell/remapping",
         "@jridgewell/sourcemap-codec",
@@ -1317,8 +1317,8 @@
     "tapable@2.3.3": {
       "integrity": "sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A=="
     },
-    "tar@7.5.19": {
-      "integrity": "sha512-4LeEWl96twnS2Q7Bz4MGqgazLqO+hJN63GZxXoIqh1T3VweYD997gbU1ItNsQafqqXTXd5WFyFdReLtwvRBNiw==",
+    "tar@7.5.20": {
+      "integrity": "sha512-9FcyK4PA6+WbzlTM9WhQm6vB5W7cP7dUiPsv1g7YDwEQnQ1CGpK3MGlKk/ITVWMk05kHZuBhmVhiv8LZoy/PFQ==",
       "dependencies": [
         "@isaacs/fs-minipass",
         "chownr",
@@ -1438,10 +1438,10 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@capacitor/android@^8.4.1",
-        "npm:@capacitor/cli@^8.4.1",
-        "npm:@capacitor/core@^8.4.1",
-        "npm:@capawesome/capacitor-passkeys@^0.0.1",
+        "npm:@capacitor/android@^8.4.2",
+        "npm:@capacitor/cli@^8.4.2",
+        "npm:@capacitor/core@^8.4.2",
+        "npm:@capawesome/capacitor-passkeys@~0.1.1",
         "npm:@lucide/svelte@^1.24.0",
         "npm:@sveltejs/adapter-static@^3.0.10",
         "npm:@sveltejs/kit@^2.69.3",
@@ -1455,9 +1455,9 @@
         "npm:highlight.js@^11.11.1",
         "npm:marked@^18.0.6",
         "npm:rollup-plugin-license@^3.7.1",
-        "npm:svelte-check@^4.7.2",
+        "npm:svelte-check@^4.7.3",
         "npm:svelte-sonner@^1.1.1",
-        "npm:svelte@^5.56.4",
+        "npm:svelte@^5.56.5",
         "npm:tailwindcss@^4.3.2",
         "npm:typescript@^6.0.3",
         "npm:vite@^8.1.4"

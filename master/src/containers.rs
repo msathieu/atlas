@@ -7,8 +7,8 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
 };
 use k8s_openapi::api::core::v1::{
-    EnvVar, LocalObjectReference, PersistentVolumeClaim, PersistentVolumeClaimSpec, PersistentVolumeClaimVolumeSource, Pod, PodSpec, SecurityContext, Service, ServicePort, ServiceSpec, Volume,
-    VolumeMount, VolumeResourceRequirements,
+    EnvVar, LocalObjectReference, PersistentVolumeClaim, PersistentVolumeClaimSpec, PersistentVolumeClaimVolumeSource, Pod, PodSpec, ResourceRequirements, SeccompProfile, SecurityContext, Service,
+    ServicePort, ServiceSpec, Volume, VolumeMount, VolumeResourceRequirements,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use kube::api::{AttachParams, DeleteParams, PostParams};
@@ -219,17 +219,35 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value_from: None,
             });
         }
+        let mut security_context = SecurityContext {
+            run_as_user: Some(0),
+            run_as_group: Some(0),
+            ..Default::default()
+        };
+        let mut limits = BTreeMap::new();
+        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
+            let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db)?;
+            if development_environment.nested_containers {
+                security_context.proc_mount = Some("Unmasked".to_string());
+                security_context.seccomp_profile = Some(SeccompProfile {
+                    localhost_profile: None,
+                    type_: "Unconfined".to_string(),
+                });
+                limits.insert("devic.es/tun".to_string(), Quantity("1".to_string()));
+            }
+        }
         let k8s_container = k8s_openapi::api::core::v1::Container {
             name: "main".to_string(),
             image: Some(container.image),
             command: Some(vec!["/usr/bin/sleep".to_string(), "infinity".to_string()]),
             volume_mounts: Some(volume_mounts),
-            security_context: Some(SecurityContext {
-                run_as_user: Some(0),
-                run_as_group: Some(0),
-                ..Default::default()
-            }),
+            security_context: Some(security_context),
             env: Some(envs),
+            resources: Some(ResourceRequirements {
+                claims: None,
+                limits: Some(limits),
+                requests: None,
+            }),
             ..Default::default()
         };
         let pull_secret = LocalObjectReference { name: "atlas-image-pull".to_string() };
@@ -238,6 +256,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             volumes: Some(volumes),
             containers: vec![k8s_container],
             image_pull_secrets: Some(vec![pull_secret]),
+            host_users: Some(false),
             ..Default::default()
         });
         pod_api.create(&PostParams::default(), &pod).await?;

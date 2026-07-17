@@ -1,5 +1,6 @@
 <script lang="ts">
 import { authenticatedFetch } from "$lib/auth";
+import { user } from "$lib/state.svelte";
 import { formatTime } from "$lib/util.ts";
 import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, Trash } from "@lucide/svelte";
 
@@ -10,15 +11,17 @@ let creationDialog: any = $state();
 let newName = $state("");
 let newRepo = $state("");
 let newBranch = $state("");
+let newNestedContainers = $state(false);
 
 async function createEnvironment() {
   await authenticatedFetch(`/api/development_environments`, {
     method: "POST",
-    body: JSON.stringify({ name: newName, repo: newRepo, branch: newBranch }),
+    body: JSON.stringify({ name: newName, repo: newRepo, branch: newBranch, nested_containers: newNestedContainers }),
   });
   newName = "";
   newRepo = "";
   newBranch = "";
+  newNestedContainers = false;
 }
 async function deleteEnvironment(id: string) {
   await authenticatedFetch(`/api/development_environments/${id}`, {
@@ -163,6 +166,10 @@ async function openDevelopmentEnvironment(id: string) {
             <td>Pending</td>
             <td>{selectedEnvironment.pending}</td>
           </tr>
+          <tr>
+            <td>Nested Containers</td>
+            <td>{selectedEnvironment.nested_containers}</td>
+          </tr>
         </tbody>
       </table>
       <div class="divider"></div>
@@ -196,6 +203,12 @@ async function openDevelopmentEnvironment(id: string) {
         <input id="name" type="text" placeholder="Name" class="input" required bind:value={newName} />
         <input id="repo" type="text" placeholder="Repository" class="input" bind:value={newRepo} />
         <input id="branch" type="text" placeholder="Branch" class="input" bind:value={newBranch} />
+        {#if user.admin}
+          <p>
+            Nested Containers:
+            <input id="nested_containers" type="checkbox" class="checkbox" bind:checked={newNestedContainers} />
+          </p>
+        {/if}
         <button class="btn btn-primary">Create</button>
       </fieldset>
     </form>
