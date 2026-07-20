@@ -45,3 +45,8 @@ message UpdateRequest {
 message UpdateResponse {
   bool success = 1;
 }
+message SSHAgentRequest {
+  string key = 1;
+}
+message SSHAgentResponse {
+}

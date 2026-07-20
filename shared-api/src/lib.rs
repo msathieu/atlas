@@ -24,6 +24,8 @@ pub enum MessageType {
     CommandResponse = 7,
     UpdateRequest = 8,
     UpdateResponse = 9,
+    SSHAgentRequest = 10,
+    SSHAgentResponse = 11,
 }
 #[derive(PartialEq, TryFromPrimitive)]
 #[repr(u32)]

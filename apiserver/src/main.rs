@@ -20,15 +20,15 @@ use rustls::{
 };
 use sha2::{Digest, Sha512};
 use shared_api::{
-    API_VERSION, CommandOrigin, CommandRequest, CommandResponse, HandshakeFinish, HandshakeRequest, HandshakeResponse, HeartbeatRequest, HeartbeatResponse, MAGIC, MessageType, SUPPORTED_ARCH,
-    SUPPORTED_OS, UpdateRequest, UpdateResponse, print_startup, read_message, write_message,
+    API_VERSION, CommandOrigin, CommandRequest, CommandResponse, ContainerOrigin, HandshakeFinish, HandshakeRequest, HandshakeResponse, HeartbeatRequest, HeartbeatResponse, MAGIC, MessageType,
+    SUPPORTED_ARCH, SUPPORTED_OS, SshAgentRequest, UpdateRequest, UpdateResponse, print_startup, read_message, write_message,
 };
 use shared_server::{
     binary::personalize_binary,
     get_db_pool, get_valkey_client, listen_for_restarts,
-    models::{Command, Device, Setting},
+    models::{Command, Container, DevelopmentEnvironment, Device, Setting},
     notify_server,
-    schema::{commands, devices, settings},
+    schema::{commands, containers, development_environments, devices, settings},
     wait_for_pubsub_msg,
 };
 use std::{
@@ -186,6 +186,15 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
             if response.success {
                 return Ok(());
             }
+        }
+    }
+
+    if let Some(container_id) = device.container_id {
+        let container: Container = containers::table.find(container_id).first(&mut db)?;
+        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
+            let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db)?;
+            write_message(MessageType::SSHAgentRequest, SshAgentRequest { key: development_environment.ssh_key }, &mut stream).await?;
+            read_message(&mut stream, Some(MessageType::SSHAgentResponse)).await?;
         }
     }
 

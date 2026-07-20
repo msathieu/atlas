@@ -1,5 +1,6 @@
 use crate::install::install_agent;
 use crate::messages::core::handle_command;
+use crate::messages::ssh::handle_ssh_agent;
 use crate::messages::update::handle_update;
 use crate::supervise::supervise_agent;
 use crate::{messages::core::handle_heartbeat, models::Setting, schema::settings};
@@ -13,7 +14,9 @@ use gethostname::gethostname;
 use mlua::Lua;
 use prost::Message;
 use sha2::{Digest, Sha512};
-use shared_api::{API_VERSION, CommandRequest, HandshakeFinish, HandshakeRequest, HandshakeResponse, HeartbeatRequest, MAGIC, MessageType, UpdateRequest, print_startup, read_message, write_message};
+use shared_api::{
+    API_VERSION, CommandRequest, HandshakeFinish, HandshakeRequest, HandshakeResponse, HeartbeatRequest, MAGIC, MessageType, SshAgentRequest, UpdateRequest, print_startup, read_message, write_message,
+};
 use std::env::{args, current_exe};
 use std::ffi::CStr;
 use std::io::stdin;
@@ -183,6 +186,7 @@ async fn open_connection(host: &str, tls_connector: TlsConnector, db: &mut Sqlit
             MessageType::HeartbeatRequest => handle_heartbeat(HeartbeatRequest::decode(&*buf)?, &mut stream).await,
             MessageType::CommandRequest => handle_command(CommandRequest::decode(&*buf)?, &mut stream).await,
             MessageType::UpdateRequest => handle_update(UpdateRequest::decode(&*buf)?, &mut stream).await,
+            MessageType::SSHAgentRequest => handle_ssh_agent(SshAgentRequest::decode(&*buf)?, &mut stream).await,
             _ => return Err("Invalid message type".into()),
         }?
     }

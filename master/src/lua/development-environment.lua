@@ -13,7 +13,8 @@ os.execute(
   'su coder -c "mkdir -p /home/coder/.local/share; ln -sf /state/project /home/coder/; ln -sf /state/code-server /home/coder/.local/share/"')
 os.execute(
   'su coder -c "mkdir -p /home/coder/.local/share/code-server/Machine; ln -sf /state/code-server-settings.json /home/coder/.local/share/code-server/Machine/settings.json"')
-os.execute('su coder -c "code-server --bind-addr 0.0.0.0:9000 --disable-telemetry" > /var/log/code-server.log 2>&1 &')
+os.execute(
+  'su coder -c "SSH_AUTH_SOCK=/run/ssh.sock code-server --bind-addr 0.0.0.0:9000 --disable-telemetry" > /var/log/code-server.log 2>&1 &')
 local password = nil
 while password == nil do
   local configfile = io.open("/home/coder/.config/code-server/config.yaml")
