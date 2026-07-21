@@ -5,10 +5,13 @@ import { page } from "$app/state";
 import { invalidateAll } from "$app/navigation";
 import { Toaster } from "svelte-sonner";
 import { connectWS, user, wsState } from "$lib/state.svelte.ts";
+import { getDatabase } from "$lib/util.ts";
 let { children, data } = $props();
 
-function logout() {
+async function logout() {
   localStorage.clear();
+  const db = getDatabase();
+  await db.delete();
   location.reload();
 }
 
@@ -46,7 +49,13 @@ setInterval(async () => {
           <li><a href="/users"><Users /><span class="hidden lg:block">Users</span></a></li>
         {/if}
         <li class="mt-auto"><a href="/profile"><User /><span class="hidden lg:block">{user.username}</span></a></li>
-        <li><button onclick={logout}><LogOut /><span class="hidden lg:block">Logout</span></button></li>
+        <li>
+          <button
+            onclick={async () => {
+              await logout();
+            }}><LogOut /><span class="hidden lg:block">Logout</span></button
+          >
+        </li>
         <li>
           <div class="text-xs" class:bg-red-500={data.info.environment !== "production"}>
             <div class:status-success={data.connected && wsState.connected} class:status-error={!data.connected || !wsState.connected} class="status"></div>

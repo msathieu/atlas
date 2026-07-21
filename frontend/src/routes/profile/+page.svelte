@@ -1,6 +1,6 @@
 <script lang="ts">
 import { authenticatedFetch } from "$lib/auth.ts";
-import { encryptToServer, formatTime } from "$lib/util.ts";
+import { encryptToServer, formatTime, getDatabase } from "$lib/util.ts";
 import { Trash } from "@lucide/svelte";
 import { toast } from "svelte-sonner";
 import { Passkeys } from "@capawesome/capacitor-passkeys";
@@ -30,7 +30,6 @@ async function changePassword() {
     passwordDialog.close();
     toast.success("Changed password");
     localStorage.removeItem("jwt");
-    localStorage.removeItem("privkey");
     location.reload();
   } else {
     toast.error("Request denied");

@@ -1,7 +1,7 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
 import { verifyResponseSignature } from "$lib/auth.ts";
-import { API_HOST, bufferToBase64, encryptToServer } from "$lib/util.ts";
+import { API_HOST, bufferToBase64, encryptToServer, getDatabase } from "$lib/util.ts";
 import { toast } from "svelte-sonner";
 import { Passkeys } from "@capawesome/capacitor-passkeys";
 import { page } from "$app/state";
@@ -11,7 +11,7 @@ let password = $state("");
 let redirect = page.url.searchParams.get("redirect");
 
 async function login() {
-  const keyPair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
+  const keyPair = await crypto.subtle.generateKey("Ed25519", false, ["sign", "verify"]);
   const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
   const body = JSON.stringify({ username, password, pubkey, timestamp: Math.floor(Date.now() / 1000) });
   const encryptedBody = await encryptToServer(body);
@@ -41,7 +41,7 @@ async function passkeyLogin() {
   await verifyResponseSignature(startRes, `passkey_start-${bufferToBase64(startHash)}`);
   const startData = await startRes.json();
   const credential = await Passkeys.getPasskey(startData["challenge"]["publicKey"]);
-  const keyPair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
+  const keyPair = await crypto.subtle.generateKey("Ed25519", false, ["sign", "verify"]);
   const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
   const encryptedBody = await encryptToServer(JSON.stringify({ flow_id: startData["flow_id"], credential, pubkey }));
   const finishRes = await fetch(`${API_HOST}/api/passkeys/finish_authentication`, {
@@ -61,7 +61,8 @@ async function passkeyLogin() {
 async function finishAuth(username: string, jwt: string, keyPair: CryptoKeyPair) {
   localStorage.setItem("username", username);
   localStorage.setItem("jwt", jwt);
-  localStorage.setItem("privkey", bufferToBase64(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey)));
+  const db = getDatabase();
+  await db.table("keys").put({ name: "jwt_signing", key: keyPair.privateKey });
   if (!redirect) {
     await goto("/");
     return;

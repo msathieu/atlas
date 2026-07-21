@@ -1,6 +1,7 @@
 import { formatRelative } from "date-fns";
 import { env } from "$env/dynamic/public";
 import { verifyResponseSignature } from "./auth.ts";
+import Dexie from "dexie";
 
 export const API_HOST = env.PUBLIC_API_HOST ? `https://${env.PUBLIC_API_HOST}` : "";
 export const API_ENCRYPTION_PUBKEY = env.PUBLIC_API_ENCRYPTION_PUBKEY;
@@ -46,13 +47,14 @@ export async function encryptToServer(data: string): Promise<ArrayBuffer> {
   return await crypto.subtle.encrypt({ name: "RSA-OAEP" }, serverPubKey, encoder.encode(data));
 }
 export async function signRequest(data: string): Promise<string> {
-  const keyStr = localStorage.getItem("privkey");
-  if (!keyStr) {
+  const db = getDatabase();
+  const record = await db.table("keys").get("jwt_signing");
+  const key = record?.key;
+  if (!key) {
     localStorage.removeItem("jwt");
     location.reload();
     throw new Error("No private key in storage");
   }
-  const key = await crypto.subtle.importKey("pkcs8", base64ToBuffer(keyStr), "Ed25519", false, ["sign"]);
   const encoder = new TextEncoder();
   return bufferToBase64(await crypto.subtle.sign("Ed25519", key, encoder.encode(data)));
 }
@@ -65,4 +67,11 @@ export async function verifySignature(data: string, signature: string): Promise<
   const pubkey = await crypto.subtle.importKey("spki", base64ToBuffer(signingPubkey), "Ed25519", false, ["verify"]);
   const encoder = new TextEncoder();
   return await crypto.subtle.verify("Ed25519", pubkey, base64ToBuffer(signature), encoder.encode(data));
+}
+export function getDatabase(): Dexie {
+  const db = new Dexie("atlas");
+  db.version(1).stores({
+    keys: "name",
+  });
+  return db;
 }

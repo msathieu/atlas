@@ -1,4 +1,4 @@
-import { API_HOST, bufferToBase64, signRequest, verifySignature } from "./util.ts";
+import { API_HOST, bufferToBase64, getDatabase, signRequest, verifySignature } from "./util.ts";
 
 export async function verifyResponseSignature(response: Response, requestSignature: string): Promise<void> {
   const encoder = new TextEncoder();
@@ -56,7 +56,6 @@ export async function authenticatedFetch(
   const response = await fn(url, init);
   if (response.status === 401) {
     localStorage.removeItem("jwt");
-    localStorage.removeItem("privkey");
     location.reload();
     throw new Error("Unauthorized");
   }
