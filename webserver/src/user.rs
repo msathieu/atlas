@@ -7,8 +7,8 @@ use axum::extract::OriginalUri;
 use axum::http::{HeaderMap, StatusCode};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
-use shared_server::hash_password;
 use shared_server::schema::users;
+use shared_server::{hash_password, notify_server};
 use uuid::Uuid;
 
 #[cfg(debug_assertions)]
@@ -26,7 +26,14 @@ pub struct GetUserInfoResponse {
     id: Uuid,
     username: String,
     admin: bool,
+    password_enabled: bool,
 }
+#[derive(Deserialize)]
+pub struct SetPasswordStateRequest {
+    password: String,
+    enabled: bool,
+}
+
 pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
@@ -51,6 +58,21 @@ pub async fn get_user_info(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
         id: user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
         username: user.username,
         admin: user.admin,
+        password_enabled: user.password_enabled,
     };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
+}
+pub async fn set_password_state(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+    let user = authenticate(&headers)?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "PUT").await?;
+    let request: SetPasswordStateRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let hash = PasswordHash::new(&user.password).or(Err(StatusCode::FORBIDDEN))?;
+    Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::FORBIDDEN))?;
+    let mut db = get_db()?;
+    diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .set(users::password_enabled.eq(request.enabled))
+        .execute(&mut db)
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    sign_response::<String>(signature, None)
 }

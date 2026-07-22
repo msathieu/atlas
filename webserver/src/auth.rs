@@ -57,7 +57,10 @@ pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), Stat
     let request: LoginRequest = serde_json::from_slice(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
     validate_timestamp(request.timestamp)?;
     let mut db = get_db()?;
-    let user: User = users::table.filter(users::username.eq(request.username)).first(&mut db).or(Err(StatusCode::UNAUTHORIZED))?;
+    let user: User = users::table
+        .filter(users::username.eq(request.username).and(users::enabled.eq(true)).and(users::password_enabled.eq(true)))
+        .first(&mut db)
+        .or(Err(StatusCode::UNAUTHORIZED))?;
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::UNAUTHORIZED))?;
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::UNAUTHORIZED))?;
     let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;

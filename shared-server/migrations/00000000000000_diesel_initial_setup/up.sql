@@ -7,7 +7,9 @@ CREATE TABLE users(
     username varchar NOT NULL UNIQUE,
     password varchar NOT NULL,
     jwt_counter integer NOT NULL,
-    admin boolean NOT NULL
+    admin boolean NOT NULL,
+    enabled boolean NOT NULL,
+    password_enabled boolean NOT NULL
 );
 CREATE TABLE chats(
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

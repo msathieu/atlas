@@ -1,7 +1,7 @@
 <script lang="ts">
 import { authenticatedFetch } from "$lib/auth.ts";
-import { encryptToServer, formatTime, getDatabase } from "$lib/util.ts";
-import { Trash } from "@lucide/svelte";
+import { encryptToServer, formatTime } from "$lib/util.ts";
+import { Check, Trash } from "@lucide/svelte";
 import { toast } from "svelte-sonner";
 import { Passkeys } from "@capawesome/capacitor-passkeys";
 
@@ -10,6 +10,7 @@ let passwordDialog: any = $state();
 let oldPassword = $state("");
 let newPassword = $state("");
 let passwordConfirmation = $state("");
+let passwordEnabled = $derived(data.user.password_enabled);
 
 async function changePassword() {
   if (newPassword != passwordConfirmation) {
@@ -35,10 +36,23 @@ async function changePassword() {
     toast.error("Request denied");
   }
 }
+async function setPasswordEnabled() {
+  const body = JSON.stringify({ password: prompt("Enter your password:"), enabled: passwordEnabled });
+  const encryptedBody = await encryptToServer(body);
+  await authenticatedFetch(
+    `/api/user/set_password_state`,
+    {
+      method: "PUT",
+      body: encryptedBody,
+    },
+    undefined,
+    "application/octet-stream",
+  );
+}
 async function registerPasskey() {
   const body = JSON.stringify({ password: prompt("Enter your password to register a new passkey:") });
   const encryptedBody = await encryptToServer(body);
-  const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST", body: encryptedBody, headers: { "Content-Type": "application/octet-stream" } });
+  const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST", body: encryptedBody }, undefined, "application/octet-stream");
   const startData = await startRes.json();
   const credential = await Passkeys.createPasskey(startData["publicKey"]);
   await authenticatedFetch(`/api/passkeys/finish_registration`, {
@@ -91,6 +105,16 @@ async function deletePasskey(id: string) {
 >
   Register Passkey
 </button>
+<form
+  onsubmit={async (e) => {
+    e.preventDefault();
+    await setPasswordEnabled();
+  }}
+>
+  Allow Password Login:
+  <input id="passwordEnabled" type="checkbox" class="checkbox" bind:checked={passwordEnabled} />
+  <button class="btn"><Check /></button>
+</form>
 <div class="divider"></div>
 <table class="border border-base-content/10 table">
   <thead>

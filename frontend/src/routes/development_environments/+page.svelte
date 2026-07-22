@@ -204,7 +204,7 @@ async function openDevelopmentEnvironment(id: string) {
       }}
     >
       <fieldset class="fieldset">
-        <input id="name" type="text" placeholder="Name" class="input" required bind:value={newName} />
+        <input id="environment_name" type="text" placeholder="Name" class="input" required bind:value={newName} />
         <input id="repo" type="text" placeholder="Repository" class="input" bind:value={newRepo} />
         <input id="branch" type="text" placeholder="Branch" class="input" bind:value={newBranch} />
         {#if user.admin}

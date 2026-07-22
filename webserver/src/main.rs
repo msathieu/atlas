@@ -13,7 +13,7 @@ use crate::{
     passkey::{delete_passkey, finish_passkey_authentication, finish_passkey_registration, passkeys_list, start_passkey_authentication, start_passkey_registration},
     settings::{get_settings, restart_system, update_setting},
     stream::{stream, stream_auth},
-    user::{change_password, get_user_info},
+    user::{change_password, get_user_info, set_password_state},
     users::{create_user, delete_user, users_list},
 };
 use axum::{
@@ -108,6 +108,7 @@ async fn main() {
         .route("/api/agent_script", get(get_agent_script))
         .route("/api/restart", post(restart_system))
         .route("/api/user/update_password", post(change_password))
+        .route("/api/user/set_password_state", put(set_password_state))
         .route("/api/user/info", get(get_user_info))
         .route("/api/users", get(users_list))
         .route("/api/users/{id}", delete(delete_user))

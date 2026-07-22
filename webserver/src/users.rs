@@ -18,6 +18,8 @@ pub struct APIUser {
     id: Uuid,
     username: String,
     admin: bool,
+    enabled: bool,
+    password_enabled: bool,
 }
 #[derive(Deserialize)]
 pub struct CreateUserRequest {
@@ -42,6 +44,8 @@ pub async fn users_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Re
                 id: user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
                 username: user.username.clone(),
                 admin: user.admin,
+                enabled: user.enabled,
+                password_enabled: user.password_enabled,
             })
         })
         .collect();
@@ -71,6 +75,8 @@ pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
         password: hash,
         jwt_counter: 0,
         admin: request.admin,
+        enabled: true,
+        password_enabled: true,
     };
     user = diesel::insert_into(users::table).values(user).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

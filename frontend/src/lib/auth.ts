@@ -1,4 +1,4 @@
-import { API_HOST, bufferToBase64, getDatabase, signRequest, verifySignature } from "./util.ts";
+import { API_HOST, bufferToBase64, signRequest, verifySignature } from "./util.ts";
 
 export async function verifyResponseSignature(response: Response, requestSignature: string): Promise<void> {
   const encoder = new TextEncoder();

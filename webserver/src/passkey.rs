@@ -140,7 +140,7 @@ pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Jso
     let request: StartPasskeyAuthenticationRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let user_option: Option<User> = users::table
-        .filter(users::username.eq(&request.username))
+        .filter(users::username.eq(&request.username).and(users::enabled.eq(true)))
         .first(&mut db)
         .optional()
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

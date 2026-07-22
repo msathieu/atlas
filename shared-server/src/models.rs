@@ -74,6 +74,8 @@ pub struct User {
     pub password: String,
     pub jwt_counter: i32,
     pub admin: bool,
+    pub enabled: bool,
+    pub password_enabled: bool,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]

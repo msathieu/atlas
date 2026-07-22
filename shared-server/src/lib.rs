@@ -126,8 +126,8 @@ pub fn authenticate_jwt(jwt: &str, aud: &str, db: &mut PooledConnection<Connecti
     validation.set_required_spec_claims(&["aud", "sub", "nbf", "exp", "counter"]);
     let token = decode::<Claims>(jwt, &key, &validation)?;
     let user: User = users::table.find(token.claims.sub).first(db)?;
-    if user.jwt_counter as usize != token.claims.counter {
-        return Err("Wrong JWT counter".into());
+    if !user.enabled || user.jwt_counter as usize != token.claims.counter {
+        return Err("Wrong JWT counter or user isn't enabled".into());
     }
     let mut pubkey = None;
     if let Some(pubkey_claim) = token.claims.pubkey {

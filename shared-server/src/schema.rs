@@ -152,6 +152,8 @@ diesel::table! {
         password -> Varchar,
         jwt_counter -> Int4,
         admin -> Bool,
+        enabled -> Bool,
+        password_enabled -> Bool,
     }
 }
 
