@@ -298,7 +298,7 @@ fn create_settings(db: &mut PgConnection) {
                 diesel::insert_into(settings::table)
                     .values(Setting {
                         name: "development_environment_image".to_owned(),
-                        value: "ghcr.io/coder/code-server:4.129.0-trixie".to_owned(),
+                        value: "ghcr.io/coder/code-server:4.130.0-trixie".to_owned(),
                     })
                     .execute(db)?;
             }

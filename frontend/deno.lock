@@ -2,10 +2,11 @@
   "version": "5",
   "specifiers": {
     "npm:@capacitor/android@^8.4.2": "8.4.2_@capacitor+core@8.4.2",
+    "npm:@capacitor/app@^8.1.1": "8.1.1_@capacitor+core@8.4.2",
     "npm:@capacitor/cli@^8.4.2": "8.4.2",
     "npm:@capacitor/core@^8.4.2": "8.4.2",
     "npm:@capawesome/capacitor-passkeys@~0.1.1": "0.1.1_@capacitor+core@8.4.2",
-    "npm:@lucide/svelte@^1.25.0": "1.25.0_svelte@5.56.7",
+    "npm:@lucide/svelte@^1.26.0": "1.26.0_svelte@5.56.7",
     "npm:@sveltejs/adapter-static@^3.0.10": "3.0.10_@sveltejs+kit@2.70.1__@sveltejs+vite-plugin-svelte@7.2.0___svelte@5.56.7___vite@8.1.5____@types+node@26.1.1__svelte@5.56.7__typescript@6.0.3__vite@8.1.5___@types+node@26.1.1_svelte@5.56.7",
     "npm:@sveltejs/kit@^2.70.1": "2.70.1_@sveltejs+vite-plugin-svelte@7.2.0__svelte@5.56.7__vite@8.1.5___@types+node@26.1.1_svelte@5.56.7_typescript@6.0.3_vite@8.1.5__@types+node@26.1.1",
     "npm:@sveltejs/vite-plugin-svelte@^7.2.0": "7.2.0_svelte@5.56.7_vite@8.1.5__@types+node@26.1.1",
@@ -29,6 +30,12 @@
   "npm": {
     "@capacitor/android@8.4.2_@capacitor+core@8.4.2": {
       "integrity": "sha512-bzf8XZ9C+ePgOQ+e+T0fnhHGH4aCNY494vvSQIF5w4AY07RwEmkFqZs1678DDSMH0hLSQpxEwXGFNUVcXO6bBA==",
+      "dependencies": [
+        "@capacitor/core"
+      ]
+    },
+    "@capacitor/app@8.1.1_@capacitor+core@8.4.2": {
+      "integrity": "sha512-xM2ZTX5jK60tFtmjsmJv+Cdj1Qsb6NcavkqmdEnCPQBeya9oKhamZJxYOnQNj1ZvcJM7sWfG6BEtSLx42pisbA==",
       "dependencies": [
         "@capacitor/core"
       ]
@@ -196,8 +203,8 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "@lucide/svelte@1.25.0_svelte@5.56.7": {
-      "integrity": "sha512-v9m+dD68jxVnqkU3K59mG/RSRFlPGzmKCGSyMfnXcaGv9jODDQMyQkcp1CGvk3Y/cUj9v7f8rw1n//K0B53xGQ==",
+    "@lucide/svelte@1.26.0_svelte@5.56.7": {
+      "integrity": "sha512-KUfLTlNRVrHZ460Um7jdrvh46hI/8Sw4+1k/Ttj4g6JI9bCrjD7HZVG4cqhh7LasjfDz5b+CuKrjd/k/3obYcA==",
       "dependencies": [
         "svelte"
       ]
@@ -1443,10 +1450,11 @@
     "packageJson": {
       "dependencies": [
         "npm:@capacitor/android@^8.4.2",
+        "npm:@capacitor/app@^8.1.1",
         "npm:@capacitor/cli@^8.4.2",
         "npm:@capacitor/core@^8.4.2",
         "npm:@capawesome/capacitor-passkeys@~0.1.1",
-        "npm:@lucide/svelte@^1.25.0",
+        "npm:@lucide/svelte@^1.26.0",
         "npm:@sveltejs/adapter-static@^3.0.10",
         "npm:@sveltejs/kit@^2.70.1",
         "npm:@sveltejs/vite-plugin-svelte@^7.2.0",

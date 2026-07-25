@@ -15,8 +15,8 @@ serde = {version = "1.0.228", features = ["derive"]}
 shared-api = {path = "../shared-api"}
 shared-server = {path = "../shared-server"}
 uuid = {version = "1.18.1", features = ["serde"]}
-jsonwebtoken = {version = "10.4.0", features = ["aws_lc_rs"]}
-base64 = "0.22.1"
+jsonwebtoken = {version = "11.0.0", features = ["aws_lc_rs"]}
+base64 = "0.23.0"
 axum-extra = {version = "0.12.0", features = ["typed-header"]}
 tower-http = {version = "0.7.0", features = ["cors", "fs"]}
 gethostname = "1.0.2"

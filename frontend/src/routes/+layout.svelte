@@ -6,6 +6,8 @@ import { invalidateAll } from "$app/navigation";
 import { Toaster } from "svelte-sonner";
 import { connectWS, user, wsState } from "$lib/state.svelte.ts";
 import { getDatabase } from "$lib/util.ts";
+import { onMount } from "svelte";
+import { App } from "@capacitor/app";
 let { children, data } = $props();
 
 async function logout() {
@@ -21,6 +23,16 @@ setInterval(async () => {
 setInterval(async () => {
   await connectWS();
 }, 5000);
+
+onMount(() => {
+  App.addListener("backButton", ({ canGoBack }) => {
+    if (canGoBack) {
+      history.back();
+    } else {
+      App.exitApp();
+    }
+  });
+});
 </script>
 
 <div class="drawer drawer-open h-screen">

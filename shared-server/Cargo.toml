@@ -8,9 +8,9 @@ publish = false
 [dependencies]
 argon2 = {version = "0.5.3", features = ["std"]}
 aws-lc-rs = "1.17.1"
-base64 = "0.22.1"
+base64 = "0.23.0"
 diesel = {version = "2.2.12", features = ["postgres", "r2d2", "uuid"]}
-jsonwebtoken = {version = "10.4.0", features = ["aws_lc_rs"]}
+jsonwebtoken = {version = "11.0.0", features = ["aws_lc_rs"]}
 object = "0.39.1"
 rand = "0.10.2"
 redis = {version = "1.2.1", features = ["connection-manager", "tokio-comp"]}

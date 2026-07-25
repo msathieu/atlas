@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 aws-lc-rs = "1.16.3"
-base64 = "0.22.1"
+base64 = "0.23.0"
 diesel = {version = "2.2.12", features = ["postgres", "uuid"]}
 diesel_migrations = "2.2.0"
 dotenvy = "0.15.7"
