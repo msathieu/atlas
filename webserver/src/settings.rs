@@ -41,6 +41,7 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
         "k8s_storageclass",
         "development_environment_image",
         "code_server_settings",
+        "code_server_extensions",
     ];
     let mut settings = HashMap::new();
     for name in allowed_settings {
@@ -74,6 +75,7 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
         "k8s_storageclass",
         "development_environment_image",
         "code_server_settings",
+        "code_server_extensions",
     ];
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);

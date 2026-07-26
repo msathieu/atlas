@@ -310,6 +310,14 @@ fn create_settings(db: &mut PgConnection) {
                     })
                     .execute(db)?;
             }
+            if !does_setting_exist(db, "code_server_extensions")? {
+                diesel::insert_into(settings::table)
+                    .values(Setting {
+                        name: "code_server_extensions".to_owned(),
+                        value: "".to_owned(),
+                    })
+                    .execute(db)?;
+            }
             Ok::<(), Box<dyn Error>>(())
         })
         .unwrap();

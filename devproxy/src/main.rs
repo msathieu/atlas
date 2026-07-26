@@ -36,7 +36,7 @@ fn get_login_body(id: Uuid) -> Result<String> {
         .find(development_environment.code_server_password.ok_or(Error::new(InternalError))?)
         .first(&mut db)
         .or(Err(Error::new(InternalError)))?;
-    if command.stdout.is_empty() {
+    if command.stdout.is_empty() || !command.stdout.chars().all(|c| c.is_ascii_alphanumeric()) {
         return Err(Error::new(InternalError));
     }
     Ok(format!("password={}", command.stdout))

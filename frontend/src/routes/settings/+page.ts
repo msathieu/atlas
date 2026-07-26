@@ -24,5 +24,6 @@ export const load: PageLoad = async ({ fetch }) => {
     k8sStorageClass: settings["k8s_storageclass"],
     developmentEnvironmentImage: settings["development_environment_image"],
     codeServerSettings: settings["code_server_settings"],
+    codeServerExtensions: settings["code_server_extensions"],
   };
 };

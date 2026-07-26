@@ -218,6 +218,12 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value: Some(code_server_settings.value),
                 value_from: None,
             });
+            let code_server_extensions: Setting = settings::table.find("code_server_extensions").first(&mut db)?;
+            envs.push(EnvVar {
+                name: "CODE_SERVER_EXTENSIONS".to_string(),
+                value: Some(code_server_extensions.value),
+                value_from: None,
+            });
         }
         let mut security_context = SecurityContext {
             run_as_user: Some(0),
