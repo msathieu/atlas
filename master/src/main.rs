@@ -26,10 +26,10 @@ use std::time::Duration;
 use tokio::time::{sleep, timeout};
 use webauthn_rs::fake::{FakePasskeyDistribution, WebauthnFakeCredentialGenerator};
 
+mod code;
 mod containers;
 mod device;
 mod llm;
-mod lua;
 mod timers;
 mod tool;
 mod tools;

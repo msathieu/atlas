@@ -20,11 +20,13 @@ use shared_api::{
 use std::env::{args, current_exe};
 use std::ffi::CStr;
 use std::io::stdin;
-use std::process::exit;
+use std::process::{Stdio, exit};
 use std::ptr;
 use std::{env, error::Error, io::Read, sync::Arc, time::Duration};
 use tokio::fs::{self, DirBuilder};
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+use tokio::process::Command;
 use tokio::time::sleep;
 use tokio_rustls::rustls::pki_types::pem::PemObject;
 use tokio_rustls::rustls::pki_types::{CertificateDer, ServerName};
@@ -65,6 +67,13 @@ async fn main() {
             let lua = Lua::new();
             lua.load(code).exec().unwrap();
             return;
+        } else if cmd == "execute-python" {
+            let mut code = String::new();
+            stdin().read_to_string(&mut code).unwrap();
+            let mut cmd = Command::new("/usr/bin/env").arg("python3").arg("-").stdin(Stdio::piped()).spawn().unwrap();
+            cmd.stdin.take().unwrap().write_all(code.as_bytes()).await.unwrap();
+            let result = cmd.wait().await.unwrap();
+            exit(result.code().unwrap());
         } else if cmd == "self-test" {
             println!("OK");
             return;

@@ -13,6 +13,7 @@ pub async fn handle_heartbeat(msg: HeartbeatRequest, stream: &mut TlsStream<TcpS
 pub async fn handle_command(msg: CommandRequest, stream: &mut TlsStream<TcpStream>) -> Result<(), Box<dyn Error>> {
     let subcommand = match CommandLanguage::try_from(msg.language)? {
         CommandLanguage::Lua => "execute-lua",
+        CommandLanguage::Python => "execute-python",
     };
     let mut cmd = Command::new(current_exe()?)
         .arg(subcommand)

@@ -59,6 +59,7 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
             };
             let language = match CommandLanguage::try_from(command.language as u32).or(Err(StatusCode::INTERNAL_SERVER_ERROR))? {
                 CommandLanguage::Lua => "Lua",
+                CommandLanguage::Python => "Python",
             };
             Ok(APICommand {
                 id: command.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,

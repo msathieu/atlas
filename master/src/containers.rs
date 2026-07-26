@@ -1,4 +1,4 @@
-use crate::lua::LUA_DEVELOPMENT_ENVIRONMENT;
+use crate::code::PY_DEVELOPMENT_ENVIRONMENT;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use diesel::prelude::*;
@@ -353,7 +353,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 id: None,
                 device: device.id.ok_or("Invalid device")?,
                 uid: Some(container.uid),
-                code: LUA_DEVELOPMENT_ENVIRONMENT.to_string(),
+                code: PY_DEVELOPMENT_ENVIRONMENT.to_string(),
                 completed: false,
                 status_code: 0,
                 stdout: "".to_owned(),
@@ -366,7 +366,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 chat_sequence: None,
                 chat_tool_call_id: None,
                 initiated: false,
-                language: CommandLanguage::Lua as i32,
+                language: CommandLanguage::Python as i32,
             };
             command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
             diesel::update(development_environments::table.find(container_id))

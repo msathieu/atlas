@@ -3,10 +3,8 @@ import { authenticatedFetch } from "$lib/auth";
 import { formatTime, getHostnameForDevice } from "$lib/util.ts";
 import { Check, Loader, Plus, Trash, X } from "@lucide/svelte";
 import DOMPurify from "dompurify";
-import hljs from "highlight.js/lib/core";
-import lua from "highlight.js/lib/languages/lua";
+import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
-hljs.registerLanguage("lua", lua);
 
 let { data } = $props();
 let selectedCommand: any = $state();
@@ -32,6 +30,8 @@ function matchHighlightLanguage(language: string): string {
   switch (language) {
     case "Lua":
       return "lua";
+    case "Python":
+      return "python";
   }
   throw new Error(`Unsupported language`);
 }
@@ -107,6 +107,10 @@ function matchHighlightLanguage(language: string): string {
           <tr>
             <td>Request Time</td>
             <td>{formatTime(selectedCommand.requested_timestamp)}</td>
+          </tr>
+          <tr>
+            <td>Language</td>
+            <td>{selectedCommand.language}</td>
           </tr>
           <tr>
             <td>Code</td>

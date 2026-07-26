@@ -25,6 +25,7 @@
           pkg-config
           postgresql_18
           protobuf
+          python3
           sdkmanager
           sqlite-interactive
           fenix.packages.x86_64-linux.stable.toolchain

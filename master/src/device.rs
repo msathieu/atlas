@@ -1,4 +1,4 @@
-use crate::lua::LUA_OS_RELEASE;
+use crate::code::LUA_OS_RELEASE;
 use diesel::prelude::*;
 use diesel::{
     PgConnection,
@@ -14,7 +14,7 @@ use shared_server::{
 };
 use std::{error::Error, time::SystemTime};
 
-const DEVICE_INFO_TYPES: [(&str, &str); 1] = [("linux-os-release", LUA_OS_RELEASE)];
+const DEVICE_INFO_TYPES: [(&str, CommandLanguage, &str); 1] = [("linux-os-release", CommandLanguage::Lua, LUA_OS_RELEASE)];
 
 pub async fn process_devices(pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
     let mut db = pool.get()?;
@@ -89,7 +89,7 @@ async fn process_device(device: Device, pool: Pool<ConnectionManager<PgConnectio
             let command = Command {
                 id: None,
                 device: device_id,
-                code: i.1.to_string(),
+                code: i.2.to_string(),
                 completed: false,
                 status_code: 0,
                 stdout: "".to_owned(),
@@ -103,7 +103,7 @@ async fn process_device(device: Device, pool: Pool<ConnectionManager<PgConnectio
                 chat_id: None,
                 chat_sequence: None,
                 chat_tool_call_id: None,
-                language: CommandLanguage::Lua as i32,
+                language: i.1 as i32,
             };
             diesel::insert_into(commands::table).values(command).execute(db)?;
             added_cmd = true;

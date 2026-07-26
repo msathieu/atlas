@@ -39,6 +39,7 @@ pub enum CommandOrigin {
 #[repr(u32)]
 pub enum CommandLanguage {
     Lua = 0,
+    Python = 1,
 }
 #[derive(PartialEq, TryFromPrimitive)]
 #[repr(u32)]
