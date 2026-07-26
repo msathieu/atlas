@@ -37,6 +37,11 @@ pub enum CommandOrigin {
 }
 #[derive(PartialEq, TryFromPrimitive)]
 #[repr(u32)]
+pub enum CommandLanguage {
+    Lua = 0,
+}
+#[derive(PartialEq, TryFromPrimitive)]
+#[repr(u32)]
 pub enum ChatType {
     Interactive = 0,
     NonInteractive = 1,

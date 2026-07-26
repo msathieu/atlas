@@ -33,6 +33,7 @@ diesel::table! {
         chat_sequence -> Nullable<Int4>,
         chat_tool_call_id -> Nullable<Varchar>,
         initiated -> Bool,
+        language -> Int4,
     }
 }
 

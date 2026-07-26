@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use rig_core::tool::{Tool, ToolError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use shared_api::CommandOrigin;
+use shared_api::{CommandLanguage, CommandOrigin};
 use shared_server::{
     get_valkey_client,
     models::{Command, PreapprovedCode},
@@ -70,6 +70,7 @@ impl ExecuteCodeTool {
             chat_sequence: Some(self.sequence),
             chat_tool_call_id: Some(self.tool_call_id.clone()),
             initiated: false,
+            language: CommandLanguage::Lua as i32,
         };
         let cmd: Command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
         let cmd_id = cmd.id.ok_or("Invalid command")?;

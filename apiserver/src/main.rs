@@ -217,7 +217,10 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
             } else {
                 command.initiated = true;
                 diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
-                let request = CommandRequest { code: command.code.clone() };
+                let request = CommandRequest {
+                    code: command.code.clone(),
+                    language: command.language as u32,
+                };
                 write_message(MessageType::CommandRequest, request, &mut stream).await?;
                 let (mut message_type, mut buf);
                 loop {

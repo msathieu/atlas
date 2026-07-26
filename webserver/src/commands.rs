@@ -11,7 +11,7 @@ use axum::{
 };
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
-use shared_api::CommandOrigin;
+use shared_api::{CommandLanguage, CommandOrigin};
 use shared_server::{models::Command, notify_server, schema::commands};
 use std::time::SystemTime;
 use uuid::Uuid;
@@ -28,6 +28,7 @@ pub struct APICommand {
     requested_timestamp: u64,
     completed_timestamp: Option<u64>,
     origin: String,
+    language: String,
 }
 #[derive(Deserialize)]
 pub struct CreateCommandRequest {
@@ -56,6 +57,9 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
                 CommandOrigin::LLMTool => "LLM Tool",
                 CommandOrigin::SystemInitiated => "System Initiated",
             };
+            let language = match CommandLanguage::try_from(command.language as u32).or(Err(StatusCode::INTERNAL_SERVER_ERROR))? {
+                CommandLanguage::Lua => "Lua",
+            };
             Ok(APICommand {
                 id: command.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
                 device: command.device,
@@ -67,6 +71,7 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
                 requested_timestamp: convert_timestamp(command.requested_timestamp)?,
                 completed_timestamp: command.completed_timestamp.map(|timestamp| convert_timestamp(timestamp).unwrap_or(0)),
                 origin: origin.to_string(),
+                language: language.to_string(),
             })
         })
         .collect();
@@ -95,6 +100,7 @@ pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -
         chat_id: None,
         chat_sequence: None,
         chat_tool_call_id: None,
+        language: CommandLanguage::Lua as i32,
     };
     cmd = diesel::insert_into(commands::table).values(cmd).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
     notify_server(&format!("API:DEVICE:{}", request.device)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

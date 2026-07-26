@@ -4,7 +4,7 @@ use diesel::{
     PgConnection,
     r2d2::{ConnectionManager, Pool},
 };
-use shared_api::CommandOrigin;
+use shared_api::{CommandLanguage, CommandOrigin};
 use shared_server::models::DeviceInfo;
 use shared_server::schema::{device_info, devices};
 use shared_server::{
@@ -103,6 +103,7 @@ async fn process_device(device: Device, pool: Pool<ConnectionManager<PgConnectio
                 chat_id: None,
                 chat_sequence: None,
                 chat_tool_call_id: None,
+                language: CommandLanguage::Lua as i32,
             };
             diesel::insert_into(commands::table).values(command).execute(db)?;
             added_cmd = true;

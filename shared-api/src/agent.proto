@@ -32,6 +32,7 @@ message HeartbeatResponse {
 }
 message CommandRequest {
   string code = 1;
+  uint32 language = 2;
 }
 message CommandResponse {
   uint32 status = 1;

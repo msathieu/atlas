@@ -59,7 +59,7 @@ async fn main() {
     }
     let args: Vec<String> = args().collect();
     if let Some(cmd) = args.get(1) {
-        if cmd == "execute-cmd" {
+        if cmd == "execute-lua" {
             let mut code = String::new();
             stdin().read_to_string(&mut code).unwrap();
             let lua = Lua::new();

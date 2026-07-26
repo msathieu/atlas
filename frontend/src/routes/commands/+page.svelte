@@ -28,6 +28,13 @@ async function deleteCommand(id: string) {
     method: "DELETE",
   });
 }
+function matchHighlightLanguage(language: string): string {
+  switch (language) {
+    case "Lua":
+      return "lua";
+  }
+  throw new Error(`Unsupported language`);
+}
 </script>
 
 <table class="border border-base-content/10 table">
@@ -103,7 +110,7 @@ async function deleteCommand(id: string) {
           </tr>
           <tr>
             <td>Code</td>
-            <td><code class="whitespace-pre">{@html DOMPurify.sanitize(hljs.highlight(selectedCommand.code, { language: "lua" }).value)}</code></td>
+            <td><code class="whitespace-pre">{@html DOMPurify.sanitize(hljs.highlight(selectedCommand.code, { language: matchHighlightLanguage(selectedCommand.language) }).value)}</code></td>
           </tr>
           {#if selectedCommand.completed}
             <tr>

@@ -14,7 +14,7 @@ use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use kube::api::{AttachParams, DeleteParams, PostParams};
 use kube::{Api, Client};
 use redis::AsyncCommands;
-use shared_api::{CommandOrigin, ContainerOrigin, ContainerState};
+use shared_api::{CommandLanguage, CommandOrigin, ContainerOrigin, ContainerState};
 use shared_server::binary::personalize_binary;
 use shared_server::models::{Command, Container, DevelopmentEnvironment, Device, Setting};
 use shared_server::schema::{commands, containers, development_environments, devices, settings};
@@ -366,6 +366,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 chat_sequence: None,
                 chat_tool_call_id: None,
                 initiated: false,
+                language: CommandLanguage::Lua as i32,
             };
             command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
             diesel::update(development_environments::table.find(container_id))
