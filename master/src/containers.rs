@@ -224,6 +224,12 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value: Some(code_server_extensions.value),
                 value_from: None,
             });
+            let webserver: Setting = settings::table.find("webserver_host").first(&mut db)?;
+            envs.push(EnvVar {
+                name: "VSCODE_PROXY_URI".to_string(),
+                value: Some(format!("https://{}-{}.devproxy.{}", development_environment.id, "{{port}}", webserver.value)),
+                value_from: None,
+            });
         }
         let mut security_context = SecurityContext {
             run_as_user: Some(0),
@@ -239,6 +245,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                     localhost_profile: None,
                     type_: "Unconfined".to_string(),
                 });
+                limits.insert("devic.es/kvm".to_string(), Quantity("1".to_string()));
                 limits.insert("devic.es/tun".to_string(), Quantity("1".to_string()));
             }
         }

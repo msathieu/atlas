@@ -20,6 +20,11 @@ use uuid::Uuid;
 struct DevProxy;
 struct RestartService;
 
+struct ProxyContext {
+    id: Uuid,
+    port: Option<u16>,
+}
+
 static DB_POOL: OnceLock<Pool<ConnectionManager<PgConnection>>> = OnceLock::new();
 static VALKEY_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
 
@@ -43,12 +48,12 @@ fn get_login_body(id: Uuid) -> Result<String> {
 }
 #[async_trait]
 impl ProxyHttp for DevProxy {
-    type CTX = Uuid;
+    type CTX = ProxyContext;
     fn new_ctx(&self) -> Self::CTX {
-        Uuid::nil()
+        ProxyContext { id: Uuid::nil(), port: None }
     }
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> Result<Box<HttpPeer>> {
-        let domain_name = format!("atlas-dev-{}.atlas.svc.cluster.local:9000", ctx);
+        let domain_name = format!("atlas-dev-{}.atlas.svc.cluster.local:9000", ctx.id);
         let address = domain_name
             .to_socket_addrs()
             .or(Err(Error::new_down(InvalidHTTPHeader)))?
@@ -62,14 +67,32 @@ impl ProxyHttp for DevProxy {
         let host = session.get_header("Host");
         let host = host.ok_or(Error::new_down(InvalidHTTPHeader))?.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?;
         let webserver_host: Setting = settings::table.find("webserver_host").first(&mut db).or(Err(Error::new(InternalError)))?;
-        let subdomain = host.strip_suffix(&format!(".dev.{}", webserver_host.value)).ok_or(Error::new_down(InvalidHTTPHeader))?;
-        let uuid = Uuid::parse_str(subdomain).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+
+        let mut uuid = None;
+        let mut port: Option<u16> = None;
+        if let Some(subdomain) = host.strip_suffix(&format!(".dev.{}", webserver_host.value)) {
+            uuid = Some(Uuid::parse_str(subdomain).or(Err(Error::new_down(InvalidHTTPHeader)))?);
+        } else if let Some(stripped_host) = host.strip_suffix(&format!(".devproxy.{}", webserver_host.value)) {
+            let (uuid_str, port_str) = stripped_host.rsplit_once('-').ok_or(Error::new_down(InvalidHTTPHeader))?;
+            uuid = Some(Uuid::parse_str(uuid_str).or(Err(Error::new_down(InvalidHTTPHeader)))?);
+            let parsed_port = port_str.parse().or(Err(Error::new_down(InvalidHTTPHeader)))?;
+            if parsed_port == 9000 {
+                return Err(Error::new_down(InvalidHTTPHeader));
+            }
+            port = Some(parsed_port);
+        }
+        let uuid = uuid.ok_or(Error::new_down(InvalidHTTPHeader))?;
+
         let container: Container = containers::table.find(uuid).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
         let uri = &session.req_header().uri;
-        if uri.path() == "/setup" {
+        if uri.path() == "/atlas_setup" {
             let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
             let jwt = uri.query().ok_or(Error::new_down(InvalidHTTPHeader))?.strip_prefix("jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
-            authenticate_jwt(jwt, &format!("devproxy-{}", uuid), &mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+            if port.is_some() {
+                authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), &mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+            } else {
+                authenticate_jwt(jwt, &format!("devproxy-{}", uuid), &mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+            }
             let cookie = format!("atlas_jwt={}; HttpOnly; Secure; SameSite=Strict", jwt);
             response.append_header("Set-Cookie", cookie).or(Err(Error::new(InternalError)))?;
             response.insert_header("Location", "/").or(Err(Error::new(InternalError)))?;
@@ -82,7 +105,11 @@ impl ProxyHttp for DevProxy {
                     let header = header.trim();
                     if header.starts_with("atlas_jwt=") {
                         let jwt = header.strip_prefix("atlas_jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
-                        let auth_result = authenticate_jwt(jwt, &format!("devproxy-{}", uuid), &mut db);
+                        let auth_result = if port.is_some() {
+                            authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), &mut db)
+                        } else {
+                            authenticate_jwt(jwt, &format!("devproxy-{}", uuid), &mut db)
+                        };
                         if auth_result.is_ok() {
                             authenticated = true;
                         }
@@ -92,14 +119,19 @@ impl ProxyHttp for DevProxy {
             }
             if !authenticated || container.state != ContainerState::Running as i32 {
                 let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
+                let mut query = "".to_string();
+                if let Some(port) = port {
+                    query = format!("?port={}", port);
+                }
                 response
-                    .insert_header("Location", format!("https://{}/embed/development_environments/{}", webserver_host.value, uuid))
+                    .insert_header("Location", format!("https://{}/embed/development_environments/{}{}", webserver_host.value, uuid, query))
                     .or(Err(Error::new(InternalError)))?;
                 session.write_response_header(Box::new(response), false).await.or(Err(Error::new(InternalError)))?;
                 return Ok(true);
             }
         }
-        *ctx = uuid;
+        ctx.id = uuid;
+        ctx.port = port;
         if VALKEY_POOL.get().is_none() {
             let client = get_valkey_client().await.or(Err(Error::new(InternalError)))?;
             VALKEY_POOL.set(client.0).ok();
@@ -119,7 +151,10 @@ impl ProxyHttp for DevProxy {
         if uri.path() == "/login" {
             upstream_request.set_method(Method::POST);
             upstream_request.insert_header("Content-Type", "application/x-www-form-urlencoded").or(Err(Error::new(InternalError)))?;
-            upstream_request.insert_header("Content-Length", get_login_body(*ctx)?.len()).or(Err(Error::new(InternalError)))?;
+            upstream_request.insert_header("Content-Length", get_login_body(ctx.id)?.len()).or(Err(Error::new(InternalError)))?;
+        }
+        if let Some(port) = ctx.port {
+            upstream_request.insert_header("Host", format!("{}.localhost", port)).or(Err(Error::new(InternalError)))?;
         }
         if let Some(cookie_header) = session.get_header("Cookie") {
             let mut new_cookie_header = String::new();
@@ -139,7 +174,7 @@ impl ProxyHttp for DevProxy {
     async fn request_body_filter(&self, session: &mut Session, body: &mut Option<Bytes>, end_of_stream: bool, ctx: &mut Self::CTX) -> Result<()> {
         let uri = &session.req_header().uri;
         if uri.path() == "/login" && end_of_stream {
-            *body = Some(Bytes::from(get_login_body(*ctx)?));
+            *body = Some(Bytes::from(get_login_body(ctx.id)?));
         }
         Ok(())
     }

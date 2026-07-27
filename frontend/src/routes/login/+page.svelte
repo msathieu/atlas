@@ -68,7 +68,7 @@ async function finishAuth(username: string, jwt: string, keyPair: CryptoKeyPair)
     return;
   }
   let target = new URL(redirect, page.url.origin);
-  await goto(target.pathname);
+  await goto(target.pathname + target.search);
 }
 </script>
 

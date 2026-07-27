@@ -6,7 +6,7 @@ use crate::{
 use axum::{
     Json,
     body::Bytes,
-    extract::{OriginalUri, Path},
+    extract::{OriginalUri, Path, Query},
     http::{HeaderMap, StatusCode},
 };
 use diesel::prelude::*;
@@ -50,6 +50,10 @@ pub struct CreateDevelopmentEnvironmentResponse {
 pub struct OpenDevelopmentEnvironmentResponse {
     url: String,
     ready: bool,
+}
+#[derive(Deserialize)]
+pub struct OpenDevelopmentEnvironmentRequest {
+    port: Option<u16>,
 }
 
 pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIDevelopmentEnvironment>>), StatusCode> {
@@ -202,7 +206,13 @@ pub async fn stop_development_environment(headers: HeaderMap, Path(id): Path<Uui
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
-pub async fn open_development_environment(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<OpenDevelopmentEnvironmentResponse>), StatusCode> {
+pub async fn open_development_environment(
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    uri: OriginalUri,
+    request: Query<OpenDevelopmentEnvironmentRequest>,
+    body: Bytes,
+) -> Result<(HeaderMap, Json<OpenDevelopmentEnvironmentResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db()?;
@@ -229,8 +239,14 @@ pub async fn open_development_environment(headers: HeaderMap, Path(id): Path<Uui
         ready = false;
     }
     let webserver: Setting = settings::table.find("webserver_host").first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let jwt = generate_jwt(&format!("devproxy-{}", id), &user, 12 * 60 * 60, None)?;
-    let url = format!("https://{}.dev.{}/setup?jwt={}", id, webserver.value, jwt);
+    let jwt = match request.port {
+        None => generate_jwt(&format!("devproxy-{}", id), &user, 12 * 60 * 60, None)?,
+        Some(_) => generate_jwt(&format!("devproxy-proxy-{}", id), &user, 12 * 60 * 60, None)?,
+    };
+    let url = match request.port {
+        None => format!("https://{}.dev.{}/atlas_setup?jwt={}", id, webserver.value, jwt),
+        Some(port) => format!("https://{}-{}.devproxy.{}/atlas_setup?jwt={}", id, port, webserver.value, jwt),
+    };
     let response = OpenDevelopmentEnvironmentResponse { url, ready };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
