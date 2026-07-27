@@ -13,6 +13,7 @@ message HandshakeRequest {
   string version = 9;
   bytes agent_hash = 10;
   bytes registration_token = 11;
+  uint32 purpose = 12;
 }
 message HandshakeResponse {
   uint64 magic = 1;
@@ -46,8 +47,14 @@ message UpdateRequest {
 message UpdateResponse {
   bool success = 1;
 }
-message SSHAgentRequest {
+message StartSSHAgentRequest {
   string key = 1;
 }
-message SSHAgentResponse {
+message StartSSHAgentResponse {
+}
+message ForwardSSHAgentRequest {
+  bytes data = 1;
+}
+message ForwardSSHAgentResponse {
+  bytes signature = 1;
 }

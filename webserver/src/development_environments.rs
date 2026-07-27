@@ -72,8 +72,8 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
                 ContainerState::Stopped => "Stopped",
             }
             .to_string();
-            let private_key = PrivateKey::from_openssh(&environment.ssh_key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-            let pubkey = private_key.public_key().to_openssh().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+            let mut private_key = PrivateKey::from_openssh(&environment.ssh_key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+            private_key.set_comment(format!("{}@atlas-{}", user.username, environment.name));
             Ok(APIDevelopmentEnvironment {
                 id: environment.id,
                 name: environment.name.clone(),
@@ -83,7 +83,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
                 state,
                 pending: container.requested_state != container.state,
                 nested_containers: environment.nested_containers,
-                ssh_key: pubkey,
+                ssh_key: private_key.public_key().to_openssh().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?,
             })
         })
         .collect();
@@ -94,7 +94,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateDevelopmentEnvironmentRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
-    if request.name.is_empty() {
+    if request.name.is_empty() || !request.name.chars().all(|c| c.is_ascii_alphanumeric()) {
         return Err(StatusCode::BAD_REQUEST);
     }
     if request.nested_containers && !user.admin {

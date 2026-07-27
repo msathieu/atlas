@@ -33,7 +33,7 @@ pub async fn process_tool_calls(pool: Pool<ConnectionManager<PgConnection>>) -> 
         .execute(&mut db)?;
         tokio::spawn(async {
             if let Err(e) = process_tool_call(call, pool).await {
-                println!("Error while processing tool calls: {}", e);
+                eprintln!("Error while processing tool calls: {}", e);
             }
         });
     }

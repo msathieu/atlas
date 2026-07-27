@@ -6,13 +6,13 @@
     "npm:@capacitor/cli@^8.4.2": "8.4.2",
     "npm:@capacitor/core@^8.4.2": "8.4.2",
     "npm:@capawesome/capacitor-passkeys@~0.1.1": "0.1.1_@capacitor+core@8.4.2",
-    "npm:@lucide/svelte@^1.26.0": "1.26.0_svelte@5.56.8",
+    "npm:@lucide/svelte@^1.27.0": "1.27.0_svelte@5.56.8",
     "npm:@sveltejs/adapter-static@^3.0.10": "3.0.10_@sveltejs+kit@2.70.1__@sveltejs+vite-plugin-svelte@7.2.0___svelte@5.56.8___vite@8.1.5____@types+node@26.1.1__svelte@5.56.8__typescript@6.0.3__vite@8.1.5___@types+node@26.1.1_svelte@5.56.8",
     "npm:@sveltejs/kit@^2.70.1": "2.70.1_@sveltejs+vite-plugin-svelte@7.2.0__svelte@5.56.8__vite@8.1.5___@types+node@26.1.1_svelte@5.56.8_typescript@6.0.3_vite@8.1.5__@types+node@26.1.1",
     "npm:@sveltejs/vite-plugin-svelte@^7.2.0": "7.2.0_svelte@5.56.8_vite@8.1.5__@types+node@26.1.1",
     "npm:@tailwindcss/vite@^4.3.3": "4.3.3_vite@8.1.5__@types+node@26.1.1_@types+node@26.1.1",
     "npm:@types/node@^26.1.1": "26.1.1",
-    "npm:daisyui@^5.7.1": "5.7.1",
+    "npm:daisyui@^5.7.4": "5.7.4",
     "npm:date-fns@^4.4.0": "4.4.0",
     "npm:dexie@^4.4.4": "4.4.4",
     "npm:dompurify@^3.4.12": "3.4.12",
@@ -203,8 +203,8 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "@lucide/svelte@1.26.0_svelte@5.56.8": {
-      "integrity": "sha512-KUfLTlNRVrHZ460Um7jdrvh46hI/8Sw4+1k/Ttj4g6JI9bCrjD7HZVG4cqhh7LasjfDz5b+CuKrjd/k/3obYcA==",
+    "@lucide/svelte@1.27.0_svelte@5.56.8": {
+      "integrity": "sha512-qzNBHdqy/MKp2qxuy/DcYELuep6h19fjo+4ech8fZsS4GtZeBtg5jgCTRQvLvwhppt0mhRN6qt8Nt8rPb/J4Ag==",
       "dependencies": [
         "svelte"
       ]
@@ -704,8 +704,8 @@
         "which"
       ]
     },
-    "daisyui@5.7.1": {
-      "integrity": "sha512-E94FQtecKyq9HKI7xYX1E0XxFIUwOkr6PCpbRUvOJdd15P/oPm6dmhJKwH6PztKHYk1wcANfldkAVaAkYdqVsA=="
+    "daisyui@5.7.4": {
+      "integrity": "sha512-zKzFIwvEvn2QvE1TbUUtDnYFOqWoxeZh+j4QXfhkZKYAT++pO2ijyT9rkFm0GIPDWR1/oo9hHZzd96AsTK0iZg=="
     },
     "date-fns@4.4.0": {
       "integrity": "sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w=="
@@ -1454,13 +1454,13 @@
         "npm:@capacitor/cli@^8.4.2",
         "npm:@capacitor/core@^8.4.2",
         "npm:@capawesome/capacitor-passkeys@~0.1.1",
-        "npm:@lucide/svelte@^1.26.0",
+        "npm:@lucide/svelte@^1.27.0",
         "npm:@sveltejs/adapter-static@^3.0.10",
         "npm:@sveltejs/kit@^2.70.1",
         "npm:@sveltejs/vite-plugin-svelte@^7.2.0",
         "npm:@tailwindcss/vite@^4.3.3",
         "npm:@types/node@^26.1.1",
-        "npm:daisyui@^5.7.1",
+        "npm:daisyui@^5.7.4",
         "npm:date-fns@^4.4.0",
         "npm:dexie@^4.4.4",
         "npm:dompurify@^3.4.12",

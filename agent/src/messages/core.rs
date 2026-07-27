@@ -3,13 +3,8 @@ use std::{env::current_exe, error::Error, process::Stdio, time::Duration};
 use prost::Message;
 use shared_api::{CommandLanguage, CommandRequest, CommandResponse, HeartbeatRequest, HeartbeatResponse, MessageType, read_message, write_message};
 use tokio::{io::AsyncWriteExt, net::TcpStream, process::Command, time::timeout};
-use tokio_rustls::client::TlsStream;
+use tokio_rustls::TlsStream;
 
-pub async fn handle_heartbeat(msg: HeartbeatRequest, stream: &mut TlsStream<TcpStream>) -> Result<(), Box<dyn Error>> {
-    let response = HeartbeatResponse { random: msg.random };
-    write_message(MessageType::HeartbeatResponse, response, stream).await?;
-    Ok(())
-}
 pub async fn handle_command(msg: CommandRequest, stream: &mut TlsStream<TcpStream>) -> Result<(), Box<dyn Error>> {
     let subcommand = match CommandLanguage::try_from(msg.language)? {
         CommandLanguage::Lua => "execute-lua",

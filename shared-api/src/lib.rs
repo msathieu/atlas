@@ -3,7 +3,11 @@
 use num_enum::TryFromPrimitive;
 use prost::Message;
 use std::{env, error::Error};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    net::TcpStream,
+};
+use tokio_rustls::TlsStream;
 
 include!(concat!(env!("OUT_DIR"), "/agent.rs"));
 
@@ -24,8 +28,10 @@ pub enum MessageType {
     CommandResponse = 7,
     UpdateRequest = 8,
     UpdateResponse = 9,
-    SSHAgentRequest = 10,
-    SSHAgentResponse = 11,
+    StartSSHAgentRequest = 10,
+    StartSSHAgentResponse = 11,
+    ForwardSSHAgentRequest = 12,
+    ForwardSSHAgentResponse = 13,
 }
 #[derive(PartialEq, TryFromPrimitive)]
 #[repr(u32)]
@@ -59,6 +65,12 @@ pub enum ContainerState {
     Stopped = 1,
     Started = 2,
     Running = 3,
+}
+#[derive(PartialEq, TryFromPrimitive)]
+#[repr(u32)]
+pub enum HandshakePurpose {
+    General = 0,
+    SSHAgent = 1,
 }
 
 pub fn print_startup(component: &str, version: &str) {
@@ -100,4 +112,9 @@ pub fn chat_type_to_str(chat_type: i32) -> Result<String, Box<dyn Error>> {
         ChatType::NonInteractive => "noninteractive",
     }
     .to_string())
+}
+pub async fn handle_heartbeat(msg: HeartbeatRequest, stream: &mut TlsStream<TcpStream>) -> Result<(), Box<dyn Error>> {
+    let response = HeartbeatResponse { random: msg.random };
+    write_message(MessageType::HeartbeatResponse, response, stream).await?;
+    Ok(())
 }

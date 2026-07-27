@@ -45,6 +45,6 @@ WantedBy=multi-user.target
         }
         return Ok(());
     }
-    println!("Unsupported platform!");
+    eprintln!("Unsupported platform!");
     Ok(())
 }

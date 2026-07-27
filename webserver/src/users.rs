@@ -64,7 +64,7 @@ pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
     require_admin(&headers)?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateUserRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
-    if request.username.is_empty() || request.password.is_empty() || request.password.len() < MIN_PASSWORD_LENGTH {
+    if request.username.is_empty() || !request.username.chars().all(|c| c.is_ascii_alphanumeric()) || request.password.is_empty() || request.password.len() < MIN_PASSWORD_LENGTH {
         return Err(StatusCode::BAD_REQUEST);
     }
     let mut db = get_db()?;

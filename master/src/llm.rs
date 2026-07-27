@@ -72,7 +72,7 @@ pub async fn process_chats(pool: Pool<ConnectionManager<PgConnection>>) -> Resul
                 _ => Err("Invalid LLM provider".into()),
             };
             if let Err(e) = result {
-                println!("Error while processing chats: {}", e);
+                eprintln!("Error while processing chats: {}", e);
                 if let Ok(mut db) = pool.get() {
                     diesel::update(chats::table.find(chat_id)).set(chats::error_count.eq(error_count + 1)).execute(&mut db).ok();
                 }
@@ -81,7 +81,7 @@ pub async fn process_chats(pool: Pool<ConnectionManager<PgConnection>>) -> Resul
     }
     for i in tasks {
         if let Err(e) = i.await {
-            println!("Error while processing chats: {}", e);
+            eprintln!("Error while processing chats: {}", e);
         }
     }
     Ok(())

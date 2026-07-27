@@ -86,7 +86,7 @@ async fn tasks_loop<T: Future<Output = Result<(), Box<dyn Error>>>>(
     pubsub_client.subscribe(sub_channel).await?;
     loop {
         if let Err(e) = func(pool.clone()).await {
-            println!("Error while running tasks: {}", e)
+            eprintln!("Error while running tasks: {}", e)
         }
         timeout(interval, async { wait_for_pubsub_msg(&mut receiver).await }).await.ok();
     }

@@ -20,8 +20,8 @@ use rustls::{
 };
 use sha2::{Digest, Sha512};
 use shared_api::{
-    API_VERSION, CommandOrigin, CommandRequest, CommandResponse, ContainerOrigin, HandshakeFinish, HandshakeRequest, HandshakeResponse, HeartbeatRequest, HeartbeatResponse, MAGIC, MessageType,
-    SUPPORTED_ARCH, SUPPORTED_OS, SshAgentRequest, UpdateRequest, UpdateResponse, print_startup, read_message, write_message,
+    API_VERSION, CommandOrigin, CommandRequest, CommandResponse, ContainerOrigin, HandshakeFinish, HandshakePurpose, HandshakeRequest, HandshakeResponse, HeartbeatRequest, HeartbeatResponse, MAGIC,
+    MessageType, SUPPORTED_ARCH, SUPPORTED_OS, StartSshAgentRequest, UpdateRequest, UpdateResponse, handle_heartbeat, print_startup, read_message, write_message,
 };
 use shared_server::{
     binary::personalize_binary,
@@ -31,6 +31,7 @@ use shared_server::{
     schema::{commands, containers, development_environments, devices, settings},
     wait_for_pubsub_msg,
 };
+use ssh_key::PrivateKey;
 use std::{
     error::Error,
     str::FromStr,
@@ -43,6 +44,10 @@ use tokio::{
 };
 use tokio_rustls::{TlsAcceptor, rustls};
 use uuid::Uuid;
+
+use crate::ssh::handle_ssh_agent;
+
+mod ssh;
 
 #[tokio::main]
 async fn main() {
@@ -73,7 +78,7 @@ async fn main() {
     loop {
         let result = accept_connection(&listener, tls_acceptor.clone(), pool.clone()).await;
         if let Err(e) = result {
-            println!("Error in connection: {}", e)
+            eprintln!("Error in connection: {}", e)
         }
     }
 }
@@ -83,14 +88,14 @@ async fn accept_connection(listener: &TcpListener, tls_acceptor: TlsAcceptor, po
     let ip = addr.ip().to_string();
     tokio::spawn(async {
         if let Err(e) = handle_connection(stream, ip, tls_acceptor, pool).await {
-            println!("Error in connection: {}", e);
+            eprintln!("Error in connection: {}", e);
         }
     });
     Ok(())
 }
 
 async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAcceptor, pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
-    let mut stream = tls_acceptor.accept(stream).await?;
+    let mut stream = tls_acceptor.accept(stream).await?.into();
     let mut db = pool.get()?;
     let (_, buf) = read_message(&mut stream, Some(MessageType::HandshakeRequest)).await?;
     let handshake_request = HandshakeRequest::decode(&*buf)?;
@@ -176,6 +181,14 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
     diesel::update(devices::table.find(uuid)).set(&device).execute(&mut db)?;
     notify_server("WEB:REFRESH").await?;
 
+    if handshake_request.purpose == HandshakePurpose::SSHAgent as u32 {
+        handle_ssh_agent(stream, db, uuid).await?;
+        return Ok(());
+    }
+    if handshake_request.purpose != HandshakePurpose::General as u32 {
+        return Err("Invalid handshake purpose".into());
+    }
+
     if let Ok(agent) = personalize_binary(&mut db, &device.arch, &device.os).await.map_err(|_| "Failed to get agent") {
         let hash = Sha512::digest(&agent).to_vec();
         if hash != device.agent_hash {
@@ -193,8 +206,16 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         let container: Container = containers::table.find(container_id).first(&mut db)?;
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db)?;
-            write_message(MessageType::SSHAgentRequest, SshAgentRequest { key: development_environment.ssh_key }, &mut stream).await?;
-            read_message(&mut stream, Some(MessageType::SSHAgentResponse)).await?;
+            let private_key = PrivateKey::from_openssh(development_environment.ssh_key)?;
+            write_message(
+                MessageType::StartSSHAgentRequest,
+                StartSshAgentRequest {
+                    key: private_key.public_key().to_openssh()?,
+                },
+                &mut stream,
+            )
+            .await?;
+            read_message(&mut stream, Some(MessageType::StartSSHAgentResponse)).await?;
         }
     }
 
@@ -227,7 +248,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
                     (message_type, buf) = read_message(&mut stream, None).await?;
                     if message_type == MessageType::HeartbeatRequest {
                         let request = HeartbeatRequest::decode(&*buf)?;
-                        write_message(MessageType::HeartbeatResponse, HeartbeatResponse { random: request.random }, &mut stream).await?;
+                        handle_heartbeat(request, &mut stream).await?;
                     } else if message_type == MessageType::CommandResponse {
                         break;
                     } else {

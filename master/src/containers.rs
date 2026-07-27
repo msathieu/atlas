@@ -52,13 +52,13 @@ pub async fn process_containers(pool: Pool<ConnectionManager<PgConnection>>) -> 
         let pool = pool.clone();
         tasks.push(tokio::spawn(async {
             if let Err(e) = process_container(container, pool).await {
-                println!("Error while processing containers: {}", e);
+                eprintln!("Error while processing containers: {}", e);
             }
         }));
     }
     for i in tasks {
         if let Err(e) = i.await {
-            println!("Error while processing containers: {}", e);
+            eprintln!("Error while processing containers: {}", e);
         }
     }
     Ok(())

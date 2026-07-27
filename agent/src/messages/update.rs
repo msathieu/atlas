@@ -9,7 +9,7 @@ use std::{
 };
 use tempfile::{NamedTempFile, TempPath};
 use tokio::{fs, net::TcpStream, process::Command};
-use tokio_rustls::client::TlsStream;
+use tokio_rustls::TlsStream;
 
 pub async fn handle_update(msg: UpdateRequest, stream: &mut TlsStream<TcpStream>) -> Result<(), Box<dyn Error>> {
     let tempfile = NamedTempFile::new()?.into_temp_path();
