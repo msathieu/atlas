@@ -27,6 +27,7 @@ struct ProxyContext {
 
 static DB_POOL: OnceLock<Pool<ConnectionManager<PgConnection>>> = OnceLock::new();
 static VALKEY_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
+static WEBSERVER_HOST: OnceLock<String> = OnceLock::new();
 
 #[async_trait]
 impl BackgroundService for RestartService {
@@ -63,16 +64,15 @@ impl ProxyHttp for DevProxy {
         Ok(Box::new(upstream))
     }
     async fn request_filter(&self, session: &mut Session, ctx: &mut Self::CTX) -> Result<bool> {
-        let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().or(Err(Error::new(InternalError)))?;
         let host = session.get_header("Host");
         let host = host.ok_or(Error::new_down(InvalidHTTPHeader))?.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?;
-        let webserver_host: Setting = settings::table.find("webserver_host").first(&mut db).or(Err(Error::new(InternalError)))?;
+        let webserver_host = WEBSERVER_HOST.get().ok_or(Error::new(InternalError))?;
 
         let mut uuid = None;
         let mut port: Option<u16> = None;
-        if let Some(subdomain) = host.strip_suffix(&format!(".dev.{}", webserver_host.value)) {
+        if let Some(subdomain) = host.strip_suffix(&format!(".dev.{}", webserver_host)) {
             uuid = Some(Uuid::parse_str(subdomain).or(Err(Error::new_down(InvalidHTTPHeader)))?);
-        } else if let Some(stripped_host) = host.strip_suffix(&format!(".devproxy.{}", webserver_host.value)) {
+        } else if let Some(stripped_host) = host.strip_suffix(&format!(".devproxy.{}", webserver_host)) {
             let (uuid_str, port_str) = stripped_host.rsplit_once('-').ok_or(Error::new_down(InvalidHTTPHeader))?;
             uuid = Some(Uuid::parse_str(uuid_str).or(Err(Error::new_down(InvalidHTTPHeader)))?);
             let parsed_port = port_str.parse().or(Err(Error::new_down(InvalidHTTPHeader)))?;
@@ -83,15 +83,15 @@ impl ProxyHttp for DevProxy {
         }
         let uuid = uuid.ok_or(Error::new_down(InvalidHTTPHeader))?;
 
-        let container: Container = containers::table.find(uuid).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
         let uri = &session.req_header().uri;
+        let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().or(Err(Error::new(InternalError)))?;
         if uri.path() == "/atlas_setup" {
             let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
             let jwt = uri.query().ok_or(Error::new_down(InvalidHTTPHeader))?.strip_prefix("jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
             if port.is_some() {
-                authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), &mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+                authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), &mut db, false).or(Err(Error::new_down(InvalidHTTPHeader)))?;
             } else {
-                authenticate_jwt(jwt, &format!("devproxy-{}", uuid), &mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+                authenticate_jwt(jwt, &format!("devproxy-{}", uuid), &mut db, false).or(Err(Error::new_down(InvalidHTTPHeader)))?;
             }
             let cookie = format!("atlas_jwt={}; HttpOnly; Secure; SameSite=Strict", jwt);
             response.append_header("Set-Cookie", cookie).or(Err(Error::new(InternalError)))?;
@@ -106,9 +106,9 @@ impl ProxyHttp for DevProxy {
                     if header.starts_with("atlas_jwt=") {
                         let jwt = header.strip_prefix("atlas_jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
                         let auth_result = if port.is_some() {
-                            authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), &mut db)
+                            authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), &mut db, true)
                         } else {
-                            authenticate_jwt(jwt, &format!("devproxy-{}", uuid), &mut db)
+                            authenticate_jwt(jwt, &format!("devproxy-{}", uuid), &mut db, true)
                         };
                         if auth_result.is_ok() {
                             authenticated = true;
@@ -117,14 +117,20 @@ impl ProxyHttp for DevProxy {
                     }
                 }
             }
-            if !authenticated || container.state != ContainerState::Running as i32 {
+            if port.is_none() {
+                let container: Container = containers::table.find(uuid).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+                if container.state != ContainerState::Running as i32 {
+                    authenticated = false;
+                }
+            }
+            if !authenticated {
                 let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
                 let mut query = "".to_string();
                 if let Some(port) = port {
                     query = format!("?port={}", port);
                 }
                 response
-                    .insert_header("Location", format!("https://{}/embed/development_environments/{}{}", webserver_host.value, uuid, query))
+                    .insert_header("Location", format!("https://{}/embed/development_environments/{}{}", webserver_host, uuid, query))
                     .or(Err(Error::new(InternalError)))?;
                 session.write_response_header(Box::new(response), false).await.or(Err(Error::new(InternalError)))?;
                 return Ok(true);
@@ -132,18 +138,20 @@ impl ProxyHttp for DevProxy {
         }
         ctx.id = uuid;
         ctx.port = port;
-        if VALKEY_POOL.get().is_none() {
-            let client = get_valkey_client().await.or(Err(Error::new(InternalError)))?;
-            VALKEY_POOL.set(client.0).ok();
+        if ctx.port.is_none() {
+            if VALKEY_POOL.get().is_none() {
+                let client = get_valkey_client().await.or(Err(Error::new(InternalError)))?;
+                VALKEY_POOL.set(client.0).ok();
+            }
+            let key = format!("DEVELOPMENT_ENVIRONMENT:{}", uuid);
+            VALKEY_POOL
+                .get()
+                .ok_or(Error::new(InternalError))?
+                .clone()
+                .set_ex(key, true, 4 * 60 * 60)
+                .await
+                .or(Err(Error::new(InternalError)))?;
         }
-        let key = format!("DEVELOPMENT_ENVIRONMENT:{}", uuid);
-        VALKEY_POOL
-            .get()
-            .ok_or(Error::new(InternalError))?
-            .clone()
-            .set_ex(key, true, 4 * 60 * 60)
-            .await
-            .or(Err(Error::new(InternalError)))?;
         Ok(false)
     }
     async fn upstream_request_filter(&self, session: &mut Session, upstream_request: &mut RequestHeader, ctx: &mut Self::CTX) -> Result<()> {
@@ -154,7 +162,13 @@ impl ProxyHttp for DevProxy {
             upstream_request.insert_header("Content-Length", get_login_body(ctx.id)?.len()).or(Err(Error::new(InternalError)))?;
         }
         if let Some(port) = ctx.port {
-            upstream_request.insert_header("Host", format!("{}.localhost", port)).or(Err(Error::new(InternalError)))?;
+            let upstream_host = format!("{}.localhost", port);
+            upstream_request.insert_header("Host", &upstream_host).or(Err(Error::new(InternalError)))?;
+            if let Some(upgrade_header) = session.get_header("Upgrade")
+                && upgrade_header.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))? == "websocket"
+            {
+                upstream_request.insert_header("Origin", format!("https://{}", upstream_host)).or(Err(Error::new(InternalError)))?;
+            }
         }
         if let Some(cookie_header) = session.get_header("Cookie") {
             let mut new_cookie_header = String::new();
@@ -184,6 +198,9 @@ fn main() {
     print_startup("devproxy", env!("CARGO_PKG_VERSION"));
     dotenvy::dotenv().ok();
     DB_POOL.set(get_db_pool().unwrap()).unwrap();
+    let mut db = DB_POOL.get().unwrap().get().unwrap();
+    let webserver_host: Setting = settings::table.find("webserver_host").first(&mut db).unwrap();
+    WEBSERVER_HOST.set(webserver_host.value).ok();
     let mut server = Server::new(None).unwrap();
     server.bootstrap();
     let mut proxy = http_proxy_service(&server.configuration, DevProxy);

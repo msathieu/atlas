@@ -85,6 +85,9 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
         .execute(&mut db)
         .or(Err(StatusCode::BAD_REQUEST))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    if name == "webserver_host" {
+        notify_server("DEVPROXY:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    }
     sign_response::<String>(signature, None)
 }
 pub async fn restart_system(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {

@@ -36,7 +36,7 @@ pub async fn stream(query: Query<StreamAuth>, socket: WebSocketUpgrade) -> Respo
         Ok(db) => db,
         Err(_) => return Response::new("Internal Server Error".into()),
     };
-    if authenticate_jwt(&query.auth, "webserver-stream", &mut db).is_err() {
+    if authenticate_jwt(&query.auth, "webserver-stream", &mut db, false).is_err() {
         return Response::new("Unauthorized".into());
     }
     socket.on_upgrade(stream_wrapper)
