@@ -113,9 +113,14 @@ pub fn parse_pubkey(pubkey: String) -> Result<ParsedPublicKey, Box<dyn Error>> {
     let key = UnparsedPublicKey::new(&ED25519, BASE64_STANDARD.decode(pubkey)?).parse()?;
     Ok(key)
 }
-pub fn authenticate_jwt(jwt: &str, aud: &str, db: &mut PooledConnection<ConnectionManager<PgConnection>>, skip_db_checks: bool) -> Result<(Option<User>, Option<ParsedPublicKey>), Box<dyn Error>> {
+pub fn authenticate_jwt(
+    jwt: &str,
+    aud: &str,
+    mut db: Option<&mut PooledConnection<ConnectionManager<PgConnection>>>,
+    skip_db_checks: bool,
+) -> Result<(Option<User>, Option<ParsedPublicKey>), Box<dyn Error>> {
     if JWT_KEY.get().is_none() {
-        let jwt_secret: Setting = settings::table.find("jwt_secret").first(db)?;
+        let jwt_secret: Setting = settings::table.find("jwt_secret").first(db.as_deref_mut().ok_or("No DB instance passed")?)?;
         let jwt_secret = BASE64_STANDARD.decode(jwt_secret.value)?;
         JWT_KEY.set(jwt_secret).ok();
     }
@@ -127,7 +132,7 @@ pub fn authenticate_jwt(jwt: &str, aud: &str, db: &mut PooledConnection<Connecti
     let token = decode::<Claims>(jwt, &key, &validation)?;
     let mut user = None;
     if !skip_db_checks {
-        let local_user: User = users::table.find(token.claims.sub).first(db)?;
+        let local_user: User = users::table.find(token.claims.sub).first(db.ok_or("No DB instance passed")?)?;
         if !local_user.enabled || local_user.jwt_counter as usize != token.claims.counter {
             return Err("Wrong JWT counter or user isn't enabled".into());
         }

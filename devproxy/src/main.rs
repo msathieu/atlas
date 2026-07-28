@@ -6,7 +6,12 @@ use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, Pool},
 };
-use pingora::{http::Method, prelude::*, server::ShutdownWatch, services::background::BackgroundService};
+use pingora::{
+    http::Method,
+    prelude::*,
+    server::{ShutdownWatch, configuration::ServerConf},
+    services::background::BackgroundService,
+};
 use redis::AsyncTypedCommands;
 use shared_api::{ContainerState, print_startup};
 use shared_server::{
@@ -14,7 +19,8 @@ use shared_server::{
     models::{Command, Container, DevelopmentEnvironment, Setting},
     schema::{commands, containers, development_environments, settings},
 };
-use std::{net::ToSocketAddrs, sync::OnceLock};
+use std::sync::OnceLock;
+use tokio::net::lookup_host;
 use uuid::Uuid;
 
 struct DevProxy;
@@ -55,8 +61,8 @@ impl ProxyHttp for DevProxy {
     }
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> Result<Box<HttpPeer>> {
         let domain_name = format!("atlas-dev-{}.atlas.svc.cluster.local:9000", ctx.id);
-        let address = domain_name
-            .to_socket_addrs()
+        let address = lookup_host(domain_name)
+            .await
             .or(Err(Error::new_down(InvalidHTTPHeader)))?
             .next()
             .ok_or(Error::new_down(InvalidHTTPHeader))?;
@@ -84,14 +90,13 @@ impl ProxyHttp for DevProxy {
         let uuid = uuid.ok_or(Error::new_down(InvalidHTTPHeader))?;
 
         let uri = &session.req_header().uri;
-        let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().or(Err(Error::new(InternalError)))?;
         if uri.path() == "/atlas_setup" {
             let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
             let jwt = uri.query().ok_or(Error::new_down(InvalidHTTPHeader))?.strip_prefix("jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
             if port.is_some() {
-                authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), &mut db, false).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+                authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
             } else {
-                authenticate_jwt(jwt, &format!("devproxy-{}", uuid), &mut db, false).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+                authenticate_jwt(jwt, &format!("devproxy-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
             }
             let cookie = format!("atlas_jwt={}; HttpOnly; Secure; SameSite=Strict", jwt);
             response.append_header("Set-Cookie", cookie).or(Err(Error::new(InternalError)))?;
@@ -101,14 +106,14 @@ impl ProxyHttp for DevProxy {
         } else {
             let mut authenticated = false;
             if let Some(cookie_header) = session.get_header("Cookie") {
-                for header in cookie_header.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?.split(";") {
-                    let header = header.trim();
-                    if header.starts_with("atlas_jwt=") {
-                        let jwt = header.strip_prefix("atlas_jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
+                for cookie in cookie_header.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?.split(";") {
+                    let cookie = cookie.trim();
+                    if cookie.starts_with("atlas_jwt=") {
+                        let jwt = cookie.strip_prefix("atlas_jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
                         let auth_result = if port.is_some() {
-                            authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), &mut db, true)
+                            authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), None, true)
                         } else {
-                            authenticate_jwt(jwt, &format!("devproxy-{}", uuid), &mut db, true)
+                            authenticate_jwt(jwt, &format!("devproxy-{}", uuid), None, true)
                         };
                         if auth_result.is_ok() {
                             authenticated = true;
@@ -118,6 +123,7 @@ impl ProxyHttp for DevProxy {
                 }
             }
             if port.is_none() {
+                let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().or(Err(Error::new(InternalError)))?;
                 let container: Container = containers::table.find(uuid).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
                 if container.state != ContainerState::Running as i32 {
                     authenticated = false;
@@ -201,7 +207,8 @@ fn main() {
     let mut db = DB_POOL.get().unwrap().get().unwrap();
     let webserver_host: Setting = settings::table.find("webserver_host").first(&mut db).unwrap();
     WEBSERVER_HOST.set(webserver_host.value).ok();
-    let mut server = Server::new(None).unwrap();
+    authenticate_jwt("", "", Some(&mut db), false).ok(); // Prefetch JWT_KEY
+    let mut server = Server::new_with_opt_and_conf(None, ServerConf { threads: 4, ..Default::default() });
     server.bootstrap();
     let mut proxy = http_proxy_service(&server.configuration, DevProxy);
     proxy.add_tcp("0.0.0.0:8001");

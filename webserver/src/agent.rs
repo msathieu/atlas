@@ -69,7 +69,7 @@ rm atlas-agent
 }
 pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, StatusCode> {
     let mut db = get_db()?;
-    authenticate_jwt(&query.auth, "webserver-download", &mut db, false).or(Err(StatusCode::UNAUTHORIZED))?;
+    authenticate_jwt(&query.auth, "webserver-download", Some(&mut db), false).or(Err(StatusCode::UNAUTHORIZED))?;
     if !SUPPORTED_ARCH.contains(&query.arch.as_str()) {
         return Err(StatusCode::BAD_REQUEST);
     }

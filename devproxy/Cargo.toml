@@ -15,3 +15,4 @@ shared-api = {path = "../shared-api"}
 shared-server = {path = "../shared-server"}
 uuid = "1.23.4"
 redis = "1.2.1"
+tokio = {version = "1.53.1", features = ["net"]}
