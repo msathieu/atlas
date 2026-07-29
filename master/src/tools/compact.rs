@@ -1,6 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
-use rig_core::tool::{Tool, ToolError};
+use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::Deserialize;
 use serde_json::json;
 use shared_server::schema::messages;
@@ -16,9 +16,9 @@ pub struct CompactArgs {
     message_count: u64,
 }
 
-impl Tool for CompactTool {
+impl PortableTool for CompactTool {
     const NAME: &str = "compact";
-    type Error = ToolError;
+    type Error = ToolExecutionError;
     type Args = CompactArgs;
     type Output = String;
 
@@ -35,8 +35,8 @@ impl Tool for CompactTool {
         })
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let pool = DB_POOL.get().ok_or(ToolError::ToolCallError("Database connection failed".into()))?;
-        let mut db = pool.get().map_err(|_| ToolError::ToolCallError("Database connection failed".into()))?;
+        let pool = DB_POOL.get().ok_or(ToolExecutionError::other("Database connection failed"))?;
+        let mut db = pool.get().map_err(|_| ToolExecutionError::other("Database connection failed"))?;
         diesel::update(
             messages::table.filter(
                 messages::chat
@@ -47,7 +47,7 @@ impl Tool for CompactTool {
         )
         .set(messages::compacted.eq(true))
         .execute(&mut db)
-        .map_err(|_| ToolError::ToolCallError("Updating messages failed".into()))?;
+        .map_err(|_| ToolExecutionError::other("Updating messages failed"))?;
         Ok("OK".into())
     }
 }

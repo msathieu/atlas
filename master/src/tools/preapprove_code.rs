@@ -1,6 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
-use rig_core::tool::{Tool, ToolError};
+use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::Deserialize;
 use serde_json::json;
 use shared_server::{models::PreapprovedCode, schema::preapproved_code};
@@ -15,9 +15,9 @@ pub struct PreapproveCodeArgs {
     pub code: String,
 }
 
-impl Tool for PreapproveCodeTool {
+impl PortableTool for PreapproveCodeTool {
     const NAME: &str = "preapprove_code";
-    type Error = ToolError;
+    type Error = ToolExecutionError;
     type Args = PreapproveCodeArgs;
     type Output = String;
 
@@ -34,8 +34,8 @@ impl Tool for PreapproveCodeTool {
         })
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let pool = DB_POOL.get().ok_or(ToolError::ToolCallError("Database connection failed".into()))?;
-        let mut db = pool.get().map_err(|_| ToolError::ToolCallError("Database connection failed".into()))?;
+        let pool = DB_POOL.get().ok_or(ToolExecutionError::other("Database connection failed"))?;
+        let mut db = pool.get().map_err(|_| ToolExecutionError::other("Database connection failed"))?;
         let preapproved_code: PreapprovedCode = diesel::insert_into(preapproved_code::table)
             .values(PreapprovedCode {
                 id: None,
@@ -43,8 +43,8 @@ impl Tool for PreapproveCodeTool {
                 code: args.code,
             })
             .get_result(&mut db)
-            .map_err(|_| ToolError::ToolCallError("Failed to insert into db".into()))?;
-        let code_id = preapproved_code.id.ok_or(ToolError::ToolCallError("Invalid request".into()))?;
+            .map_err(|_| ToolExecutionError::other("Failed to insert into db"))?;
+        let code_id = preapproved_code.id.ok_or(ToolExecutionError::other("Invalid request"))?;
         Ok(code_id.to_string())
     }
 }

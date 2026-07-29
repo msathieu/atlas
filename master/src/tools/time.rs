@@ -1,4 +1,4 @@
-use rig_core::tool::{Tool, ToolError};
+use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::Deserialize;
 use serde_json::json;
 use time::OffsetDateTime;
@@ -8,9 +8,9 @@ pub struct TimeTool;
 #[derive(Deserialize)]
 pub struct TimeArgs {}
 
-impl Tool for TimeTool {
+impl PortableTool for TimeTool {
     const NAME: &str = "time";
-    type Error = ToolError;
+    type Error = ToolExecutionError;
     type Args = TimeArgs;
     type Output = String;
 

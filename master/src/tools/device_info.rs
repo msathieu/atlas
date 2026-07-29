@@ -1,6 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
-use rig_core::tool::{Tool, ToolError};
+use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::Deserialize;
 use serde_json::json;
 use shared_server::{models::DeviceInfo, schema::device_info};
@@ -14,9 +14,9 @@ pub struct DeviceInfoArgs {
     info_type: String,
 }
 
-impl Tool for DeviceInfoTool {
+impl PortableTool for DeviceInfoTool {
     const NAME: &str = "device_info";
-    type Error = ToolError;
+    type Error = ToolExecutionError;
     type Args = DeviceInfoArgs;
     type Output = String;
 
@@ -34,15 +34,15 @@ impl Tool for DeviceInfoTool {
         })
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        let pool = DB_POOL.get().ok_or(ToolError::ToolCallError("Database connection failed".into()))?;
-        let mut db = pool.get().map_err(|_| ToolError::ToolCallError("Database connection failed".into()))?;
-        let device_uuid = Uuid::parse_str(&args.device).map_err(|_| ToolError::ToolCallError("Invalid device".into()))?;
+        let pool = DB_POOL.get().ok_or(ToolExecutionError::other("Database connection failed"))?;
+        let mut db = pool.get().map_err(|_| ToolExecutionError::other("Database connection failed"))?;
+        let device_uuid = Uuid::parse_str(&args.device).map_err(|_| ToolExecutionError::other("Invalid device"))?;
         let info: DeviceInfo = device_info::table
             .filter(device_info::device.eq(device_uuid).and(device_info::info_type.eq(args.info_type)))
             .get_result(&mut db)
-            .map_err(|_| ToolError::ToolCallError("Invalid device info".into()))?;
+            .map_err(|_| ToolExecutionError::other("Invalid device info"))?;
         if !info.success {
-            return Err(ToolError::ToolCallError("Obtaining device info failed".into()));
+            return Err(ToolExecutionError::other("Obtaining device info failed"));
         }
         Ok(info.data)
     }

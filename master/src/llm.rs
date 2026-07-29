@@ -1,20 +1,17 @@
-use crate::tools::{
-    compact::CompactTool, device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, preapprove_code::PreapproveCodeTool, sleep::SleepTool, summary::SummaryTool, time::TimeTool,
-};
+use crate::tools::get_toolset;
 use diesel::{
     PgConnection,
     dsl::insert_into,
     prelude::*,
     r2d2::{ConnectionManager, Pool},
 };
+use rig_agent::agent::Text;
 use rig_core::{
     OneOrMany,
-    agent::Text,
     client::CompletionClient,
-    completion::Completion,
+    completion::CompletionModel,
     message::{AssistantContent, ReasoningContent, ToolFunction, ToolResult, ToolResultContent, UserContent},
     providers::{openai, openrouter},
-    tool::builtin::ThinkTool,
 };
 use shared_api::ChatType;
 use shared_server::{
@@ -166,27 +163,6 @@ The servers you can access are: {}
 "#,
         chat_type_prompt, device_names
     );
-    let agent = client
-        .agent(&model)
-        .preamble(&preamble)
-        .tool(DeviceInfoTool)
-        .tool(EmailTool)
-        .tool(ExecuteCodeTool {
-            user: chat.uid,
-            chat: chat.id.ok_or("Invalid chat")?,
-            sequence: 0,
-            tool_call_id: "".to_string(),
-        })
-        .tool(PreapproveCodeTool { chat: chat.id.ok_or("Invalid chat")? })
-        .tool(ThinkTool)
-        .tool(TimeTool)
-        .tool(SleepTool)
-        .tool(CompactTool {
-            chat: chat.id.ok_or("Invalid chat")?,
-            sequence: 0,
-        })
-        .tool(SummaryTool { chat: chat.id.ok_or("Invalid chat")? })
-        .build();
     let mut ai_messages = Vec::new();
     for msg in messages {
         if msg.compacted {
@@ -236,7 +212,15 @@ The servers you can access are: {}
         }
     }
     let (last_ai_message, other_ai_messages) = ai_messages.split_last().ok_or("Invalid chat")?;
-    let completion = agent.completion(last_ai_message.clone(), other_ai_messages.to_vec()).await?.send().await?;
+    let toolset = get_toolset(chat.uid, chat.id.ok_or("Invalid chat")?, 0, "".to_string());
+    let completion = client
+        .completion_model(&model)
+        .completion_request(last_ai_message.clone())
+        .preamble(preamble)
+        .messages(other_ai_messages.to_vec())
+        .tools(toolset.get_tool_definitions())
+        .send()
+        .await?;
     let mut text = None;
     let mut calls = Vec::new();
     let mut reasoning = None;
@@ -250,6 +234,9 @@ The servers you can access are: {}
                 text = Some(text_part);
             }
             AssistantContent::ToolCall(call) => {
+                if !toolset.contains(call.function.name.as_str()) {
+                    return Err("Invalid tool call".into());
+                }
                 let mut consent = None;
                 if auto_approved_tools.contains(&call.function.name.as_str()) {
                     consent = Some(true);

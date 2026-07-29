@@ -1,12 +1,10 @@
-use crate::tools::{
-    compact::CompactTool, device_info::DeviceInfoTool, email::EmailTool, execute_code::ExecuteCodeTool, preapprove_code::PreapproveCodeTool, sleep::SleepTool, summary::SummaryTool, time::TimeTool,
-};
+use crate::tools::get_toolset;
 use diesel::{
     PgConnection,
     prelude::*,
     r2d2::{ConnectionManager, Pool},
 };
-use rig_core::tool::{ToolDyn, builtin::ThinkTool};
+use rig_agent::tool::ToolContext;
 use shared_server::{
     models::{Chat, ToolCall},
     notify_server,
@@ -42,38 +40,14 @@ pub async fn process_tool_calls(pool: Pool<ConnectionManager<PgConnection>>) -> 
 async fn process_tool_call(call: ToolCall, pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
     let mut db = pool.get()?;
     let chat: Chat = chats::table.filter(chats::id.eq(call.chat)).get_result(&mut db)?;
-    let mut incorrect_tool = false;
-    let tool: Box<dyn ToolDyn> = match call.tool.as_str() {
-        "device_info" => Box::new(DeviceInfoTool {}),
-        "email" => Box::new(EmailTool {}),
-        "execute_code" => Box::new(ExecuteCodeTool {
-            user: chat.uid,
-            chat: call.chat,
-            sequence: call.sequence,
-            tool_call_id: call.call_id.clone(),
-        }),
-        "preapprove_code" => Box::new(PreapproveCodeTool { chat: call.chat }),
-        "think" => Box::new(ThinkTool {}),
-        "time" => Box::new(TimeTool {}),
-        "sleep" => Box::new(SleepTool {}),
-        "compact" => Box::new(CompactTool {
-            chat: call.chat,
-            sequence: call.sequence,
-        }),
-        "summary" => Box::new(SummaryTool { chat: call.chat }),
-        _ => {
-            incorrect_tool = true;
-            Box::new(ThinkTool {})
-        }
-    };
-    let text = if incorrect_tool {
-        "Tool doesn't exist".to_string()
+    let toolset = get_toolset(chat.uid, call.chat, call.sequence, call.call_id.clone());
+    let execution = toolset.execute(&call.tool, call.request, &mut ToolContext::new()).await;
+    let text = if let Some(json) = execution.output().as_json() {
+        json.to_string()
+    } else if let Some(output) = execution.output().as_text() {
+        output.to_string()
     } else {
-        let result = tool.call(call.request).await;
-        match result {
-            Ok(result) => result,
-            Err(e) => format!("Error while executing tool: {}", e),
-        }
+        "Error while executing tool".to_string()
     };
     diesel::update(tool_calls::table.filter(tool_calls::chat.eq(call.chat).and(tool_calls::sequence.eq(call.sequence)).and(tool_calls::call_id.eq(call.call_id))))
         .set(tool_calls::response.eq(Some(text)))

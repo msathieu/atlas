@@ -1,6 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
-use rig_core::tool::{Tool, ToolError};
+use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use shared_api::{CommandLanguage, CommandOrigin};
@@ -90,9 +90,9 @@ impl ExecuteCodeTool {
         })
     }
 }
-impl Tool for ExecuteCodeTool {
+impl PortableTool for ExecuteCodeTool {
     const NAME: &str = "execute_code";
-    type Error = ToolError;
+    type Error = ToolExecutionError;
     type Args = ExecuteCodeArgs;
     type Output = ExecuteCodeOutput;
 
@@ -114,6 +114,6 @@ impl Tool for ExecuteCodeTool {
         })
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
-        self.call_internal(args).await.map_err(|e| ToolError::ToolCallError(e.to_string().into()))
+        self.call_internal(args).await.map_err(|e| ToolExecutionError::other(e.to_string()))
     }
 }

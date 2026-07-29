@@ -1,4 +1,4 @@
-use rig_core::tool::{Tool, ToolError};
+use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::Deserialize;
 use serde_json::json;
 use std::time::Duration;
@@ -11,9 +11,9 @@ pub struct SleepArgs {
     seconds: u64,
 }
 
-impl Tool for SleepTool {
+impl PortableTool for SleepTool {
     const NAME: &str = "sleep";
-    type Error = ToolError;
+    type Error = ToolExecutionError;
     type Args = SleepArgs;
     type Output = String;
 
