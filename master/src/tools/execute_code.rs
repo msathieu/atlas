@@ -6,9 +6,9 @@ use serde_json::json;
 use shared_api::{CommandLanguage, CommandOrigin};
 use shared_server::{
     get_valkey_client,
-    models::{Command, PreapprovedCode},
+    models::{Command, PreapprovedCode, User},
     notify_server,
-    schema::{commands, preapproved_code},
+    schema::{commands, preapproved_code, users},
     wait_for_pubsub_msg,
 };
 use std::{error::Error, str::FromStr, time::SystemTime};
@@ -46,6 +46,10 @@ impl ExecuteCodeTool {
         }
         let pool = DB_POOL.get().ok_or("Database connection failed")?;
         let mut db = pool.get()?;
+        let user: User = users::table.find(self.user).first(&mut db)?;
+        if !user.admin {
+            return Err("Code execution is only available to administrators".into());
+        }
         if let Some(preapproved_id) = args.preapproved_code_id {
             let preapproved_code: PreapprovedCode = preapproved_code::table.find(Uuid::from_str(&preapproved_id)?).get_result(&mut db)?;
             if preapproved_code.chat != self.chat {

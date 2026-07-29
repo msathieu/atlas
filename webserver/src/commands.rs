@@ -1,5 +1,5 @@
 use crate::{
-    auth::authenticate,
+    auth::{authenticate, require_admin},
     get_db,
     util::{convert_timestamp, sign_response, validate_signature},
 };
@@ -81,6 +81,7 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
 }
 pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateCommandResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
+    require_admin(&headers)?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateCommandRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
