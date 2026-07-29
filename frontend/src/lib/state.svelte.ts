@@ -4,6 +4,7 @@ import { API_HOST } from "./util.ts";
 
 export const wsState: { ws: WebSocket | null; connected: boolean } = $state({ ws: null, connected: false });
 export const user = $state({ username: "unknown", admin: false });
+export const mounted = $state({ mounted: false });
 
 export async function connectWS(fn?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
   if (!wsState.ws && localStorage.getItem("jwt")) {
@@ -18,7 +19,7 @@ export async function connectWS(fn?: (input: RequestInfo | URL, init?: RequestIn
       wsState.ws = null;
     });
     wsState.ws.addEventListener("message", async (msg) => {
-      if (msg.data === "POLL") {
+      if (msg.data === "POLL" && mounted.mounted) {
         await invalidateAll();
       }
       wsState.ws?.send("");

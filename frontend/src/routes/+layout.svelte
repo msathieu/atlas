@@ -4,7 +4,7 @@ import { Code, LogOut, MessageSquare, Package, Server, Settings, User, Users } f
 import { page } from "$app/state";
 import { invalidateAll } from "$app/navigation";
 import { Toaster } from "svelte-sonner";
-import { connectWS, user, wsState } from "$lib/state.svelte.ts";
+import { connectWS, mounted, user, wsState } from "$lib/state.svelte.ts";
 import { getDatabase } from "$lib/util.ts";
 import { onMount } from "svelte";
 import { App } from "@capacitor/app";
@@ -32,6 +32,7 @@ onMount(() => {
       App.exitApp();
     }
   });
+  mounted.mounted = true;
 });
 </script>
 
