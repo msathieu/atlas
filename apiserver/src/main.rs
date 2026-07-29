@@ -96,7 +96,6 @@ async fn accept_connection(listener: &TcpListener, tls_acceptor: TlsAcceptor, po
 
 async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAcceptor, pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
     let mut stream = tls_acceptor.accept(stream).await?.into();
-    let mut db = pool.get()?;
     let (_, buf) = read_message(&mut stream, Some(MessageType::HandshakeRequest)).await?;
     let handshake_request = HandshakeRequest::decode(&*buf)?;
     if handshake_request.magic != MAGIC as u64 || handshake_request.api_version != API_VERSION as u64 {
@@ -118,6 +117,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         auth_challenge: vec![],
         reset: false,
     };
+    let mut db = pool.get()?;
     if handshake_request.register_device {
         let allowed: Setting = settings::table.find("allow_new_devices").first(&mut db)?;
         if allowed.value != "true" {
@@ -167,7 +167,9 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
     let challenge: [u8; 128] = rand::random();
     handshake_response.auth_challenge = challenge.to_vec();
     write_message(MessageType::HandshakeResponse, handshake_response, &mut stream).await?;
+    drop(db);
     let (_, buf) = read_message(&mut stream, Some(MessageType::HandshakeFinish)).await?;
+    let mut db = pool.get()?;
     let handshake_finish = HandshakeFinish::decode(&*buf)?;
     let public_key = UnparsedPublicKey::new(&ED25519, &device.pubkey);
     public_key.verify(&challenge, &handshake_finish.auth_response)?;

@@ -101,6 +101,12 @@ pub async fn read_message<T: AsyncRead + Unpin>(stream: &mut T, message_type_req
     let mut buf: [u8; 8] = [0; 8];
     stream.read_exact(&mut buf).await?;
     let len = u64::from_le_bytes(buf) as usize;
+    if len > 128 * 1024 * 1024 {
+        return Err("Message too large".into());
+    }
+    if (message_type == MessageType::HandshakeRequest || message_type == MessageType::HandshakeResponse || message_type == MessageType::HandshakeFinish) && len > 1024 * 1024 {
+        return Err("Handshake message too large".into());
+    }
     let mut buf = vec![0; len];
     stream.read_exact(&mut buf).await?;
     Ok((message_type, buf))

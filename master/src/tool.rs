@@ -40,6 +40,7 @@ pub async fn process_tool_calls(pool: Pool<ConnectionManager<PgConnection>>) -> 
 async fn process_tool_call(call: ToolCall, pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
     let mut db = pool.get()?;
     let chat: Chat = chats::table.filter(chats::id.eq(call.chat)).get_result(&mut db)?;
+    drop(db);
     let toolset = get_toolset(chat.uid, call.chat, call.sequence, call.call_id.clone());
     let execution = toolset.execute(&call.tool, call.request, &mut ToolContext::new()).await;
     let text = if let Some(json) = execution.output().as_json() {
@@ -49,6 +50,7 @@ async fn process_tool_call(call: ToolCall, pool: Pool<ConnectionManager<PgConnec
     } else {
         "Error while executing tool".to_string()
     };
+    let mut db = pool.get()?;
     diesel::update(tool_calls::table.filter(tool_calls::chat.eq(call.chat).and(tool_calls::sequence.eq(call.sequence)).and(tool_calls::call_id.eq(call.call_id))))
         .set(tool_calls::response.eq(Some(text)))
         .execute(&mut db)?;

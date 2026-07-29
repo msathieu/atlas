@@ -82,7 +82,9 @@ impl ExecuteCodeTool {
         pubsub_client.subscribe(format!("MASTER:CMD:{}", cmd_id)).await?;
         diesel::update(commands::table.find(cmd_id)).set(commands::completed.eq(false)).execute(&mut db)?;
         notify_server(&format!("API:DEVICE:{}", args.device)).await?;
+        drop(db);
         wait_for_pubsub_msg(&mut receiver).await;
+        let mut db = pool.get()?;
         let cmd: Command = commands::table.find(cmd_id).get_result(&mut db)?;
         diesel::delete(commands::table.find(cmd_id)).execute(&mut db)?;
         let stdout = if args.return_stdout { cmd.stdout } else { "".to_string() };
