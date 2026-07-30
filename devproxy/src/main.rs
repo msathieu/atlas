@@ -29,6 +29,7 @@ struct RestartService;
 struct ProxyContext {
     id: Uuid,
     port: Option<u16>,
+    login_upstream: bool,
 }
 
 static DB_POOL: OnceLock<Pool<ConnectionManager<PgConnection>>> = OnceLock::new();
@@ -57,7 +58,11 @@ fn get_login_body(id: Uuid) -> Result<String> {
 impl ProxyHttp for DevProxy {
     type CTX = ProxyContext;
     fn new_ctx(&self) -> Self::CTX {
-        ProxyContext { id: Uuid::nil(), port: None }
+        ProxyContext {
+            id: Uuid::nil(),
+            port: None,
+            login_upstream: false,
+        }
     }
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> Result<Box<HttpPeer>> {
         let domain_name = format!("atlas-dev-{}.atlas.svc.cluster.local:9000", ctx.id);
@@ -162,11 +167,6 @@ impl ProxyHttp for DevProxy {
     }
     async fn upstream_request_filter(&self, session: &mut Session, upstream_request: &mut RequestHeader, ctx: &mut Self::CTX) -> Result<()> {
         let uri = &session.req_header().uri;
-        if uri.path() == "/login" {
-            upstream_request.set_method(Method::POST);
-            upstream_request.insert_header("Content-Type", "application/x-www-form-urlencoded").or(Err(Error::new(InternalError)))?;
-            upstream_request.insert_header("Content-Length", get_login_body(ctx.id)?.len()).or(Err(Error::new(InternalError)))?;
-        }
         if let Some(port) = ctx.port {
             let upstream_host = format!("{}.localhost", port);
             upstream_request.insert_header("Host", &upstream_host).or(Err(Error::new(InternalError)))?;
@@ -176,6 +176,7 @@ impl ProxyHttp for DevProxy {
                 upstream_request.insert_header("Origin", format!("https://{}", upstream_host)).or(Err(Error::new(InternalError)))?;
             }
         }
+        let mut is_logged_in = false;
         if let Some(cookie_header) = session.get_header("Cookie") {
             let mut new_cookie_header = String::new();
             for header in cookie_header.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?.split(";") {
@@ -186,14 +187,22 @@ impl ProxyHttp for DevProxy {
                     }
                     new_cookie_header.push_str(header);
                 }
+                if header.starts_with("code-server-session=") {
+                    is_logged_in = true;
+                }
             }
             upstream_request.insert_header("Cookie", new_cookie_header).or(Err(Error::new(InternalError)))?;
         }
+        if !is_logged_in && uri.path() == "/login" {
+            upstream_request.set_method(Method::POST);
+            upstream_request.insert_header("Content-Type", "application/x-www-form-urlencoded").or(Err(Error::new(InternalError)))?;
+            upstream_request.insert_header("Content-Length", get_login_body(ctx.id)?.len()).or(Err(Error::new(InternalError)))?;
+            ctx.login_upstream = true;
+        }
         Ok(())
     }
-    async fn request_body_filter(&self, session: &mut Session, body: &mut Option<Bytes>, end_of_stream: bool, ctx: &mut Self::CTX) -> Result<()> {
-        let uri = &session.req_header().uri;
-        if uri.path() == "/login" && end_of_stream {
+    async fn request_body_filter(&self, _session: &mut Session, body: &mut Option<Bytes>, end_of_stream: bool, ctx: &mut Self::CTX) -> Result<()> {
+        if ctx.login_upstream && end_of_stream {
             *body = Some(Bytes::from(get_login_body(ctx.id)?));
         }
         Ok(())
