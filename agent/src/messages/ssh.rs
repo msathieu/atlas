@@ -9,11 +9,22 @@ use ssh_agent_lib::{
     proto::{Identity, PublicCredential, SignRequest},
 };
 use ssh_key::{Algorithm, PublicKey, Signature};
-use std::{error::Error, fs::Permissions, os::unix::fs::PermissionsExt, sync::Arc, time::Duration};
+use std::{
+    error::Error,
+    fs::Permissions,
+    os::unix::fs::PermissionsExt,
+    sync::{
+        Arc, LazyLock,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 use tokio::{
     fs::{remove_file, set_permissions},
     net::{TcpStream, UnixListener},
+    select,
     sync::Mutex,
+    task::JoinHandle,
     time::sleep,
 };
 use tokio_rustls::{TlsConnector, TlsStream};
@@ -24,6 +35,17 @@ struct SSHAgent {
     stream: Arc<Mutex<TlsStream<TcpStream>>>,
 }
 
+static SSH_TASK: LazyLock<Mutex<Option<JoinHandle<()>>>> = LazyLock::new(|| Mutex::new(None));
+static SSH_HEALTHY: AtomicBool = AtomicBool::new(true);
+
+async fn sign_internal(agent: &mut SSHAgent, request: SignRequest) -> Result<Signature, Box<dyn Error>> {
+    let mut stream = agent.stream.lock().await;
+    write_message(MessageType::ForwardSSHAgentRequest, ForwardSshAgentRequest { data: request.data }, &mut *stream).await?;
+    let (_, buf) = read_message(&mut *stream, Some(MessageType::ForwardSSHAgentResponse)).await?;
+    let response = ForwardSshAgentResponse::decode(&*buf)?;
+    let signature = Signature::new(Algorithm::Ed25519, response.signature)?;
+    Ok(signature)
+}
 #[async_trait]
 impl Session for SSHAgent {
     async fn request_identities(&mut self) -> Result<Vec<Identity>, AgentError> {
@@ -36,17 +58,24 @@ impl Session for SSHAgent {
         if request.credential.key_data() != self.key.key_data() {
             return Err(AgentError::Failure);
         }
-        let mut stream = self.stream.lock().await;
-        write_message(MessageType::ForwardSSHAgentRequest, ForwardSshAgentRequest { data: request.data }, &mut *stream)
-            .await
-            .or(Err(AgentError::Failure))?;
-        let (_, buf) = read_message(&mut *stream, Some(MessageType::ForwardSSHAgentResponse)).await.or(Err(AgentError::Failure))?;
-        let response = ForwardSshAgentResponse::decode(&*buf).or(Err(AgentError::Failure))?;
-        let signature = Signature::new(Algorithm::Ed25519, response.signature).or(Err(AgentError::Failure))?;
-        Ok(signature)
+        match sign_internal(self, request).await {
+            Ok(signature) => Ok(signature),
+            Err(_) => {
+                SSH_HEALTHY.store(false, Ordering::SeqCst);
+                return Err(AgentError::Failure);
+            }
+        }
     }
 }
 
+async fn check_health() -> Result<(), Box<dyn Error>> {
+    loop {
+        if !SSH_HEALTHY.load(Ordering::SeqCst) {
+            return Err("SSH Agent is unhealthy".into());
+        }
+        sleep(Duration::from_secs(60)).await;
+    }
+}
 async fn ssh_agent(key: PublicKey, host: &str, tls_connector: &TlsConnector, db: &mut SqliteConnection) -> Result<(), Box<dyn Error>> {
     let stream = start_connection(host, tls_connector, db, HandshakePurpose::SSHAgent).await?.ok_or("Invalid device state")?;
     let path = "/run/ssh.sock";
@@ -57,7 +86,11 @@ async fn ssh_agent(key: PublicKey, host: &str, tls_connector: &TlsConnector, db:
         key,
         stream: Arc::new(Mutex::new(stream)),
     };
-    listen(listener, agent).await?;
+    SSH_HEALTHY.store(true, Ordering::SeqCst);
+    select! {
+        result = listen(listener, agent) => result?,
+        result = check_health() => result?,
+    };
     Ok(())
 }
 async fn ssh_agent_task(key: PublicKey, host: String, tls_connector: TlsConnector) -> Result<(), Box<dyn Error>> {
@@ -70,10 +103,14 @@ async fn ssh_agent_task(key: PublicKey, host: String, tls_connector: TlsConnecto
     }
 }
 pub async fn handle_ssh_agent(msg: StartSshAgentRequest, stream: &mut TlsStream<TcpStream>, host: String, tls_connector: TlsConnector) -> Result<(), Box<dyn Error>> {
+    if let Some(ssh_task) = SSH_TASK.lock().await.as_ref() {
+        ssh_task.abort();
+    }
     let public_key = PublicKey::from_openssh(&msg.key)?;
-    tokio::spawn(async {
+    let task = tokio::spawn(async {
         ssh_agent_task(public_key, host, tls_connector).await.unwrap();
     });
+    *SSH_TASK.lock().await = Some(task);
     write_message(MessageType::StartSSHAgentResponse, StartSshAgentResponse {}, stream).await?;
     Ok(())
 }
