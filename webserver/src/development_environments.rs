@@ -169,7 +169,7 @@ pub async fn start_development_environment(headers: HeaderMap, Path(id): Path<Uu
         .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
         .0
-        .set_ex(key, true, 4 * 60 * 60)
+        .set_ex(key, true, 16 * 60 * 60)
         .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     diesel::update(

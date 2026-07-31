@@ -28,11 +28,6 @@ async function deleteEnvironment(id: string) {
     method: "DELETE",
   });
 }
-async function startEnvironment(id: string) {
-  await authenticatedFetch(`/api/development_environments/${id}/start`, {
-    method: "POST",
-  });
-}
 async function stopEnvironment(id: string) {
   await authenticatedFetch(`/api/development_environments/${id}/stop`, {
     method: "POST",
@@ -83,7 +78,7 @@ async function openDevelopmentEnvironment(id: string) {
         <td>{environment.branch}</td>
         <td>{formatTime(environment.created_at)}</td>
         <td>
-          {#if !environment.pending && environment.state === "Running"}
+          {#if !environment.pending}
             <button
               class="btn"
               onclick={async (e) => {
@@ -93,6 +88,8 @@ async function openDevelopmentEnvironment(id: string) {
             >
               <ExternalLink />
             </button>
+          {/if}
+          {#if !environment.pending && (environment.state === "Running" || environment.state === "Started")}
             <button
               class="btn"
               onclick={async (e) => {
@@ -101,17 +98,6 @@ async function openDevelopmentEnvironment(id: string) {
               }}
             >
               <Power />
-            </button>
-          {/if}
-          {#if !environment.pending && environment.state === "Stopped"}
-            <button
-              class="btn"
-              onclick={async (e) => {
-                e.stopPropagation();
-                await startEnvironment(environment.id);
-              }}
-            >
-              <Play />
             </button>
           {/if}
         </td>

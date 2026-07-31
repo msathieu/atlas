@@ -105,6 +105,7 @@ impl ProxyHttp for DevProxy {
             }
             let cookie = format!("atlas_jwt={}; HttpOnly; Secure; SameSite=Strict", jwt);
             response.append_header("Set-Cookie", cookie).or(Err(Error::new(InternalError)))?;
+            response.append_header("Set-Cookie", "code-server-session=; Max-Age=-1").or(Err(Error::new(InternalError)))?;
             response.insert_header("Location", "/").or(Err(Error::new(InternalError)))?;
             session.write_response_header(Box::new(response), false).await.or(Err(Error::new(InternalError)))?;
             return Ok(true);
@@ -159,7 +160,7 @@ impl ProxyHttp for DevProxy {
                 .get()
                 .ok_or(Error::new(InternalError))?
                 .clone()
-                .set_ex(key, true, 4 * 60 * 60)
+                .set_ex(key, true, 16 * 60 * 60)
                 .await
                 .or(Err(Error::new(InternalError)))?;
         }
@@ -193,7 +194,7 @@ impl ProxyHttp for DevProxy {
             }
             upstream_request.insert_header("Cookie", new_cookie_header).or(Err(Error::new(InternalError)))?;
         }
-        if !is_logged_in && uri.path() == "/login" {
+        if (!is_logged_in || ctx.port.is_none()) && uri.path() == "/login" {
             upstream_request.set_method(Method::POST);
             upstream_request.insert_header("Content-Type", "application/x-www-form-urlencoded").or(Err(Error::new(InternalError)))?;
             upstream_request.insert_header("Content-Length", get_login_body(ctx.id)?.len()).or(Err(Error::new(InternalError)))?;
