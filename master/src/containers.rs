@@ -236,6 +236,16 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value: Some(format!("https://{}-{}.devproxy.{}", development_environment.id, "{{port}}", webserver.value)),
                 value_from: None,
             });
+            envs.push(EnvVar {
+                name: "ATLAS_REPO_URL".to_string(),
+                value: Some(development_environment.repo.unwrap_or("".to_string())),
+                value_from: None,
+            });
+            envs.push(EnvVar {
+                name: "ATLAS_REPO_BRANCH".to_string(),
+                value: Some(development_environment.branch.unwrap_or("".to_string())),
+                value_from: None,
+            });
         }
         let mut security_context = SecurityContext {
             run_as_user: Some(0),

@@ -2,6 +2,8 @@ import os
 import re
 import subprocess
 import time
+import urllib.error
+import urllib.request
 
 
 def run_command(cmd: str, user: str | None = None):
@@ -34,3 +36,16 @@ print(password, end="")
 for i in os.getenv("CODE_SERVER_EXTENSIONS", "").split(","):
     if i:
         run_command(f"HOME=/home/coder code-server --install-extension {i} > /dev/null 2>&1", "coder")
+if os.getenv("ATLAS_REPO_URL") and not os.path.exists("/state/project/.git"):
+    branch = ""
+    if os.getenv("ATLAS_REPO_BRANCH"):
+        branch = f"-b {os.getenv('ATLAS_REPO_BRANCH')}"
+    run_command(f"git clone {os.getenv('ATLAS_REPO_URL')} {branch} /state/project", "coder")
+while True:
+    try:
+        with urllib.request.urlopen("http://localhost:9000", timeout=2) as response:
+            if response.status == 200:
+                break
+    except urllib.error.URLError, TimeoutError:
+        pass
+    time.sleep(1)
