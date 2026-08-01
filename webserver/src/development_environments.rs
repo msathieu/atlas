@@ -114,6 +114,8 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
         state: ContainerState::NonExistent as i32,
         requested_state: ContainerState::Stopped as i32,
         image: image.value,
+        storage_size: 25,
+        memory_limit: 16,
     };
     let mut id = Uuid::nil();
     let repo = if request.repo.is_empty() { None } else { Some(request.repo) };

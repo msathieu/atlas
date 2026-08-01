@@ -64,6 +64,10 @@ pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), Stat
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::UNAUTHORIZED))?;
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::UNAUTHORIZED))?;
     let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
+    diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .set(users::last_login.eq(Some(SystemTime::now())))
+        .execute(&mut db)
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let response = LoginResponse { jwt };
     Ok((sign_response(format!("login-{}", BASE64_STANDARD.encode(Sha512::digest(body))), Some(&response))?, Json(response)))
 }

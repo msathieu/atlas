@@ -1,7 +1,7 @@
 <script lang="ts">
 import { Check, Plus, Trash, X } from "@lucide/svelte";
 import { authenticatedFetch } from "$lib/auth.ts";
-import { encryptToServer } from "$lib/util.ts";
+import { encryptToServer, formatTime } from "$lib/util.ts";
 
 let { data } = $props();
 let selectedUser: any = $state();
@@ -46,6 +46,7 @@ async function deleteUser(id: string) {
       <th>Username</th>
       <th>Enabled</th>
       <th>Password Enabled</th>
+      <th>Last Login</th>
     </tr>
   </thead>
   <tbody>
@@ -77,6 +78,13 @@ async function deleteUser(id: string) {
             <Check />
           {:else}
             <X />
+          {/if}
+        </td>
+        <td>
+          {#if user.last_login}
+            {formatTime(user.last_login)}
+          {:else}
+            Never
           {/if}
         </td>
       </tr>
@@ -121,6 +129,16 @@ async function deleteUser(id: string) {
           <tr>
             <td>Password Enabled</td>
             <td>{selectedUser.password_enabled}</td>
+          </tr>
+          <tr>
+            <td>Last Login</td>
+            <td>
+              {#if selectedUser.last_login}
+                {formatTime(selectedUser.last_login)}
+              {:else}
+                Never
+              {/if}
+            </td>
           </tr>
         </tbody>
       </table>

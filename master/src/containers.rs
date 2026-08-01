@@ -110,7 +110,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         let mut pvc = PersistentVolumeClaim::default();
         pvc.metadata.name = Some(pvc_name);
         let mut resources = BTreeMap::new();
-        resources.insert("storage".to_string(), Quantity("25Gi".to_string()));
+        resources.insert("storage".to_string(), Quantity(format!("{}Gi", container.storage_size)));
         pvc.spec = Some(PersistentVolumeClaimSpec {
             access_modes: Some(vec!["ReadWriteOncePod".to_string()]),
             storage_class_name: Some(storageclass.value),
@@ -137,6 +137,12 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             });
             service_api.create(&PostParams::default(), &service).await?;
             pvc.metadata.name = Some(nix_pvc_name);
+            let mut resources = BTreeMap::new();
+            resources.insert("storage".to_string(), Quantity("25Gi".to_string()));
+            pvc.spec.as_mut().ok_or("Invalid PVC")?.resources = Some(VolumeResourceRequirements {
+                limits: None,
+                requests: Some(resources),
+            });
             pvc_api.create(&PostParams::default(), &pvc).await?;
         }
         notify_server("WEB:REFRESH").await?;
@@ -237,6 +243,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             ..Default::default()
         };
         let mut limits = BTreeMap::new();
+        let mut requests = BTreeMap::new();
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db)?;
             if development_environment.nested_containers {
@@ -249,6 +256,10 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 limits.insert("devic.es/tun".to_string(), Quantity("1".to_string()));
             }
         }
+        limits.insert("memory".to_string(), Quantity(format!("{}Gi", container.memory_limit)));
+        requests.insert("memory".to_string(), Quantity("1Gi".to_string()));
+        limits.insert("ephemeral-storage".to_string(), Quantity("64Gi".to_string()));
+        requests.insert("ephemeral-storage".to_string(), Quantity("4Gi".to_string()));
         let k8s_container = k8s_openapi::api::core::v1::Container {
             name: "main".to_string(),
             image: Some(container.image),
@@ -259,7 +270,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             resources: Some(ResourceRequirements {
                 claims: None,
                 limits: Some(limits),
-                requests: None,
+                requests: Some(requests),
             }),
             ..Default::default()
         };

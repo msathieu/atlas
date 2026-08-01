@@ -46,6 +46,8 @@ diesel::table! {
         created_at -> Timestamp,
         image -> Varchar,
         requested_state -> Int4,
+        storage_size -> Int4,
+        memory_limit -> Int4,
     }
 }
 
@@ -155,6 +157,7 @@ diesel::table! {
         admin -> Bool,
         enabled -> Bool,
         password_enabled -> Bool,
+        last_login -> Nullable<Timestamp>,
     }
 }
 

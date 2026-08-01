@@ -77,6 +77,7 @@ pub struct User {
     pub admin: bool,
     pub enabled: bool,
     pub password_enabled: bool,
+    pub last_login: Option<SystemTime>,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
@@ -164,6 +165,8 @@ pub struct Container {
     pub created_at: SystemTime,
     pub image: String,
     pub requested_state: i32,
+    pub storage_size: i32,
+    pub memory_limit: i32,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]

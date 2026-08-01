@@ -9,7 +9,8 @@ CREATE TABLE users(
     jwt_counter integer NOT NULL,
     admin boolean NOT NULL,
     enabled boolean NOT NULL,
-    password_enabled boolean NOT NULL
+    password_enabled boolean NOT NULL,
+    last_login timestamp
 );
 CREATE TABLE chats(
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -72,7 +73,9 @@ CREATE TABLE containers(
     state integer NOT NULL,
     created_at timestamp NOT NULL,
     image varchar NOT NULL,
-    requested_state integer NOT NULL
+    requested_state integer NOT NULL,
+    storage_size integer NOT NULL,
+    memory_limit integer NOT NULL
 );
 CREATE TABLE devices(
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

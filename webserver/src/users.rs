@@ -1,7 +1,7 @@
 use crate::auth::require_admin;
 use crate::get_db;
 use crate::user::MIN_PASSWORD_LENGTH;
-use crate::util::{decrypt_body, sign_response, validate_signature};
+use crate::util::{convert_timestamp, decrypt_body, sign_response, validate_signature};
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{OriginalUri, Path};
@@ -20,6 +20,7 @@ pub struct APIUser {
     admin: bool,
     enabled: bool,
     password_enabled: bool,
+    last_login: Option<u64>,
 }
 #[derive(Deserialize)]
 pub struct CreateUserRequest {
@@ -46,6 +47,7 @@ pub async fn users_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Re
                 admin: user.admin,
                 enabled: user.enabled,
                 password_enabled: user.password_enabled,
+                last_login: user.last_login.map(|timestamp| convert_timestamp(timestamp).unwrap_or(0)),
             })
         })
         .collect();
@@ -77,6 +79,7 @@ pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
         admin: request.admin,
         enabled: true,
         password_enabled: true,
+        last_login: None,
     };
     user = diesel::insert_into(users::table).values(user).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

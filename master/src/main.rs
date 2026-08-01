@@ -341,6 +341,7 @@ fn create_settings(db: &mut PgConnection) {
                     jwt_counter: 0,
                     enabled: true,
                     password_enabled: true,
+                    last_login: None,
                 })
                 .execute(db)?;
             println!("Initial Credentials: admin / {}", password);

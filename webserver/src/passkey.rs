@@ -214,6 +214,10 @@ pub async fn finish_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Js
         ))
         .execute(&mut db)
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    diesel::update(users::table.find(uid))
+        .set(users::last_login.eq(Some(SystemTime::now())))
+        .execute(&mut db)
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
     let response = FinishPasskeyAuthenticationResponse { jwt };
