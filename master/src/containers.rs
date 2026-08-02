@@ -89,7 +89,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         }
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let key = format!("DEVELOPMENT_ENVIRONMENT:{}", container_id);
-            let exists: bool = get_valkey_client().await?.0.exists(key).await?;
+            let exists = get_valkey_client().await?.0.exists(key).await?;
             if !exists {
                 request_stop = true;
             }

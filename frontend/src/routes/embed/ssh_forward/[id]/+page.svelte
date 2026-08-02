@@ -3,7 +3,7 @@ import { authenticatedFetch } from "$lib/auth.ts";
 let { data, params } = $props();
 
 async function approveRequest(approved: boolean) {
-  await authenticatedFetch(`/api/development_environments/ssh_forward/${params.id}`, {
+  await authenticatedFetch(`/api/development_environments/ssh_forward/approve/${params.id}`, {
     method: "POST",
     body: JSON.stringify({ approved }),
   });

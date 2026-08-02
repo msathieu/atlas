@@ -10,7 +10,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use diesel::prelude::*;
-use redis::AsyncTypedCommands;
+use redis::{AsyncTypedCommands, ExistenceCheck, SetExpiry, SetOptions};
 use serde::{Deserialize, Serialize};
 use shared_api::{ContainerOrigin, ContainerState};
 use shared_server::{
@@ -263,7 +263,7 @@ pub async fn open_development_environment(
 }
 pub async fn get_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<GetSSHForwardRequestResponse>), StatusCode> {
     let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db()?;
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
     let development_environment_id: String = valkey_client
@@ -279,6 +279,14 @@ pub async fn get_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid>, u
         .filter(containers::id.eq(development_environment.id).and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
         .first::<Container>(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
+    let requested_key = format!("SSH_FORWARD_REQUESTED:{}", id);
+    let exists = valkey_client
+        .set_options(requested_key, "", SetOptions::default().conditional_set(ExistenceCheck::NX).with_expiration(SetExpiry::EX(60)))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    if exists.is_none() {
+        return Err(StatusCode::NOT_FOUND);
+    }
     let response = GetSSHForwardRequestResponse {
         development_environment_id: development_environment.id,
         name: development_environment.name,

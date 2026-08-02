@@ -26,7 +26,7 @@ async fn validate_nonce(nonce: Uuid) -> Result<(), StatusCode> {
         VALKEY_POOL.set(client.0).ok();
     }
     let key = format!("NONCE:{}", nonce);
-    let exists: Option<String> = VALKEY_POOL
+    let exists = VALKEY_POOL
         .get()
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
         .clone()

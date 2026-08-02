@@ -127,8 +127,8 @@ async fn main() {
         .route("/api/development_environments/{id}/open", post(open_development_environment))
         .route("/api/development_environments/{id}/start", post(start_development_environment))
         .route("/api/development_environments/{id}/stop", post(stop_development_environment))
-        .route("/api/development_environments/ssh_forward/{id}", get(get_ssh_forward_request))
-        .route("/api/development_environments/ssh_forward/{id}", post(approve_ssh_forward_request))
+        .route("/api/development_environments/ssh_forward/{id}", post(get_ssh_forward_request))
+        .route("/api/development_environments/ssh_forward/approve/{id}", post(approve_ssh_forward_request))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any).expose_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();
