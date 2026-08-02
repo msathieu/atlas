@@ -8,7 +8,7 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode, Uri},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
-use redis::{AsyncCommands, ExistenceCheck, SetExpiry, SetOptions};
+use redis::{AsyncTypedCommands, ExistenceCheck, SetExpiry, SetOptions};
 use serde::Serialize;
 use sha2::{Digest, Sha512};
 use shared_server::get_valkey_client;

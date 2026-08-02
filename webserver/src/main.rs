@@ -6,7 +6,8 @@ use crate::{
     chat::{chats_list, create_chat, delete_chat, delete_message, get_chat, manage_tool_call_consent, send_message},
     commands::{commands_list, create_command, delete_command},
     development_environments::{
-        create_development_environment, delete_development_environment, development_environments_list, open_development_environment, start_development_environment, stop_development_environment,
+        approve_ssh_forward_request, create_development_environment, delete_development_environment, development_environments_list, get_ssh_forward_request, open_development_environment,
+        start_development_environment, stop_development_environment,
     },
     devices::{approve_device, delete_device, devices_list},
     info::{assetlinks, server_info},
@@ -126,6 +127,8 @@ async fn main() {
         .route("/api/development_environments/{id}/open", post(open_development_environment))
         .route("/api/development_environments/{id}/start", post(start_development_environment))
         .route("/api/development_environments/{id}/stop", post(stop_development_environment))
+        .route("/api/development_environments/ssh_forward/{id}", get(get_ssh_forward_request))
+        .route("/api/development_environments/ssh_forward/{id}", post(approve_ssh_forward_request))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any).expose_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();

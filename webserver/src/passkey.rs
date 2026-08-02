@@ -12,7 +12,7 @@ use axum::{
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
-use redis::AsyncCommands;
+use redis::AsyncTypedCommands;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 use shared_server::{
@@ -105,7 +105,7 @@ pub async fn start_passkey_registration(headers: HeaderMap, uri: OriginalUri, bo
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
     let key = format!("PASSKEY_REGISTRATION:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?);
     let registration_json = serde_json::to_string(&registration).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let _: Option<String> = valkey_client.set_ex(key, registration_json, 300).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    valkey_client.set_ex(key, registration_json, 300).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok((sign_response(signature, Some(&challenge))?, Json(challenge)))
 }
 pub async fn finish_passkey_registration(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
@@ -181,7 +181,7 @@ pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Jso
     let key = format!("PASSKEY_AUTHENTICATION:{}", flow_id);
     let authentication_data = PasskeyAuthenticationValkey { authentication, uid };
     let authentication_json = serde_json::to_string(&authentication_data).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let _: Option<String> = valkey_client.set_ex(key, authentication_json, 300).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    valkey_client.set_ex(key, authentication_json, 300).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let response = StartPasskeyAuthenticationResponse { challenge, flow_id };
     Ok((
         sign_response(format!("passkey_start-{}", BASE64_STANDARD.encode(Sha512::digest(body))), Some(&response))?,

@@ -55,6 +55,15 @@ pub struct OpenDevelopmentEnvironmentResponse {
 pub struct OpenDevelopmentEnvironmentRequest {
     port: Option<u16>,
 }
+#[derive(Serialize)]
+pub struct GetSSHForwardRequestResponse {
+    development_environment_id: Uuid,
+    name: String,
+}
+#[derive(Deserialize)]
+pub struct ApproveSSHForwardRequestRequest {
+    approved: bool,
+}
 
 pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIDevelopmentEnvironment>>), StatusCode> {
     let user = authenticate(&headers)?.0;
@@ -251,4 +260,53 @@ pub async fn open_development_environment(
     };
     let response = OpenDevelopmentEnvironmentResponse { url, ready };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
+}
+pub async fn get_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<GetSSHForwardRequestResponse>), StatusCode> {
+    let user = authenticate(&headers)?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
+    let mut db = get_db()?;
+    let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
+    let development_environment_id: String = valkey_client
+        .get(format!("SSH_FORWARD:{}", id))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let development_environment: DevelopmentEnvironment = development_environments::table
+        .find(Uuid::parse_str(&development_environment_id).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?)
+        .first(&mut db)
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    containers::table
+        .filter(containers::id.eq(development_environment.id).and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
+        .first::<Container>(&mut db)
+        .or(Err(StatusCode::NOT_FOUND))?;
+    let response = GetSSHForwardRequestResponse {
+        development_environment_id: development_environment.id,
+        name: development_environment.name,
+    };
+    Ok((sign_response(signature, Some(&response))?, Json(response)))
+}
+pub async fn approve_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+    let user = authenticate(&headers)?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
+    let request: ApproveSSHForwardRequestRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
+    let mut db = get_db()?;
+    let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
+    let development_environment_id: String = valkey_client
+        .get(format!("SSH_FORWARD:{}", id))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    containers::table
+        .filter(
+            containers::id
+                .eq(Uuid::parse_str(&development_environment_id).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?)
+                .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)),
+        )
+        .first::<Container>(&mut db)
+        .or(Err(StatusCode::NOT_FOUND))?;
+    let data = if request.approved { "APPROVED" } else { "DENIED" };
+    let valkey_key = format!("SSH_FORWARD_APPROVAL:{}", id);
+    valkey_client.set_ex(valkey_key, data, 15).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("API:SSH_FORWARD:{}", id)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    sign_response::<String>(signature, None)
 }

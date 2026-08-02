@@ -4,10 +4,10 @@
   "version": "0.0.1",
   "type": "module",
   "devDependencies": {
-    "@capacitor/android": "^8.4.2",
+    "@capacitor/android": "^8.5.0",
     "@capacitor/app": "^8.1.1",
-    "@capacitor/cli": "^8.4.2",
-    "@capacitor/core": "^8.4.2",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
     "@capawesome/capacitor-passkeys": "^0.1.1",
     "@lucide/svelte": "^1.28.0",
     "@sveltejs/adapter-static": "^3.0.10",

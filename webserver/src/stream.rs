@@ -45,11 +45,15 @@ async fn stream_wrapper(socket: WebSocket) {
     stream_handler(socket).await.ok();
 }
 async fn stream_handler(mut socket: WebSocket) -> Result<(), Box<dyn Error>> {
-    let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
-    pubsub_client.subscribe("WEB:REFRESH").await?;
+    let (mut valkey_client, mut receiver) = get_valkey_client().await?;
+    valkey_client.subscribe("WEB:REFRESH").await?;
     loop {
-        if timeout(Duration::from_secs(30), async { wait_for_pubsub_msg(&mut receiver).await }).await.is_ok() {
-            socket.send("POLL".into()).await?;
+        if let Ok(data) = timeout(Duration::from_secs(30), async { wait_for_pubsub_msg(&mut receiver).await }).await {
+            if data.starts_with("SSH_FORWARD:") {
+                socket.send(data.into()).await?;
+            } else {
+                socket.send("POLL".into()).await?;
+            }
         } else {
             socket.send("".into()).await?;
         }

@@ -1,4 +1,5 @@
 import { invalidateAll } from "$app/navigation";
+import { page } from "$app/state";
 import { authenticatedFetch } from "./auth.ts";
 import { API_HOST } from "./util.ts";
 
@@ -19,8 +20,14 @@ export async function connectWS(fn?: (input: RequestInfo | URL, init?: RequestIn
       wsState.ws = null;
     });
     wsState.ws.addEventListener("message", async (msg) => {
+      const sshPrefix = "SSH_FORWARD:";
       if (msg.data === "POLL" && mounted.mounted) {
         await invalidateAll();
+      } else if (msg.data.startsWith(sshPrefix)) {
+        if (!page.url.pathname.startsWith("/embed/")) {
+          const signingId = msg.data.slice(sshPrefix.length);
+          globalThis.open(`/embed/ssh_forward/${signingId}`, "_blank", "popup");
+        }
       }
       wsState.ws?.send("");
     });

@@ -13,17 +13,14 @@ use std::{
     error::Error,
     fs::Permissions,
     os::unix::fs::PermissionsExt,
-    sync::{
-        Arc, LazyLock,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, LazyLock},
     time::Duration,
 };
 use tokio::{
     fs::{remove_file, set_permissions},
     net::{TcpStream, UnixListener},
     select,
-    sync::Mutex,
+    sync::{Mutex, Notify},
     task::JoinHandle,
     time::sleep,
 };
@@ -36,7 +33,7 @@ struct SSHAgent {
 }
 
 static SSH_TASK: LazyLock<Mutex<Option<JoinHandle<()>>>> = LazyLock::new(|| Mutex::new(None));
-static SSH_HEALTHY: AtomicBool = AtomicBool::new(true);
+static SSH_HEALTH_NOTIFY: Notify = Notify::const_new();
 
 async fn sign_internal(agent: &mut SSHAgent, request: SignRequest) -> Result<Signature, Box<dyn Error>> {
     let mut stream = agent.stream.lock().await;
@@ -61,7 +58,7 @@ impl Session for SSHAgent {
         match sign_internal(self, request).await {
             Ok(signature) => Ok(signature),
             Err(_) => {
-                SSH_HEALTHY.store(false, Ordering::SeqCst);
+                SSH_HEALTH_NOTIFY.notify_one();
                 return Err(AgentError::Failure);
             }
         }
@@ -69,12 +66,8 @@ impl Session for SSHAgent {
 }
 
 async fn check_health() -> Result<(), Box<dyn Error>> {
-    loop {
-        if !SSH_HEALTHY.load(Ordering::SeqCst) {
-            return Err("SSH Agent is unhealthy".into());
-        }
-        sleep(Duration::from_secs(60)).await;
-    }
+    SSH_HEALTH_NOTIFY.notified().await;
+    Err("SSH Agent is unhealthy".into())
 }
 async fn ssh_agent(key: PublicKey, host: &str, tls_connector: &TlsConnector, db: &mut SqliteConnection) -> Result<(), Box<dyn Error>> {
     let stream = start_connection(host, tls_connector, db, HandshakePurpose::SSHAgent).await?.ok_or("Invalid device state")?;
@@ -86,7 +79,6 @@ async fn ssh_agent(key: PublicKey, host: &str, tls_connector: &TlsConnector, db:
         key,
         stream: Arc::new(Mutex::new(stream)),
     };
-    SSH_HEALTHY.store(true, Ordering::SeqCst);
     select! {
         result = listen(listener, agent) => result?,
         result = check_health() => result?,

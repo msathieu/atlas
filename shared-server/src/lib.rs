@@ -17,7 +17,7 @@ use diesel::{
 use diesel::{prelude::*, r2d2::PooledConnection};
 use jsonwebtoken::{DecodingKey, Validation, decode};
 use rand::random_range;
-use redis::{AsyncCommands, PushInfo, PushKind, RedisError, aio::ConnectionManagerConfig};
+use redis::{AsyncTypedCommands, Msg, PushInfo, PushKind, RedisError, aio::ConnectionManagerConfig};
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error, process::exit, sync::OnceLock, time::Duration};
 use tokio::{
@@ -70,19 +70,27 @@ pub async fn get_valkey_client() -> Result<(redis::aio::ConnectionManager, Unbou
     Ok((manager, rx))
 }
 pub async fn notify_server(channel: &str) -> Result<(), Box<dyn Error>> {
+    notify_server_with_msg(channel, "").await
+}
+pub async fn notify_server_with_msg(channel: &str, msg: &str) -> Result<(), Box<dyn Error>> {
     if PUBSUB_POOL.get().is_none() {
         let client = get_valkey_client().await?;
         PUBSUB_POOL.set(client.0).ok();
     }
-    PUBSUB_POOL.get().ok_or("Failed to get pubsub client")?.clone().publish::<&str, &str, ()>(channel, "").await?;
+    PUBSUB_POOL.get().ok_or("Failed to get pubsub client")?.clone().publish::<&str, &str>(channel, msg).await?;
     Ok(())
 }
-pub async fn wait_for_pubsub_msg(receiver: &mut UnboundedReceiver<PushInfo>) {
+pub async fn wait_for_pubsub_msg(receiver: &mut UnboundedReceiver<PushInfo>) -> String {
     loop {
-        if let Some(msg) = receiver.recv().await
-            && msg.kind == PushKind::Message
+        if let Some(push_info) = receiver.recv().await
+            && push_info.kind == PushKind::Message
         {
-            return;
+            if let Some(msg) = Msg::from_push_info(push_info)
+                && let Ok(payload) = msg.get_payload::<String>()
+            {
+                return payload;
+            }
+            return "".into();
         }
     }
 }

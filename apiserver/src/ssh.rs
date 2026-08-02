@@ -3,6 +3,7 @@ use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 use diesel::r2d2::PooledConnection;
 use prost::Message;
+use redis::AsyncTypedCommands;
 use shared_api::ForwardSshAgentRequest;
 use shared_api::ForwardSshAgentResponse;
 use shared_api::HeartbeatRequest;
@@ -10,17 +11,36 @@ use shared_api::MessageType;
 use shared_api::handle_heartbeat;
 use shared_api::read_message;
 use shared_api::write_message;
+use shared_server::get_valkey_client;
 use shared_server::models::DevelopmentEnvironment;
+use shared_server::notify_server_with_msg;
 use shared_server::schema::development_environments;
+use shared_server::wait_for_pubsub_msg;
 use shared_server::{models::Device, schema::devices};
 use signature::Signer;
 use ssh_key::PrivateKey;
 use std::error::Error;
+use std::time::Duration;
 use tokio::net::TcpStream;
+use tokio::time::timeout;
 use tokio_rustls::TlsStream;
 use uuid::Uuid;
 
-pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStream<TcpStream>, key: &PrivateKey) -> Result<(), Box<dyn Error>> {
+pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStream<TcpStream>, key: &PrivateKey, environment_uuid: Uuid) -> Result<(), Box<dyn Error>> {
+    let (mut valkey_client, mut receiver) = get_valkey_client().await?;
+    let signing_id = Uuid::new_v4();
+    let valkey_key = format!("SSH_FORWARD:{}", signing_id);
+    valkey_client.set_ex(valkey_key, environment_uuid.to_string(), 60).await.or(Err("Failed to set valkey key"))?;
+    valkey_client.subscribe(format!("API:SSH_FORWARD:{}", signing_id)).await?;
+    notify_server_with_msg("WEB:REFRESH", &format!("SSH_FORWARD:{}", signing_id)).await?;
+    if timeout(Duration::from_secs(60), async { wait_for_pubsub_msg(&mut receiver).await }).await.is_err() {
+        return Err("Timeout waiting for user approval".into());
+    }
+    let response_key = format!("SSH_FORWARD_APPROVAL:{}", signing_id);
+    let response: Option<String> = valkey_client.get(&response_key).await.or(Err("Failed to get response from valkey"))?;
+    if response != Some("APPROVED".to_string()) {
+        return Err("User did not approve SSH forwarding".into());
+    }
     let signature = key.try_sign(&msg.data)?;
     let response = ForwardSshAgentResponse {
         signature: signature.as_bytes().to_vec(),
@@ -40,7 +60,7 @@ pub async fn handle_ssh_agent(mut stream: TlsStream<TcpStream>, mut db: PooledCo
         let (message_type, buf) = read_message(&mut stream, None).await?;
         match message_type {
             MessageType::HeartbeatRequest => handle_heartbeat(HeartbeatRequest::decode(&*buf)?, &mut stream).await,
-            MessageType::ForwardSSHAgentRequest => handle_ssh_forward(ForwardSshAgentRequest::decode(&*buf)?, &mut stream, &private_key).await,
+            MessageType::ForwardSSHAgentRequest => handle_ssh_forward(ForwardSshAgentRequest::decode(&*buf)?, &mut stream, &private_key, development_environment.id).await,
             _ => return Err("Invalid message type".into()),
         }?
     }

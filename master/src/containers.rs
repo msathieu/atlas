@@ -13,7 +13,7 @@ use k8s_openapi::api::core::v1::{
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use kube::api::{AttachParams, DeleteParams, PostParams};
 use kube::{Api, Client};
-use redis::AsyncCommands;
+use redis::AsyncTypedCommands;
 use shared_api::{CommandLanguage, CommandOrigin, ContainerOrigin, ContainerState};
 use shared_server::binary::personalize_binary;
 use shared_server::models::{Command, Container, DevelopmentEnvironment, Device, Setting};
@@ -89,8 +89,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         }
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let key = format!("DEVELOPMENT_ENVIRONMENT:{}", container_id);
-            let exists: usize = get_valkey_client().await?.0.exists(key).await?;
-            if exists == 0 {
+            let exists: bool = get_valkey_client().await?.0.exists(key).await?;
+            if !exists {
                 request_stop = true;
             }
         }
@@ -236,16 +236,20 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value: Some(format!("https://{}-{}.devproxy.{}", development_environment.id, "{{port}}", webserver.value)),
                 value_from: None,
             });
-            envs.push(EnvVar {
-                name: "ATLAS_REPO_URL".to_string(),
-                value: Some(development_environment.repo.unwrap_or("".to_string())),
-                value_from: None,
-            });
-            envs.push(EnvVar {
-                name: "ATLAS_REPO_BRANCH".to_string(),
-                value: Some(development_environment.branch.unwrap_or("".to_string())),
-                value_from: None,
-            });
+            if let Some(repo) = development_environment.repo {
+                envs.push(EnvVar {
+                    name: "ATLAS_REPO_URL".to_string(),
+                    value: Some(repo),
+                    value_from: None,
+                });
+            }
+            if let Some(branch) = development_environment.branch {
+                envs.push(EnvVar {
+                    name: "ATLAS_REPO_BRANCH".to_string(),
+                    value: Some(branch),
+                    value_from: None,
+                });
+            }
         }
         let mut security_context = SecurityContext {
             run_as_user: Some(0),
