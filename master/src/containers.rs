@@ -419,7 +419,10 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             || container.requested_state == ContainerState::NonExistent as i32)
     {
         let pod_api: Api<Pod> = Api::namespaced(client, namespace);
-        if pod_api.get_opt(&container_name).await?.is_some() {
+        if let Some(pod) = pod_api.get_opt(&container_name).await?
+            && let Some(status) = pod.status
+            && status.phase == Some("Running".to_string())
+        {
             let mut process = pod_api.exec(&container_name, vec!["/usr/bin/killall", "-9", "atlas-agent"], &AttachParams::default()).await?;
             process.take_status().ok_or("Invalid process")?.await;
             process.join().await?;

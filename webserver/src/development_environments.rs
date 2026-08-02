@@ -175,6 +175,10 @@ pub async fn start_development_environment(headers: HeaderMap, Path(id): Path<Uu
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db()?;
+    containers::table
+        .filter(containers::id.eq(id).and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
+        .first::<Container>(&mut db)
+        .or(Err(StatusCode::NOT_FOUND))?;
     let key = format!("DEVELOPMENT_ENVIRONMENT:{}", id);
     get_valkey_client()
         .await

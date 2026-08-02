@@ -2,6 +2,10 @@
 import { authenticatedFetch } from "$lib/auth.ts";
 let { data, params } = $props();
 
+setTimeout(() => {
+  window.close();
+}, 60000);
+
 async function approveRequest(approved: boolean) {
   await authenticatedFetch(`/api/development_environments/ssh_forward/approve/${params.id}`, {
     method: "POST",
