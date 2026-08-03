@@ -132,7 +132,9 @@ pub async fn finish_passkey_registration(headers: HeaderMap, uri: OriginalUri, b
         name: request.name,
     };
     diesel::insert_into(passkeys::table).values(passkey_db).execute(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
-    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
 pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Json<StartPasskeyAuthenticationResponse>), StatusCode> {
@@ -256,6 +258,8 @@ pub async fn delete_passkey(headers: HeaderMap, Path(id): Path<String>, uri: Ori
     diesel::delete(passkeys::table.filter(passkeys::id.eq(credential_id).and(passkeys::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))))
         .execute(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
-    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }

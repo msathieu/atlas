@@ -11,7 +11,7 @@ use axum::{
     response::Response,
 };
 use serde::{Deserialize, Serialize};
-use shared_server::{authenticate_jwt, get_valkey_client, wait_for_pubsub_msg};
+use shared_server::{authenticate_jwt, get_valkey_client, models::User, wait_for_pubsub_msg};
 use std::{error::Error, time::Duration};
 use tokio::time::timeout;
 
@@ -36,17 +36,24 @@ pub async fn stream(query: Query<StreamAuth>, socket: WebSocketUpgrade) -> Respo
         Ok(db) => db,
         Err(_) => return Response::new("Internal Server Error".into()),
     };
-    if authenticate_jwt(&query.auth, "webserver-stream", Some(&mut db), false).is_err() {
-        return Response::new("Unauthorized".into());
-    }
-    socket.on_upgrade(stream_wrapper)
+    let user = match authenticate_jwt(&query.auth, "webserver-stream", Some(&mut db), false) {
+        Ok(user) => user.0,
+        Err(_) => return Response::new("Unauthorized".into()),
+    };
+    let user = match user {
+        Some(user) => user,
+        None => return Response::new("Unauthorized".into()),
+    };
+    socket.on_upgrade(|socket| stream_wrapper(socket, user))
 }
-async fn stream_wrapper(socket: WebSocket) {
-    stream_handler(socket).await.ok();
+async fn stream_wrapper(socket: WebSocket, user: User) {
+    stream_handler(socket, user).await.ok();
 }
-async fn stream_handler(mut socket: WebSocket) -> Result<(), Box<dyn Error>> {
+async fn stream_handler(mut socket: WebSocket, user: User) -> Result<(), Box<dyn Error>> {
     let (mut valkey_client, mut receiver) = get_valkey_client().await?;
     valkey_client.subscribe("WEB:REFRESH").await?;
+    let key = format!("WEB:REFRESH:{}", user.id.ok_or("Invalid user")?);
+    valkey_client.subscribe(key).await?;
     loop {
         if let Ok(data) = timeout(Duration::from_secs(30), async { wait_for_pubsub_msg(&mut receiver).await }).await {
             if data.starts_with("SSH_FORWARD:") {

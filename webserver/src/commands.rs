@@ -106,7 +106,9 @@ pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -
     };
     cmd = diesel::insert_into(commands::table).values(cmd).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
     notify_server(&format!("API:DEVICE:{}", request.device)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let response = CreateCommandResponse {
         id: cmd.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
     };
@@ -119,7 +121,9 @@ pub async fn delete_command(headers: HeaderMap, Path(id): Path<Uuid>, uri: Origi
     diesel::delete(commands::table.filter(commands::id.eq(id).and(commands::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))))
         .execute(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
-    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server(&format!("MASTER:CMD:{}", id)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }

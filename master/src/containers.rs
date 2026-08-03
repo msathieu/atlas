@@ -99,7 +99,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 .set(containers::requested_state.eq(ContainerState::Stopped as i32))
                 .execute(&mut db)?;
             container.requested_state = ContainerState::Stopped as i32;
-            notify_server("WEB:REFRESH").await?;
+            notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         }
     }
     if container.state == ContainerState::NonExistent as i32
@@ -145,7 +145,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             });
             pvc_api.create(&PostParams::default(), &pvc).await?;
         }
-        notify_server("WEB:REFRESH").await?;
+        notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Stopped as i32 && container.requested_state == ContainerState::NonExistent as i32 {
         let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
@@ -164,7 +164,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::NonExistent as i32))
             .execute(&mut db)?;
-        notify_server("WEB:REFRESH").await?;
+        notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Stopped as i32 && (container.requested_state == ContainerState::Started as i32 || container.requested_state == ContainerState::Running as i32) {
         let pod_api = Api::namespaced(client, namespace);
@@ -301,7 +301,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::Started as i32))
             .execute(&mut db)?;
-        notify_server("WEB:REFRESH").await?;
+        notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Started as i32 && (container.requested_state == ContainerState::Stopped as i32 || container.requested_state == ContainerState::NonExistent as i32) {
         let pod_api: Api<Pod> = Api::namespaced(client, namespace);
@@ -311,7 +311,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::Stopped as i32))
             .execute(&mut db)?;
-        notify_server("WEB:REFRESH").await?;
+        notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Started as i32 && container.requested_state == ContainerState::Running as i32 {
         let pod_api: Api<Pod> = Api::namespaced(client, namespace);
@@ -329,7 +329,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             diesel::update(containers::table.find(container_id))
                 .set(containers::requested_state.eq(ContainerState::Stopped as i32))
                 .execute(&mut db)?;
-            notify_server("WEB:REFRESH").await?;
+            notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
             notify_server("MASTER:CONTAINERS").await?;
             return Ok(());
         }
@@ -369,7 +369,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             diesel::update(containers::table.find(container_id))
                 .set(containers::requested_state.eq(ContainerState::Stopped as i32))
                 .execute(&mut db)?;
-            notify_server("WEB:REFRESH").await?;
+            notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
             notify_server("MASTER:CONTAINERS").await?;
             return Ok(());
         }

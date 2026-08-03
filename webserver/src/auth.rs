@@ -33,7 +33,7 @@ pub struct LoginResponse {
 #[cfg(debug_assertions)]
 pub const JWT_EXPIRY: usize = 8 * 60 * 60;
 #[cfg(not(debug_assertions))]
-pub const JWT_EXPIRY: usize = 60 * 60;
+pub const JWT_EXPIRY: usize = 2 * 60 * 60;
 
 pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) -> Result<String, StatusCode> {
     if let Some(pubkey) = &pubkey {

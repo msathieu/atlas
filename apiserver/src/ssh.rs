@@ -12,8 +12,10 @@ use shared_api::handle_heartbeat;
 use shared_api::read_message;
 use shared_api::write_message;
 use shared_server::get_valkey_client;
+use shared_server::models::Container;
 use shared_server::models::DevelopmentEnvironment;
 use shared_server::notify_server_with_msg;
+use shared_server::schema::containers;
 use shared_server::schema::development_environments;
 use shared_server::wait_for_pubsub_msg;
 use shared_server::{models::Device, schema::devices};
@@ -26,13 +28,13 @@ use tokio::time::timeout;
 use tokio_rustls::TlsStream;
 use uuid::Uuid;
 
-pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStream<TcpStream>, key: &PrivateKey, environment_uuid: Uuid) -> Result<(), Box<dyn Error>> {
+pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStream<TcpStream>, key: &PrivateKey, environment_uuid: Uuid, uid: Uuid) -> Result<(), Box<dyn Error>> {
     let (mut valkey_client, mut receiver) = get_valkey_client().await?;
     let signing_id = Uuid::new_v4();
     let valkey_key = format!("SSH_FORWARD:{}", signing_id);
     valkey_client.set_ex(valkey_key, environment_uuid.to_string(), 60).await.or(Err("Failed to set valkey key"))?;
     valkey_client.subscribe(format!("API:SSH_FORWARD:{}", signing_id)).await?;
-    notify_server_with_msg("WEB:REFRESH", &format!("SSH_FORWARD:{}", signing_id)).await?;
+    notify_server_with_msg(&format!("WEB:REFRESH:{}", uid), &format!("SSH_FORWARD:{}", signing_id)).await?;
     if timeout(Duration::from_secs(60), async { wait_for_pubsub_msg(&mut receiver).await }).await.is_err() {
         return Err("Timeout waiting for user approval".into());
     }
@@ -48,19 +50,20 @@ pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStr
     write_message(MessageType::ForwardSSHAgentResponse, response, stream).await?;
     Ok(())
 }
-pub async fn handle_ssh_agent(mut stream: TlsStream<TcpStream>, mut db: PooledConnection<ConnectionManager<PgConnection>>, uuid: Uuid) -> Result<(), Box<dyn Error>> {
-    let device: Device = devices::table.find(uuid).first(&mut db)?;
+pub async fn handle_ssh_agent(mut stream: TlsStream<TcpStream>, mut db: PooledConnection<ConnectionManager<PgConnection>>, device_uuid: Uuid) -> Result<(), Box<dyn Error>> {
+    let device: Device = devices::table.find(device_uuid).first(&mut db)?;
     let development_environment: DevelopmentEnvironment = development_environments::table.find(device.container_id.ok_or("Device is not a container")?).first(&mut db)?;
+    let container: Container = containers::table.find(development_environment.id).first(&mut db)?;
     let private_key = PrivateKey::from_openssh(development_environment.ssh_key)?;
     loop {
-        let device_exists = devices::table.find(uuid).first::<Device>(&mut db).optional()?.is_some();
+        let device_exists = devices::table.find(device_uuid).first::<Device>(&mut db).optional()?.is_some();
         if !device_exists {
             return Err("Device no longer exists".into());
         }
         let (message_type, buf) = read_message(&mut stream, None).await?;
         match message_type {
             MessageType::HeartbeatRequest => handle_heartbeat(HeartbeatRequest::decode(&*buf)?, &mut stream).await,
-            MessageType::ForwardSSHAgentRequest => handle_ssh_forward(ForwardSshAgentRequest::decode(&*buf)?, &mut stream, &private_key, development_environment.id).await,
+            MessageType::ForwardSSHAgentRequest => handle_ssh_forward(ForwardSshAgentRequest::decode(&*buf)?, &mut stream, &private_key, development_environment.id, container.uid).await,
             _ => return Err("Invalid message type".into()),
         }?
     }

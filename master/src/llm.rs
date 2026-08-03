@@ -118,7 +118,7 @@ async fn process_chat<C: CompletionClient>(chat: Chat, pool: Pool<ConnectionMana
             reply.content = "Maximum number of consecutive LLM messages reached".into();
         }
         insert_into(messages::table).values(reply).execute(&mut db)?;
-        notify_server("WEB:REFRESH").await?;
+        notify_server(&format!("WEB:REFRESH:{}", chat.uid)).await?;
         return Ok(());
     }
     let devices: Vec<Device> = devices::table.filter(devices::approved.eq(true)).get_results(&mut db)?;
@@ -324,7 +324,7 @@ The servers you can access are: {}
             .execute(db)?;
         Ok::<(), Box<dyn Error>>(())
     })?;
-    notify_server("WEB:REFRESH").await?;
+    notify_server(&format!("WEB:REFRESH:{}", chat.uid)).await?;
     if !calls.is_empty() {
         notify_server("MASTER:TOOLS").await?;
     }

@@ -132,7 +132,9 @@ pub async fn create_chat(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
         refresh_consecutive_llm_messages: refresh_time,
     };
     chat = diesel::insert_into(chats::table).values(chat).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
-    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let response = CreateChatResponse {
         id: chat.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
     };
@@ -145,7 +147,9 @@ pub async fn delete_chat(headers: HeaderMap, Path(id): Path<Uuid>, uri: Original
     diesel::delete(chats::table.filter(chats::id.eq(id).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))))
         .execute(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
-    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
 pub async fn get_chat(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<APIChatDetailed>), StatusCode> {
@@ -253,7 +257,9 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<Uuid>, uri: Origina
         .execute(&mut db)
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     diesel::insert_into(messages::table).values(message).execute(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
-    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:LLM").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
@@ -282,7 +288,9 @@ pub async fn manage_tool_call_consent(headers: HeaderMap, Path((chat_id, seq, ca
             .or(Err(StatusCode::NOT_FOUND))?;
         notify_server("MASTER:LLM").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     }
-    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
 pub async fn delete_message(headers: HeaderMap, Path((id, seq)): Path<(Uuid, i32)>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
@@ -296,7 +304,9 @@ pub async fn delete_message(headers: HeaderMap, Path((id, seq)): Path<(Uuid, i32
     diesel::delete(messages::table.filter(messages::chat.eq(id).and(messages::sequence.eq(seq))))
         .execute(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
-    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:LLM").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
