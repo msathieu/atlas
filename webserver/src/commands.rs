@@ -12,7 +12,11 @@ use axum::{
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use shared_api::{CommandLanguage, CommandOrigin};
-use shared_server::{models::Command, notify_server, schema::commands};
+use shared_server::{
+    models::{Command, DevelopmentEnvironment},
+    notify_server,
+    schema::{commands, development_environments},
+};
 use std::time::SystemTime;
 use uuid::Uuid;
 
@@ -118,6 +122,15 @@ pub async fn delete_command(headers: HeaderMap, Path(id): Path<Uuid>, uri: Origi
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
+    if development_environments::table
+        .filter(development_environments::code_server_password.eq(id))
+        .first::<DevelopmentEnvironment>(&mut db)
+        .optional()
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
+        .is_some()
+    {
+        return Err(StatusCode::NOT_FOUND);
+    }
     diesel::delete(commands::table.filter(commands::id.eq(id).and(commands::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))))
         .execute(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;

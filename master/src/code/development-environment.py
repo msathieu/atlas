@@ -18,9 +18,18 @@ with open("/state/code-server-settings.json", "w") as file:
     _ = file.write(os.getenv("CODE_SERVER_SETTINGS", "{}"))
 _ = subprocess.run("killall code-server nix-daemon 2> /dev/null", check=False, shell=True)
 _ = subprocess.run("nix-daemon > /var/log/nix.log 2>&1 &", check=False, shell=True)
-run_command("mkdir -p /home/coder/.local/share; ln -sf /state/project /home/coder/; ln -sf /state/code-server /home/coder/.local/share/", "coder")
-run_command("mkdir -p /home/coder/.local/share/code-server/Machine; ln -sf /state/code-server-settings.json /home/coder/.local/share/code-server/Machine/settings.json", "coder")
-run_command('su coder -c "SSH_AUTH_SOCK=/run/ssh.sock code-server --bind-addr 0.0.0.0:9000 --disable-telemetry --proxy-domain localhost /home/coder/project" > /var/log/code-server.log 2>&1 &')
+run_command("mkdir -p /state/code-server/Machine; ln -sf /state/code-server-settings.json /state/code-server/Machine/settings.json", "coder")
+if os.getenv("ATLAS_REPO_URL") and not os.path.exists("/state/project/.git"):
+    branch = ""
+    if os.getenv("ATLAS_REPO_BRANCH"):
+        branch = f"-b {os.getenv('ATLAS_REPO_BRANCH')}"
+    run_command(f"git clone {os.getenv('ATLAS_REPO_URL')} {branch} /state/project", "coder")
+nix_command = ""
+if os.path.exists("/state/project/flake.lock"):
+    nix_command = "nix develop /state/project -c"
+run_command(
+    f'su coder -c "SSH_AUTH_SOCK=/run/ssh.sock {nix_command} code-server --user-data-dir /state/code-server --bind-addr 0.0.0.0:9000 --disable-telemetry --proxy-domain localhost /state/project" > /var/log/code-server.log 2>&1 &'
+)
 password = None
 while password is None:
     try:
@@ -36,11 +45,6 @@ print(password, end="")
 for i in os.getenv("CODE_SERVER_EXTENSIONS", "").split(","):
     if i:
         run_command(f"HOME=/home/coder code-server --install-extension {i} > /dev/null 2>&1", "coder")
-if os.getenv("ATLAS_REPO_URL") and not os.path.exists("/state/project/.git"):
-    branch = ""
-    if os.getenv("ATLAS_REPO_BRANCH"):
-        branch = f"-b {os.getenv('ATLAS_REPO_BRANCH')}"
-    run_command(f"git clone {os.getenv('ATLAS_REPO_URL')} {branch} /state/project", "coder")
 while True:
     try:
         with urllib.request.urlopen("http://localhost:9000", timeout=2) as response:
