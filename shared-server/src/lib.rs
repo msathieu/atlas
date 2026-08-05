@@ -63,7 +63,7 @@ pub async fn get_valkey_client() -> Result<(redis::aio::ConnectionManager, Unbou
     );
     let client = redis::Client::open(url)?;
     let mut config = ConnectionManagerConfig::new();
-    config = config.set_automatic_resubscription();
+    config = config.set_automatic_resubscription().set_number_of_retries(50);
     let (tx, rx) = unbounded_channel();
     config = config.set_push_sender(tx);
     let manager = redis::aio::ConnectionManager::new_with_config(client, config).await?;
@@ -82,7 +82,11 @@ pub async fn notify_server_with_msg(channel: &str, msg: &str) -> Result<(), Box<
 }
 pub async fn wait_for_pubsub_msg(receiver: &mut UnboundedReceiver<PushInfo>) -> String {
     loop {
-        if let Some(push_info) = receiver.recv().await
+        let received = receiver.recv().await;
+        if received.is_none() {
+            return "".into();
+        }
+        if let Some(push_info) = received
             && push_info.kind == PushKind::Message
         {
             if let Some(msg) = Msg::from_push_info(push_info)

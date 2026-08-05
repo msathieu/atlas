@@ -3,7 +3,7 @@ import { authenticatedFetch } from "$lib/auth.ts";
 let { data, params } = $props();
 
 setTimeout(() => {
-  window.close();
+  globalThis.close();
 }, 60000);
 
 async function approveRequest(approved: boolean) {
@@ -11,7 +11,7 @@ async function approveRequest(approved: boolean) {
     method: "POST",
     body: JSON.stringify({ approved }),
   });
-  window.close();
+  globalThis.close();
 }
 </script>
 

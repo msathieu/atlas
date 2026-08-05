@@ -107,7 +107,14 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateDevelopmentEnvironmentRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
-    if request.name.is_empty() || !request.name.chars().all(|c| c.is_ascii_alphanumeric()) {
+    if request.name.is_empty()
+        || !request.name.chars().all(|c| c.is_ascii_alphanumeric())
+        || !request.repo.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ':' || c == '/' || c == '.')
+        || !request.branch.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '/' || c == '.')
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if !request.repo.is_empty() && !request.repo.starts_with("https://") {
         return Err(StatusCode::BAD_REQUEST);
     }
     if request.nested_containers && !user.admin {

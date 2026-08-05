@@ -8,5 +8,11 @@
       "sizes": "768x768",
       "type": "image/png"
     }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+atlasrepo",
+      "url": "/embed/create_development_environment?url=%s"
+    }
   ]
 }

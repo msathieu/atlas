@@ -127,7 +127,7 @@ fn create_settings(db: &mut PgConnection) {
                 diesel::insert_into(settings::table)
                     .values(Setting {
                         name: "llm_default_provider".to_owned(),
-                        value: "openrouter".to_string(),
+                        value: "generic".to_string(),
                     })
                     .execute(db)?;
             }
