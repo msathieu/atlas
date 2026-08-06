@@ -25,5 +25,6 @@ export const load: PageLoad = async ({ fetch }) => {
     developmentEnvironmentImage: settings["development_environment_image"],
     developmentEnvironmentSettings: settings["development_environment_settings"],
     developmentEnvironmentExtensions: settings["development_environment_extensions"],
+    developmentEnvironmentGitconfig: settings["development_environment_gitconfig"],
   };
 };

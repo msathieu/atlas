@@ -230,6 +230,12 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value: Some(development_environment_extensions.value),
                 value_from: None,
             });
+            let development_environment_gitconfig: Setting = settings::table.find("development_environment_gitconfig").first(&mut db)?;
+            envs.push(EnvVar {
+                name: "DEVELOPMENT_ENVIRONMENT_GITCONFIG".to_string(),
+                value: Some(development_environment_gitconfig.value),
+                value_from: None,
+            });
             let webserver: Setting = settings::table.find("webserver_host").first(&mut db)?;
             envs.push(EnvVar {
                 name: "VSCODE_PROXY_URI".to_string(),
@@ -408,7 +414,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             };
             command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
             diesel::update(development_environments::table.find(container_id))
-                .set(development_environments::code_server_password.eq(command.id.ok_or("Invalid command")?))
+                .set(development_environments::ide_password.eq(command.id.ok_or("Invalid command")?))
                 .execute(&mut db)?;
         }
         notify_server("WEB:REFRESH").await?;
@@ -429,7 +435,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         }
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             diesel::update(development_environments::table.find(container_id))
-                .set(development_environments::code_server_password.eq(None::<Uuid>))
+                .set(development_environments::ide_password.eq(None::<Uuid>))
                 .execute(&mut db)?;
         }
         diesel::delete(devices::table.filter(devices::container_id.eq(container_id))).execute(&mut db)?;

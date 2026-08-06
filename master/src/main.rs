@@ -318,6 +318,14 @@ fn create_settings(db: &mut PgConnection) {
                     })
                     .execute(db)?;
             }
+            if !does_setting_exist(db, "development_environment_gitconfig")? {
+                diesel::insert_into(settings::table)
+                    .values(Setting {
+                        name: "development_environment_gitconfig".to_owned(),
+                        value: "".to_owned(),
+                    })
+                    .execute(db)?;
+            }
             Ok::<(), Box<dyn Error>>(())
         })
         .unwrap();

@@ -42,6 +42,7 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
         "development_environment_image",
         "development_environment_settings",
         "development_environment_extensions",
+        "development_environment_gitconfig",
     ];
     let mut settings = HashMap::new();
     for name in allowed_settings {
@@ -76,6 +77,7 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
         "development_environment_image",
         "development_environment_settings",
         "development_environment_extensions",
+        "development_environment_gitconfig",
     ];
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);

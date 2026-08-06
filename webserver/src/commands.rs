@@ -123,7 +123,7 @@ pub async fn delete_command(headers: HeaderMap, Path(id): Path<Uuid>, uri: Origi
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let mut db = get_db()?;
     if development_environments::table
-        .filter(development_environments::code_server_password.eq(id))
+        .filter(development_environments::ide_password.eq(id))
         .first::<DevelopmentEnvironment>(&mut db)
         .optional()
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?

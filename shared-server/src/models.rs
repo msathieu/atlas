@@ -177,7 +177,7 @@ pub struct DevelopmentEnvironment {
     pub name: String,
     pub repo: Option<String>,
     pub branch: Option<String>,
-    pub code_server_password: Option<Uuid>,
     pub nested_containers: bool,
     pub ssh_key: String,
+    pub ide_password: Option<Uuid>,
 }

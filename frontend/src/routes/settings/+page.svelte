@@ -25,6 +25,7 @@ let k8sStorageClass = $derived(data.k8sStorageClass);
 let developmentEnvironmentImage = $derived(data.developmentEnvironmentImage);
 let developmentEnvironmentSettings = $derived(data.developmentEnvironmentSettings);
 let developmentEnvironmentExtensions = $derived(data.developmentEnvironmentExtensions);
+let developmentEnvironmentGitconfig = $derived(data.developmentEnvironmentGitconfig);
 let downloadLink: any = $state();
 let actuallyDownload = false;
 
@@ -72,6 +73,7 @@ async function restart() {
 <Setting name="development_environment_image" description="Development Environment Image" val={developmentEnvironmentImage} type="text" />
 <Setting name="development_environment_settings" description="Development Environment Settings" val={developmentEnvironmentSettings} type="textarea" />
 <Setting name="development_environment_extensions" description="Development Environment Extensions" val={developmentEnvironmentExtensions} type="text" />
+<Setting name="development_environment_gitconfig" description="Development Environment Git Configuration" val={developmentEnvironmentGitconfig} type="textarea" />
 
 <h1 class="text-xl">API Certificate</h1>
 <br />

@@ -46,7 +46,7 @@ fn get_login_body(id: Uuid) -> Result<String> {
     let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().or(Err(Error::new(InternalError)))?;
     let development_environment: DevelopmentEnvironment = development_environments::table.find(id).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
     let command: Command = commands::table
-        .find(development_environment.code_server_password.ok_or(Error::new(InternalError))?)
+        .find(development_environment.ide_password.ok_or(Error::new(InternalError))?)
         .first(&mut db)
         .or(Err(Error::new(InternalError)))?;
     if command.stdout.is_empty() || !command.stdout.chars().all(|c| c.is_ascii_alphanumeric()) {

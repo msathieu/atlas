@@ -146,7 +146,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
             name: request.name,
             repo,
             branch,
-            code_server_password: None,
+            ide_password: None,
             nested_containers: request.nested_containers,
             ssh_key: ssh_key_exported.to_string(),
         };
@@ -260,8 +260,8 @@ pub async fn open_development_environment(
         ready = false;
     }
     let development_environment: DevelopmentEnvironment = development_environments::table.find(id).first(&mut db).or(Err(StatusCode::NOT_FOUND))?;
-    if let Some(code_server_password) = development_environment.code_server_password {
-        let command: Command = commands::table.find(code_server_password).first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    if let Some(ide_password) = development_environment.ide_password {
+        let command: Command = commands::table.find(ide_password).first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
         if command.stdout.is_empty() {
             ready = false;
         }
