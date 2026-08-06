@@ -298,22 +298,22 @@ fn create_settings(db: &mut PgConnection) {
                 diesel::insert_into(settings::table)
                     .values(Setting {
                         name: "development_environment_image".to_owned(),
-                        value: "ghcr.io/coder/code-server:4.131.0-trixie".to_owned(),
+                        value: "".to_owned(),
                     })
                     .execute(db)?;
             }
-            if !does_setting_exist(db, "code_server_settings")? {
+            if !does_setting_exist(db, "development_environment_settings")? {
                 diesel::insert_into(settings::table)
                     .values(Setting {
-                        name: "code_server_settings".to_owned(),
+                        name: "development_environment_settings".to_owned(),
                         value: "{}".to_owned(),
                     })
                     .execute(db)?;
             }
-            if !does_setting_exist(db, "code_server_extensions")? {
+            if !does_setting_exist(db, "development_environment_extensions")? {
                 diesel::insert_into(settings::table)
                     .values(Setting {
-                        name: "code_server_extensions".to_owned(),
+                        name: "development_environment_extensions".to_owned(),
                         value: "".to_owned(),
                     })
                     .execute(db)?;

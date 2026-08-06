@@ -218,16 +218,16 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value: Some(format!("Atlas - {}", development_environment.name)),
                 value_from: None,
             });
-            let code_server_settings: Setting = settings::table.find("code_server_settings").first(&mut db)?;
+            let development_environment_settings: Setting = settings::table.find("development_environment_settings").first(&mut db)?;
             envs.push(EnvVar {
-                name: "CODE_SERVER_SETTINGS".to_string(),
-                value: Some(code_server_settings.value),
+                name: "DEVELOPMENT_ENVIRONMENT_SETTINGS".to_string(),
+                value: Some(development_environment_settings.value),
                 value_from: None,
             });
-            let code_server_extensions: Setting = settings::table.find("code_server_extensions").first(&mut db)?;
+            let development_environment_extensions: Setting = settings::table.find("development_environment_extensions").first(&mut db)?;
             envs.push(EnvVar {
-                name: "CODE_SERVER_EXTENSIONS".to_string(),
-                value: Some(code_server_extensions.value),
+                name: "DEVELOPMENT_ENVIRONMENT_EXTENSIONS".to_string(),
+                value: Some(development_environment_extensions.value),
                 value_from: None,
             });
             let webserver: Setting = settings::table.find("webserver_host").first(&mut db)?;
@@ -238,14 +238,14 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             });
             if let Some(repo) = development_environment.repo {
                 envs.push(EnvVar {
-                    name: "ATLAS_REPO_URL".to_string(),
+                    name: "DEVELOPMENT_ENVIRONMENT_REPO".to_string(),
                     value: Some(repo),
                     value_from: None,
                 });
             }
             if let Some(branch) = development_environment.branch {
                 envs.push(EnvVar {
-                    name: "ATLAS_REPO_BRANCH".to_string(),
+                    name: "DEVELOPMENT_ENVIRONMENT_BRANCH".to_string(),
                     value: Some(branch),
                     value_from: None,
                 });

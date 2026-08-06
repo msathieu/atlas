@@ -23,8 +23,8 @@ let mailTo = $derived(data.mailTo);
 let apkHash = $derived(data.apkHash);
 let k8sStorageClass = $derived(data.k8sStorageClass);
 let developmentEnvironmentImage = $derived(data.developmentEnvironmentImage);
-let codeServerSettings = $derived(data.codeServerSettings);
-let codeServerExtensions = $derived(data.codeServerExtensions);
+let developmentEnvironmentSettings = $derived(data.developmentEnvironmentSettings);
+let developmentEnvironmentExtensions = $derived(data.developmentEnvironmentExtensions);
 let downloadLink: any = $state();
 let actuallyDownload = false;
 
@@ -70,8 +70,8 @@ async function restart() {
 <Setting name="apk_hash" description="APK Hash" val={apkHash} type="text" />
 <Setting name="k8s_storageclass" description="Kubernetes Storage Class" val={k8sStorageClass} type="text" />
 <Setting name="development_environment_image" description="Development Environment Image" val={developmentEnvironmentImage} type="text" />
-<Setting name="code_server_settings" description="Code Server Settings" val={codeServerSettings} type="textarea" />
-<Setting name="code_server_extensions" description="Code Server Extensions" val={codeServerExtensions} type="text" />
+<Setting name="development_environment_settings" description="Development Environment Settings" val={developmentEnvironmentSettings} type="textarea" />
+<Setting name="development_environment_extensions" description="Development Environment Extensions" val={developmentEnvironmentExtensions} type="text" />
 
 <h1 class="text-xl">API Certificate</h1>
 <br />

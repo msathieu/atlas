@@ -2,10 +2,15 @@ import type { PageLoad } from "./$types.ts";
 
 export const load: PageLoad = ({ url }) => {
   const urlParam = url.searchParams.get("url");
-  const start = "web+atlasrepo://open?repo=";
-  if (!urlParam || !urlParam.startsWith(start)) {
+  if (!urlParam) {
     globalThis.close();
+    throw new Error("Missing url parameter");
   }
-  const repo = urlParam?.slice(start.length);
+  const urlObject = new URL(urlParam);
+  const repo = urlObject.searchParams.get("repo");
+  if (urlObject.protocol !== "web+atlasrepo:" || urlObject.host !== "open" || !repo) {
+    globalThis.close();
+    throw new Error("Invalid url parameter");
+  }
   return { repo };
 };

@@ -5,7 +5,7 @@ import { encryptToServer } from "./util.ts";
 export async function updateSetting(name: string, value: string) {
   const body = JSON.stringify({ value });
   let response;
-  if (name === "code_server_settings") {
+  if (name === "development_environment_settings") {
     response = await authenticatedFetch(`/api/settings/${name}`, { method: "PUT", body });
   } else {
     response = await authenticatedFetch(

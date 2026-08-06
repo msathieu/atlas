@@ -23,7 +23,7 @@ export const load: PageLoad = async ({ fetch }) => {
     apkHash: settings["apk_hash"],
     k8sStorageClass: settings["k8s_storageclass"],
     developmentEnvironmentImage: settings["development_environment_image"],
-    codeServerSettings: settings["code_server_settings"],
-    codeServerExtensions: settings["code_server_extensions"],
+    developmentEnvironmentSettings: settings["development_environment_settings"],
+    developmentEnvironmentExtensions: settings["development_environment_extensions"],
   };
 };

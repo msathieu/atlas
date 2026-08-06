@@ -40,8 +40,8 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
         "apk_hash",
         "k8s_storageclass",
         "development_environment_image",
-        "code_server_settings",
-        "code_server_extensions",
+        "development_environment_settings",
+        "development_environment_extensions",
     ];
     let mut settings = HashMap::new();
     for name in allowed_settings {
@@ -53,7 +53,7 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
 pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     require_admin(&headers)?;
     let signature = validate_signature(&headers, uri.0, &body, "PUT").await?;
-    let body = if name == "code_server_settings" { body.to_vec() } else { decrypt_body(body)? };
+    let body = if name == "development_environment_settings" { body.to_vec() } else { decrypt_body(body)? };
     let request: UpdateSettingRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let allowed_settings = [
@@ -74,8 +74,8 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
         "apk_hash",
         "k8s_storageclass",
         "development_environment_image",
-        "code_server_settings",
-        "code_server_extensions",
+        "development_environment_settings",
+        "development_environment_extensions",
     ];
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);
