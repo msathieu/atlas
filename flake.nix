@@ -19,6 +19,7 @@
           git
           jq
           kubectl
+          kubernetes-helm
           lua5_5
           openjdk
           openssl
