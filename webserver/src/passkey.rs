@@ -21,7 +21,7 @@ use shared_server::{
     notify_server,
     schema::{passkeys, settings, users},
 };
-use std::time::SystemTime;
+use std::{env, time::SystemTime};
 use uuid::Uuid;
 use webauthn_rs::{
     Webauthn, WebauthnBuilder,
@@ -73,10 +73,10 @@ pub struct APIPasskey {
 
 pub fn get_webauthn() -> Result<Webauthn, StatusCode> {
     let mut db = get_db()?;
-    let web_host: Setting = settings::table.find("webserver_host").get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let url = Url::parse(&format!("https://{}", web_host.value)).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let web_host = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let url = Url::parse(&format!("https://{}", web_host)).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let apk_hash: Setting = settings::table.find("apk_hash").get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let mut builder = WebauthnBuilder::new(&web_host.value, &url).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let mut builder = WebauthnBuilder::new(&web_host, &url).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     if !apk_hash.value.is_empty() {
         let apk_hash = apk_hash.value.replace(":", "");
         let apk_hash = hex::decode(apk_hash).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

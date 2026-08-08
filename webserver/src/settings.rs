@@ -26,8 +26,6 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
     let mut db = get_db()?;
     let allowed_settings = [
         "allow_new_devices",
-        "apiserver_host",
-        "webserver_host",
         "mail_server",
         "mail_username",
         "mail_from",
@@ -38,8 +36,6 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
         "llm_openrouter_model",
         "tls_cert",
         "apk_hash",
-        "k8s_storageclass",
-        "development_environment_image",
         "development_environment_settings",
         "development_environment_extensions",
         "development_environment_gitconfig",
@@ -59,8 +55,6 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
     let mut db = get_db()?;
     let allowed_settings = [
         "allow_new_devices",
-        "apiserver_host",
-        "webserver_host",
         "mail_server",
         "mail_username",
         "mail_password",
@@ -73,8 +67,6 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
         "llm_openrouter_key",
         "llm_openrouter_model",
         "apk_hash",
-        "k8s_storageclass",
-        "development_environment_image",
         "development_environment_settings",
         "development_environment_extensions",
         "development_environment_gitconfig",
@@ -87,9 +79,6 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
         .execute(&mut db)
         .or(Err(StatusCode::BAD_REQUEST))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    if name == "webserver_host" {
-        notify_server("DEVPROXY:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    }
     sign_response::<String>(signature, None)
 }
 pub async fn restart_system(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {

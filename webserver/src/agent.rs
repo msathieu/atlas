@@ -9,11 +9,11 @@ use axum::{
     extract::{OriginalUri, Query},
     http::{HeaderMap, StatusCode},
 };
-use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 use shared_api::{SUPPORTED_ARCH, SUPPORTED_OS};
-use shared_server::{authenticate_jwt, binary::personalize_binary, models::Setting, schema::settings};
+use shared_server::{authenticate_jwt, binary::personalize_binary};
+use std::env;
 
 #[derive(Deserialize)]
 pub struct DownloadAuth {
@@ -50,7 +50,7 @@ pub async fn get_agent_script(headers: HeaderMap, uri: OriginalUri, request: Que
     };
     let hash = Sha512::digest(&agent).to_vec();
     let jwt = generate_jwt("webserver-download", &user, 10 * 60, None)?;
-    let web_host: Setting = settings::table.find("webserver_host").get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let web_host = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let script = format!(
         r#"curl -fO "https://{}/api/atlas-agent?auth={}&arch={}&os={}" &&\
 sha512sum -c <<< "{}  atlas-agent" &&\
@@ -58,7 +58,7 @@ chmod +x atlas-agent &&\
 ./atlas-agent install &&\
 rm atlas-agent
 "#,
-        web_host.value,
+        web_host,
         jwt,
         request.arch,
         request.os,

@@ -24,6 +24,12 @@ spec:
           image: {{ .Values.image }}
           command: ['/master']
           env:
+            - name: APISERVER_HOST
+              value: {{ .Values.apiserverHost }}
+            - name: WEBSERVER_HOST
+              value: {{ .Values.webserverHost }}
+            - name: STORAGE_CLASS
+              value: {{ .Values.storageClass }}
             - name: VALKEY_HOST
               value: atlas-valkey
             - name: DATABASE_HOST

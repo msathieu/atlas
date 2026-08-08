@@ -13,16 +13,12 @@ let genericEndpoint = $derived(data.genericEndpoint);
 let genericModel = $derived(data.genericModel);
 let genericKey = $state("");
 let allowNewDevices = $derived(data.allowNewDevices === "true");
-let apiserverHost = $derived(data.apiserverHost);
-let webserverHost = $derived(data.webserverHost);
 let mailServer = $derived(data.mailServer);
 let mailUsername = $derived(data.mailUsername);
 let mailPassword = $state("");
 let mailFrom = $derived(data.mailFrom);
 let mailTo = $derived(data.mailTo);
 let apkHash = $derived(data.apkHash);
-let k8sStorageClass = $derived(data.k8sStorageClass);
-let developmentEnvironmentImage = $derived(data.developmentEnvironmentImage);
 let developmentEnvironmentSettings = $derived(data.developmentEnvironmentSettings);
 let developmentEnvironmentExtensions = $derived(data.developmentEnvironmentExtensions);
 let developmentEnvironmentGitconfig = $derived(data.developmentEnvironmentGitconfig);
@@ -61,16 +57,12 @@ async function restart() {
 </form>
 <br />
 
-<Setting name="apiserver_host" description="API Server Host" val={apiserverHost} type="text" />
-<Setting name="webserver_host" description="Web Server Host" val={webserverHost} type="text" />
 <Setting name="mail_server" description="Mail Server" val={mailServer} type="text" />
 <Setting name="mail_username" description="Mail Username" val={mailUsername} type="text" />
 <Setting name="mail_password" description="Mail Password" val={mailPassword} type="text" />
 <Setting name="mail_from" description="Mail From" val={mailFrom} type="text" />
 <Setting name="mail_to" description="Mail To" val={mailTo} type="text" />
 <Setting name="apk_hash" description="APK Hash" val={apkHash} type="text" />
-<Setting name="k8s_storageclass" description="Kubernetes Storage Class" val={k8sStorageClass} type="text" />
-<Setting name="development_environment_image" description="Development Environment Image" val={developmentEnvironmentImage} type="text" />
 <Setting name="development_environment_settings" description="Development Environment Settings" val={developmentEnvironmentSettings} type="textarea" />
 <Setting name="development_environment_extensions" description="Development Environment Extensions" val={developmentEnvironmentExtensions} type="text" />
 <Setting name="development_environment_gitconfig" description="Development Environment Git Configuration" val={developmentEnvironmentGitconfig} type="textarea" />

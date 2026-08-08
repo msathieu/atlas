@@ -19,6 +19,10 @@ spec:
           image: {{ .Values.image }}
           command: ['/apiserver']
           env:
+            - name: APISERVER_HOST
+              value: {{ .Values.apiserverHost }}
+            - name: WEBSERVER_HOST
+              value: {{ .Values.webserverHost }}
             - name: VALKEY_HOST
               value: atlas-valkey
             - name: DATABASE_HOST
@@ -45,3 +49,16 @@ spec:
     app: atlas-api
   ports:
     - port: 8612
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: atlas-api
+spec:
+  parentRefs:
+    - name: {{ .Values.envoyName }}
+      sectionName: atlas-api
+  rules:
+    - backendRefs:
+        - name: atlas-api
+          port: 8612

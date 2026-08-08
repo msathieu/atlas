@@ -15,12 +15,12 @@ use serde::{Deserialize, Serialize};
 use shared_api::{ContainerOrigin, ContainerState};
 use shared_server::{
     get_valkey_client,
-    models::{Command, Container, DevelopmentEnvironment, Setting},
+    models::{Command, Container, DevelopmentEnvironment},
     notify_server,
-    schema::{commands, containers, development_environments, settings},
+    schema::{commands, containers, development_environments},
 };
 use ssh_key::{Algorithm::Ed25519, LineEnding, PrivateKey, rand_core::OsRng};
-use std::{error::Error, time::SystemTime};
+use std::{env, error::Error, time::SystemTime};
 use uuid::Uuid;
 
 #[derive(Serialize)]
@@ -121,7 +121,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
         return Err(StatusCode::FORBIDDEN);
     }
     let mut db = get_db()?;
-    let image: Setting = settings::table.find("development_environment_image").first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let image = env::var("IMAGE_IDE").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut container = Container {
         id: None,
         created_at: SystemTime::now(),
@@ -129,7 +129,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
         origin: ContainerOrigin::DevelopmentEnvironment as i32,
         state: ContainerState::NonExistent as i32,
         requested_state: ContainerState::Stopped as i32,
-        image: image.value,
+        image,
         storage_size: 25,
         memory_limit: 16,
     };
@@ -268,14 +268,14 @@ pub async fn open_development_environment(
     } else {
         ready = false;
     }
-    let webserver: Setting = settings::table.find("webserver_host").first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let webserver = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let jwt = match request.port {
         None => generate_jwt(&format!("devproxy-{}", id), &user, 12 * 60 * 60, None)?,
         Some(_) => generate_jwt(&format!("devproxy-proxy-{}", id), &user, 12 * 60 * 60, None)?,
     };
     let url = match request.port {
-        None => format!("https://{}.dev.{}/atlas_setup?jwt={}", id, webserver.value, jwt),
-        Some(port) => format!("https://{}-{}.devproxy.{}/atlas_setup?jwt={}", id, port, webserver.value, jwt),
+        None => format!("https://{}.dev.{}/atlas_setup?jwt={}", id, webserver, jwt),
+        Some(port) => format!("https://{}-{}.devproxy.{}/atlas_setup?jwt={}", id, port, webserver, jwt),
     };
     let response = OpenDevelopmentEnvironmentResponse { url, ready };
     Ok((sign_response(signature, Some(&response))?, Json(response)))

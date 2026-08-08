@@ -107,22 +107,6 @@ fn create_settings(db: &mut PgConnection) {
                     })
                     .execute(db)?;
             }
-            if !does_setting_exist(db, "apiserver_host")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "apiserver_host".to_owned(),
-                        value: "localhost".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "webserver_host")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "webserver_host".to_owned(),
-                        value: "localhost".to_string(),
-                    })
-                    .execute(db)?;
-            }
             if !does_setting_exist(db, "llm_default_provider")? {
                 diesel::insert_into(settings::table)
                     .values(Setting {
@@ -282,22 +266,6 @@ fn create_settings(db: &mut PgConnection) {
                 diesel::insert_into(settings::table)
                     .values(Setting {
                         name: "apk_hash".to_owned(),
-                        value: "".to_owned(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "k8s_storageclass")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "k8s_storageclass".to_owned(),
-                        value: "ceph-block".to_owned(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "development_environment_image")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "development_environment_image".to_owned(),
                         value: "".to_owned(),
                     })
                     .execute(db)?;

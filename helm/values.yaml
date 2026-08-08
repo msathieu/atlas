@@ -1,6 +1,11 @@
 image: ""
+imageIDE: ""
 replicas: 2
 imagePullSecret: ""
 namespace: ""
 databaseStorageClass: local-path
 barmanObjectName: ""
+envoyName: envoy
+apiserverHost: ""
+webserverHost: ""
+storageClass: ceph-block

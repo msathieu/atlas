@@ -5,12 +5,12 @@ use base64::prelude::BASE64_STANDARD;
 use diesel::PgConnection;
 use diesel::prelude::*;
 use object::{Object, ObjectSection};
+use std::env;
 use std::{error::Error, ffi::CString, str::FromStr};
 use tokio::fs;
 
 pub async fn personalize_binary(db: &mut PgConnection, arch: &str, os: &str) -> Result<Vec<u8>, Box<dyn Error>> {
-    let host: Setting = settings::table.find("apiserver_host").get_result(db)?;
-    let host = host.value;
+    let host = env::var("APISERVER_HOST")?;
     let tls_cert: Setting = settings::table.find("tls_cert").get_result(db)?;
     let tls_cert = tls_cert.value;
     let registration_token: Setting = settings::table.find("registration_token").get_result(db)?;

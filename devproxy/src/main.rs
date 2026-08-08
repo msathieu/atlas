@@ -16,10 +16,10 @@ use redis::AsyncTypedCommands;
 use shared_api::{ContainerState, print_startup};
 use shared_server::{
     authenticate_jwt, get_db_pool, get_valkey_client, listen_for_restarts,
-    models::{Command, Container, DevelopmentEnvironment, Setting},
-    schema::{commands, containers, development_environments, settings},
+    models::{Command, Container, DevelopmentEnvironment},
+    schema::{commands, containers, development_environments},
 };
-use std::sync::OnceLock;
+use std::{env, sync::OnceLock};
 use tokio::net::lookup_host;
 use uuid::Uuid;
 
@@ -34,7 +34,6 @@ struct ProxyContext {
 
 static DB_POOL: OnceLock<Pool<ConnectionManager<PgConnection>>> = OnceLock::new();
 static VALKEY_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
-static WEBSERVER_HOST: OnceLock<String> = OnceLock::new();
 
 #[async_trait]
 impl BackgroundService for RestartService {
@@ -77,7 +76,7 @@ impl ProxyHttp for DevProxy {
     async fn request_filter(&self, session: &mut Session, ctx: &mut Self::CTX) -> Result<bool> {
         let host = session.get_header("Host");
         let host = host.ok_or(Error::new_down(InvalidHTTPHeader))?.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?;
-        let webserver_host = WEBSERVER_HOST.get().ok_or(Error::new(InternalError))?;
+        let webserver_host = env::var("WEBSERVER_HOST").or(Err(Error::new(InternalError)))?;
 
         let mut uuid = None;
         let mut port: Option<u16> = None;
@@ -215,8 +214,6 @@ fn main() {
     dotenvy::dotenv().ok();
     DB_POOL.set(get_db_pool().unwrap()).unwrap();
     let mut db = DB_POOL.get().unwrap().get().unwrap();
-    let webserver_host: Setting = settings::table.find("webserver_host").first(&mut db).unwrap();
-    WEBSERVER_HOST.set(webserver_host.value).ok();
     authenticate_jwt("", "", Some(&mut db), false).ok(); // Prefetch JWT_KEY
     let mut server = Server::new_with_opt_and_conf(None, ServerConf { threads: 4, ..Default::default() });
     server.bootstrap();

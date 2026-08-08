@@ -20,6 +20,7 @@ use shared_server::models::{Command, Container, DevelopmentEnvironment, Device, 
 use shared_server::schema::{commands, containers, development_environments, devices, settings};
 use shared_server::{get_valkey_client, notify_server};
 use std::collections::BTreeMap;
+use std::env;
 use std::error::Error;
 use std::time::{Duration, SystemTime};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -105,7 +106,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
     if container.state == ContainerState::NonExistent as i32
         && (container.requested_state == ContainerState::Stopped as i32 || container.requested_state == ContainerState::Started as i32 || container.requested_state == ContainerState::Running as i32)
     {
-        let storageclass: Setting = settings::table.find("k8s_storageclass").first(&mut db).unwrap();
+        let storageclass = env::var("STORAGE_CLASS")?;
         let pvc_api = Api::namespaced(client.clone(), namespace);
         let mut pvc = PersistentVolumeClaim::default();
         pvc.metadata.name = Some(pvc_name);
@@ -113,7 +114,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         resources.insert("storage".to_string(), Quantity(format!("{}Gi", container.storage_size)));
         pvc.spec = Some(PersistentVolumeClaimSpec {
             access_modes: Some(vec!["ReadWriteOncePod".to_string()]),
-            storage_class_name: Some(storageclass.value),
+            storage_class_name: Some(storageclass),
             resources: Some(VolumeResourceRequirements {
                 limits: None,
                 requests: Some(resources),
@@ -236,10 +237,10 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value: Some(development_environment_gitconfig.value),
                 value_from: None,
             });
-            let webserver: Setting = settings::table.find("webserver_host").first(&mut db)?;
+            let webserver = env::var("WEBSERVER_HOST")?;
             envs.push(EnvVar {
                 name: "VSCODE_PROXY_URI".to_string(),
-                value: Some(format!("https://{}-{}.devproxy.{}", development_environment.id, "{{port}}", webserver.value)),
+                value: Some(format!("https://{}-{}.devproxy.{}", development_environment.id, "{{port}}", webserver)),
                 value_from: None,
             });
             if let Some(repo) = development_environment.repo {
