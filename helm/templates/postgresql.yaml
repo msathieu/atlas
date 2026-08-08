@@ -1,0 +1,63 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: atlas-db
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-standard-trixie
+  instances: 2
+  enablePDB: false
+  storage:
+    storageClass: {{ .Values.databaseStorageClass }}
+    size: 5Gi
+  postgresql:
+    parameters:
+      max_connections: "250"
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ .Values.barmanObjectName }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: atlas-db
+spec:
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+  schedule: "0 0 0 * * *"
+  cluster:
+    name: atlas-db
+  backupOwnerReference: self
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: atlas-db
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: atlas-db
+  policyTypes:
+    - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: atlas-api
+    - podSelector:
+        matchLabels:
+          app: atlas-master
+    - podSelector:
+        matchLabels:
+          app: atlas-web
+    - podSelector:
+        matchLabels:
+          app: atlas-devproxy
+    - podSelector:
+        matchLabels:
+          cnpg.io/cluster: atlas-db
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: cnpg-system

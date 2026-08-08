@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-devproxy
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: atlas-devproxy
+  template:
+    metadata:
+      name: atlas-devproxy
+      labels:
+        app: atlas-devproxy
+    spec:
+      hostUsers: false
+      containers:
+        - name: atlas-devproxy
+          image: {{ .Values.image }}
+          command: ['/devproxy']
+          env:
+            - name: VALKEY_HOST
+              value: atlas-valkey
+            - name: DATABASE_HOST
+              value: atlas-db-rw
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-db-app
+                  key: password
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-valkey-password
+                  key: password
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas-devproxy
+spec:
+  selector:
+    app: atlas-devproxy
+  ports:
+    - port: 8001

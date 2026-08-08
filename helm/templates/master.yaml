@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: atlas-master
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: atlas-master
+spec:
+  selector:
+    matchLabels:
+      app: atlas-master
+  template:
+    metadata:
+      name: atlas-master
+      labels:
+        app: atlas-master
+    spec:
+      serviceAccountName: atlas-master
+      hostUsers: false
+      containers:
+        - name: atlas-master
+          image: {{ .Values.image }}
+          command: ['/master']
+          env:
+            - name: VALKEY_HOST
+              value: atlas-valkey
+            - name: DATABASE_HOST
+              value: atlas-db-rw
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-db-app
+                  key: password
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-valkey-password
+                  key: password
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}

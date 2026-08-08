@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-api
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: atlas-api
+  template:
+    metadata:
+      name: atlas-api
+      labels:
+        app: atlas-api
+    spec:
+      hostUsers: false
+      containers:
+        - name: atlas-api
+          image: {{ .Values.image }}
+          command: ['/apiserver']
+          env:
+            - name: VALKEY_HOST
+              value: atlas-valkey
+            - name: DATABASE_HOST
+              value: atlas-db-rw
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-db-app
+                  key: password
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-valkey-password
+                  key: password
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas-api
+spec:
+  selector:
+    app: atlas-api
+  ports:
+    - port: 8612

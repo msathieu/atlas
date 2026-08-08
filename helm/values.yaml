@@ -1,0 +1,6 @@
+image: ""
+replicas: 2
+imagePullSecret: ""
+namespace: ""
+databaseStorageClass: local-path
+barmanObjectName: ""

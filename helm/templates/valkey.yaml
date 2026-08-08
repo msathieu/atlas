@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: atlas-valkey
+spec:
+  selector:
+    matchLabels:
+      app: atlas-valkey
+  template:
+    metadata:
+      name: atlas-valkey
+      labels:
+        app: atlas-valkey
+    spec:
+      hostUsers: false
+      containers:
+        - name: atlas-valkey
+          image: docker.io/valkey/valkey:9.1.1
+          command: ['/bin/sh', '-c', 'valkey-server --requirepass "$VALKEY_PASSWORD"']
+          env:
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-valkey-password
+                  key: password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlas-valkey
+spec:
+  selector:
+    app: atlas-valkey
+  ports:
+    - port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: atlas-valkey
+spec:
+  podSelector:
+    matchLabels:
+      app: atlas-valkey
+  policyTypes:
+    - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: atlas-api
+    - podSelector:
+        matchLabels:
+          app: atlas-master
+    - podSelector:
+        matchLabels:
+          app: atlas-web
+    - podSelector:
+        matchLabels:
+          app: atlas-devproxy
