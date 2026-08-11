@@ -15,6 +15,7 @@ use crate::{
     settings::{get_settings, restart_system, update_setting},
     stream::{stream, stream_auth},
     user::{change_password, get_user_info, set_password_state},
+    user_setting::{get_user_settings, update_user_setting},
     users::{create_user, delete_user, users_list},
 };
 use axum::{
@@ -48,6 +49,7 @@ mod passkey;
 mod settings;
 mod stream;
 mod user;
+mod user_setting;
 mod users;
 mod util;
 
@@ -111,6 +113,8 @@ async fn main() {
         .route("/api/user/update_password", post(change_password))
         .route("/api/user/set_password_state", put(set_password_state))
         .route("/api/user/info", get(get_user_info))
+        .route("/api/user/settings", get(get_user_settings))
+        .route("/api/user/settings/{name}", put(update_user_setting))
         .route("/api/users", get(users_list))
         .route("/api/users/{id}", delete(delete_user))
         .route("/api/users", post(create_user))

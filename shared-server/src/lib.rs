@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    models::{Setting, User},
-    schema::{settings, users},
+    models::{Setting, User, UserSetting},
+    schema::{settings, user_settings, users},
 };
 use argon2::{
     Algorithm, Argon2, Params, PasswordHasher, Version,
@@ -155,4 +155,12 @@ pub fn authenticate_jwt(
         pubkey = Some(parse_pubkey(pubkey_claim)?);
     }
     Ok((user, pubkey))
+}
+pub fn get_user_setting(uid: Uuid, name: String, db: &mut PooledConnection<ConnectionManager<PgConnection>>) -> Result<UserSetting, Box<dyn Error>> {
+    let setting: UserSetting = user_settings::table
+        .filter(user_settings::uid.eq(uid).and(user_settings::name.eq(&name)))
+        .first(db)
+        .optional()?
+        .unwrap_or(UserSetting { uid, name, value: "".to_string() });
+    Ok(setting)
 }

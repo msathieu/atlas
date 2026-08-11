@@ -128,3 +128,9 @@ CREATE TABLE development_environments(
     ssh_key varchar NOT NULL,
     ide_password uuid REFERENCES commands ON DELETE SET NULL
 );
+CREATE TABLE user_settings(
+    uid uuid REFERENCES users ON DELETE CASCADE,
+    name varchar NOT NULL,
+    value varchar NOT NULL,
+    PRIMARY KEY(uid, name)
+);

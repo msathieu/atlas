@@ -57,8 +57,8 @@ onMount(() => {
         <li><a href="/commands"><Code /><span class="hidden lg:block">Commands</span></a></li>
         <li><a href="/chats"><MessageSquare /><span class="hidden lg:block">Chats</span></a></li>
         <li><a href="/development_environments"><Package /><span class="hidden lg:block">DevEnvs</span></a></li>
+        <li><a href="/settings"><Settings /><span class="hidden lg:block">Settings</span></a></li>
         {#if user.admin}
-          <li><a href="/settings"><Settings /><span class="hidden lg:block">Settings</span></a></li>
           <li><a href="/users"><Users /><span class="hidden lg:block">Users</span></a></li>
         {/if}
         <li class="mt-auto"><a href="/profile"><User /><span class="hidden lg:block">{user.username}</span></a></li>

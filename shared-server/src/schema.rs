@@ -149,6 +149,14 @@ diesel::table! {
 }
 
 diesel::table! {
+    user_settings (uid, name) {
+        uid -> Uuid,
+        name -> Varchar,
+        value -> Varchar,
+    }
+}
+
+diesel::table! {
     users (id) {
         id -> Uuid,
         username -> Varchar,
@@ -172,6 +180,7 @@ diesel::joinable!(devices -> containers (container_id));
 diesel::joinable!(messages -> chats (chat));
 diesel::joinable!(passkeys -> users (uid));
 diesel::joinable!(preapproved_code -> chats (chat));
+diesel::joinable!(user_settings -> users (uid));
 
 diesel::allow_tables_to_appear_in_same_query!(
     chats,
@@ -185,5 +194,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     preapproved_code,
     settings,
     tool_calls,
+    user_settings,
     users,
 );

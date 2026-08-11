@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     auth::require_admin,
     get_db,
@@ -14,6 +12,7 @@ use axum::{
 use diesel::prelude::*;
 use serde::Deserialize;
 use shared_server::{models::Setting, notify_server, schema::settings};
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct UpdateSettingRequest {
@@ -36,9 +35,6 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
         "llm_openrouter_model",
         "tls_cert",
         "apk_hash",
-        "development_environment_settings",
-        "development_environment_extensions",
-        "development_environment_gitconfig",
     ];
     let mut settings = HashMap::new();
     for name in allowed_settings {
@@ -50,8 +46,7 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
 pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     require_admin(&headers)?;
     let signature = validate_signature(&headers, uri.0, &body, "PUT").await?;
-    let body = if name == "development_environment_settings" { body.to_vec() } else { decrypt_body(body)? };
-    let request: UpdateSettingRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: UpdateSettingRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
     let allowed_settings = [
         "allow_new_devices",
@@ -67,9 +62,6 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
         "llm_openrouter_key",
         "llm_openrouter_model",
         "apk_hash",
-        "development_environment_settings",
-        "development_environment_extensions",
-        "development_environment_gitconfig",
     ];
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);
@@ -77,7 +69,7 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
     diesel::update(settings::table.find(&name))
         .set(settings::value.eq(request.value))
         .execute(&mut db)
-        .or(Err(StatusCode::BAD_REQUEST))?;
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }

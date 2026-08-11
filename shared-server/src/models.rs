@@ -181,3 +181,12 @@ pub struct DevelopmentEnvironment {
     pub ssh_key: String,
     pub ide_password: Option<Uuid>,
 }
+
+#[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
+#[diesel(table_name = crate::schema::user_settings)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct UserSetting {
+    pub uid: Uuid,
+    pub name: String,
+    pub value: String,
+}

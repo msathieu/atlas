@@ -16,9 +16,9 @@ use kube::{Api, Client};
 use redis::AsyncTypedCommands;
 use shared_api::{CommandLanguage, CommandOrigin, ContainerOrigin, ContainerState};
 use shared_server::binary::personalize_binary;
-use shared_server::models::{Command, Container, DevelopmentEnvironment, Device, Setting};
-use shared_server::schema::{commands, containers, development_environments, devices, settings};
-use shared_server::{get_valkey_client, notify_server};
+use shared_server::models::{Command, Container, DevelopmentEnvironment, Device};
+use shared_server::schema::{commands, containers, development_environments, devices};
+use shared_server::{get_user_setting, get_valkey_client, notify_server};
 use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
@@ -219,19 +219,19 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value: Some(format!("Atlas - {}", development_environment.name)),
                 value_from: None,
             });
-            let development_environment_settings: Setting = settings::table.find("development_environment_settings").first(&mut db)?;
+            let development_environment_settings = get_user_setting(container.uid, "development_environment_settings".to_string(), &mut db)?;
             envs.push(EnvVar {
                 name: "DEVELOPMENT_ENVIRONMENT_SETTINGS".to_string(),
                 value: Some(development_environment_settings.value),
                 value_from: None,
             });
-            let development_environment_extensions: Setting = settings::table.find("development_environment_extensions").first(&mut db)?;
+            let development_environment_extensions = get_user_setting(container.uid, "development_environment_extensions".to_string(), &mut db)?;
             envs.push(EnvVar {
                 name: "DEVELOPMENT_ENVIRONMENT_EXTENSIONS".to_string(),
                 value: Some(development_environment_extensions.value),
                 value_from: None,
             });
-            let development_environment_gitconfig: Setting = settings::table.find("development_environment_gitconfig").first(&mut db)?;
+            let development_environment_gitconfig = get_user_setting(container.uid, "development_environment_gitconfig".to_string(), &mut db)?;
             envs.push(EnvVar {
                 name: "DEVELOPMENT_ENVIRONMENT_GITCONFIG".to_string(),
                 value: Some(development_environment_gitconfig.value),

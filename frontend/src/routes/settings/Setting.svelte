@@ -2,7 +2,7 @@
 import { Check } from "@lucide/svelte";
 import { updateSetting } from "$lib/settings.ts";
 
-let { name, description, val, type } = $props();
+let { name, description, val, type, global } = $props();
 </script>
 
 <h1 class="text-xl">{description}</h1>
@@ -10,7 +10,7 @@ let { name, description, val, type } = $props();
 <form
   onsubmit={async (e) => {
     e.preventDefault();
-    await updateSetting(name, val);
+    await updateSetting(name, val, global === "true");
   }}
 >
   {#if type === "textarea"}
