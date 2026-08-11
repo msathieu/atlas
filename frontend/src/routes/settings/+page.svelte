@@ -23,6 +23,7 @@
   let developmentEnvironmentSettings = $derived(data.developmentEnvironmentSettings);
   let developmentEnvironmentExtensions = $derived(data.developmentEnvironmentExtensions);
   let developmentEnvironmentGitconfig = $derived(data.developmentEnvironmentGitconfig);
+  let developmentEnvironmentPaths = $derived(data.developmentEnvironmentPaths);
   let downloadLink: any = $state();
   let actuallyDownload = false;
 
@@ -44,6 +45,7 @@
 <Setting name="development_environment_settings" description="Development Environment Settings" val={developmentEnvironmentSettings} global="false" type="textarea" />
 <Setting name="development_environment_extensions" description="Development Environment Extensions" val={developmentEnvironmentExtensions} global="false" type="text" />
 <Setting name="development_environment_gitconfig" description="Development Environment Git Configuration" val={developmentEnvironmentGitconfig} global="false" type="textarea" />
+<Setting name="development_environment_paths" description="Development Environment Persisted Paths" val={developmentEnvironmentPaths} global="false" type="text" />
 
 {#if user.admin}
   <h1 class="text-2xl">System Settings</h1>

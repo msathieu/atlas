@@ -68,7 +68,7 @@ CREATE TABLE passkeys(
 );
 CREATE TABLE containers(
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    uid uuid NOT NULL REFERENCES users ON DELETE CASCADE,
+    uid uuid NOT NULL REFERENCES users ON DELETE RESTRICT,
     origin integer NOT NULL,
     state integer NOT NULL,
     created_at timestamp NOT NULL,

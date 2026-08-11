@@ -237,6 +237,12 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 value: Some(development_environment_gitconfig.value),
                 value_from: None,
             });
+            let development_environment_paths = get_user_setting(container.uid, "development_environment_paths".to_string(), &mut db)?;
+            envs.push(EnvVar {
+                name: "DEVELOPMENT_ENVIRONMENT_PATHS".to_string(),
+                value: Some(development_environment_paths.value),
+                value_from: None,
+            });
             let webserver = env::var("WEBSERVER_HOST")?;
             envs.push(EnvVar {
                 name: "VSCODE_PROXY_URI".to_string(),

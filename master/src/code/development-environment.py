@@ -20,7 +20,10 @@ with open("/etc/gitconfig", "w") as file:
     _ = file.write(os.getenv("DEVELOPMENT_ENVIRONMENT_GITCONFIG", "{}"))
 _ = subprocess.run("killall code-server nix-daemon 2> /dev/null", check=False, shell=True)
 run_command("nix-daemon > /var/log/nix.log 2>&1 &")
-run_command("mkdir -p /state/ide/Machine; ln -sf /state/ide-settings.json /state/ide/Machine/settings.json", "ide")
+run_command("mkdir -p /state/ide/Machine && ln -sf /state/ide-settings.json /state/ide/Machine/settings.json", "ide")
+for i in os.getenv("DEVELOPMENT_ENVIRONMENT_PATHS", "").split(";"):
+    if i:
+        run_command(f"mkdir -p /state/misc/{i} && rm -f /home/ide/{i} && ln -sf /state/misc/{i} /home/ide/{i}", "ide")
 if os.getenv("DEVELOPMENT_ENVIRONMENT_REPO") and not os.path.exists("/state/project/.git"):
     if os.getenv("DEVELOPMENT_ENVIRONMENT_BRANCH"):
         run_command(["git", "clone", os.getenv("DEVELOPMENT_ENVIRONMENT_REPO") or "", "-b", os.getenv("DEVELOPMENT_ENVIRONMENT_BRANCH") or "", "/state/project"], "ide", False)
@@ -32,7 +35,7 @@ if os.path.exists("/state/project/flake.lock"):
 run_command(
     f'su ide -c "SSH_AUTH_SOCK=/run/ssh.sock {nix_command} code-server --user-data-dir /state/ide --bind-addr 0.0.0.0:9000 --disable-telemetry --proxy-domain localhost /state/project" > /var/log/code-server.log 2>&1 &'
 )
-for i in os.getenv("DEVELOPMENT_ENVIRONMENT_EXTENSIONS", "").split(","):
+for i in os.getenv("DEVELOPMENT_ENVIRONMENT_EXTENSIONS", "").split(";"):
     if i:
         run_command(f"HOME=/home/ide code-server --user-data-dir /state/ide --install-extension {i}", "ide")
 password = None

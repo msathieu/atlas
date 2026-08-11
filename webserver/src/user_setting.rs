@@ -23,7 +23,12 @@ pub async fn get_user_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let mut db = get_db()?;
-    let allowed_settings = ["development_environment_settings", "development_environment_extensions", "development_environment_gitconfig"];
+    let allowed_settings = [
+        "development_environment_settings",
+        "development_environment_extensions",
+        "development_environment_gitconfig",
+        "development_environment_paths",
+    ];
     let mut settings = HashMap::new();
     for name in allowed_settings {
         let setting = get_user_setting(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?, name.to_string(), &mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
@@ -38,7 +43,12 @@ pub async fn update_user_setting(headers: HeaderMap, Path(name): Path<String>, u
     let body = if name == "development_environment_settings" { body.to_vec() } else { decrypt_body(body)? };
     let request: UpdateUserSettingRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db()?;
-    let allowed_settings = ["development_environment_settings", "development_environment_extensions", "development_environment_gitconfig"];
+    let allowed_settings = [
+        "development_environment_settings",
+        "development_environment_extensions",
+        "development_environment_gitconfig",
+        "development_environment_paths",
+    ];
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);
     }

@@ -27,12 +27,14 @@ export const load: PageLoad = async ({ fetch }) => {
       developmentEnvironmentSettings: userSettings["development_environment_settings"],
       developmentEnvironmentExtensions: userSettings["development_environment_extensions"],
       developmentEnvironmentGitconfig: userSettings["development_environment_gitconfig"],
+      developmentEnvironmentPaths: userSettings["development_environment_paths"],
     };
   } else {
     return {
       developmentEnvironmentSettings: userSettings["development_environment_settings"],
       developmentEnvironmentExtensions: userSettings["development_environment_extensions"],
       developmentEnvironmentGitconfig: userSettings["development_environment_gitconfig"],
+      developmentEnvironmentPaths: userSettings["development_environment_paths"],
     };
   }
 };
