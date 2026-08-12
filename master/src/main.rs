@@ -187,14 +187,6 @@ fn create_settings(db: &mut PgConnection) {
                     })
                     .execute(db)?;
             }
-            if !does_setting_exist(db, "mail_to")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "mail_to".to_owned(),
-                        value: "".to_string(),
-                    })
-                    .execute(db)?;
-            }
             if !does_setting_exist(db, "tls_key")? {
                 println!("TLS key not found, generating...");
                 let key_pair = KeyPair::generate_for(&PKCS_ECDSA_P521_SHA512)?;

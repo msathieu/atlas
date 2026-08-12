@@ -8,9 +8,12 @@ use lettre::{
 use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::Deserialize;
 use serde_json::json;
-use shared_server::{models::Setting, schema::settings};
+use shared_server::{get_user_setting, models::Setting, schema::settings};
+use uuid::Uuid;
 
-pub struct EmailTool;
+pub struct EmailTool {
+    pub user: Uuid,
+}
 
 #[derive(Deserialize)]
 pub struct EmailArgs {
@@ -56,10 +59,7 @@ impl PortableTool for EmailTool {
             .find("mail_from")
             .get_result(&mut db)
             .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
-        let mail_to: Setting = settings::table
-            .find("mail_to")
-            .get_result(&mut db)
-            .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
+        let mail_to = get_user_setting(self.user, "mail_to".to_string(), &mut db).map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
         if mail_server.value.is_empty() || mail_username.value.is_empty() || mail_password.value.is_empty() || mail_from.value.is_empty() || mail_to.value.is_empty() {
             return Err(ToolExecutionError::other("Mail server isn't configured"));
         }

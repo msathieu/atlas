@@ -17,7 +17,7 @@ pub mod time;
 pub fn get_toolset(user: Uuid, chat: Uuid, sequence: i32, tool_call_id: String) -> ToolSet {
     ToolSet::builder()
         .static_tool(DeviceInfoTool {})
-        .static_tool(EmailTool {})
+        .static_tool(EmailTool { user })
         .static_tool(ExecuteCodeTool { user, chat, sequence, tool_call_id })
         .static_tool(PreapproveCodeTool { chat })
         .static_tool(ThinkTool {})

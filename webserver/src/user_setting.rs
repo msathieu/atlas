@@ -28,6 +28,7 @@ pub async fn get_user_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes
         "development_environment_extensions",
         "development_environment_gitconfig",
         "development_environment_paths",
+        "mail_to",
     ];
     let mut settings = HashMap::new();
     for name in allowed_settings {
@@ -48,6 +49,7 @@ pub async fn update_user_setting(headers: HeaderMap, Path(name): Path<String>, u
         "development_environment_extensions",
         "development_environment_gitconfig",
         "development_environment_paths",
+        "mail_to",
     ];
     if !allowed_settings.contains(&name.as_str()) {
         return Err(StatusCode::NOT_FOUND);

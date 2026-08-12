@@ -21,7 +21,7 @@ export const load: PageLoad = async ({ fetch }) => {
       mailServer: settings["mail_server"],
       mailUsername: settings["mail_username"],
       mailFrom: settings["mail_from"],
-      mailTo: settings["mail_to"],
+      mailTo: userSettings["mail_to"],
       installationScript: installationScript["script"],
       apkHash: settings["apk_hash"],
       developmentEnvironmentSettings: userSettings["development_environment_settings"],
@@ -31,6 +31,7 @@ export const load: PageLoad = async ({ fetch }) => {
     };
   } else {
     return {
+      mailTo: userSettings["mail_to"],
       developmentEnvironmentSettings: userSettings["development_environment_settings"],
       developmentEnvironmentExtensions: userSettings["development_environment_extensions"],
       developmentEnvironmentGitconfig: userSettings["development_environment_gitconfig"],

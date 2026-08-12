@@ -46,6 +46,7 @@
 <Setting name="development_environment_extensions" description="Development Environment Extensions" val={developmentEnvironmentExtensions} global="false" type="text" />
 <Setting name="development_environment_gitconfig" description="Development Environment Git Configuration" val={developmentEnvironmentGitconfig} global="false" type="textarea" />
 <Setting name="development_environment_paths" description="Development Environment Persisted Paths" val={developmentEnvironmentPaths} global="false" type="text" />
+<Setting name="mail_to" description="Mail To" val={mailTo} global="false" type="text" />
 
 {#if user.admin}
   <h1 class="text-2xl">System Settings</h1>
@@ -75,7 +76,6 @@
   <Setting name="mail_username" description="Mail Username" val={mailUsername} global="true" type="text" />
   <Setting name="mail_password" description="Mail Password" val={mailPassword} global="true" type="text" />
   <Setting name="mail_from" description="Mail From" val={mailFrom} global="true" type="text" />
-  <Setting name="mail_to" description="Mail To" val={mailTo} global="true" type="text" />
   <Setting name="apk_hash" description="APK Hash" val={apkHash} global="true" type="text" />
 
   <h1 class="text-xl">API Certificate</h1>
