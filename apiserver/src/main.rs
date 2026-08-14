@@ -42,7 +42,10 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time::timeout,
 };
-use tokio_rustls::{TlsAcceptor, rustls};
+use tokio_rustls::{
+    TlsAcceptor,
+    rustls::{self, crypto::aws_lc_rs::kx_group::X25519MLKEM768},
+};
 use uuid::Uuid;
 
 use crate::ssh::handle_ssh_agent;
@@ -56,6 +59,7 @@ async fn main() {
     listen_for_restarts("API".to_string()).await;
     CryptoProvider {
         cipher_suites: vec![TLS13_AES_256_GCM_SHA384],
+        kx_groups: vec![X25519MLKEM768],
         ..aws_lc_rs::default_provider()
     }
     .install_default()
