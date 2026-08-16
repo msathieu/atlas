@@ -63,7 +63,7 @@ pub async fn get_valkey_client() -> Result<(redis::aio::ConnectionManager, Unbou
     );
     let client = redis::Client::open(url)?;
     let mut config = ConnectionManagerConfig::new();
-    config = config.set_automatic_resubscription().set_number_of_retries(50);
+    config = config.set_automatic_resubscription().set_number_of_retries(12);
     let (tx, rx) = unbounded_channel();
     config = config.set_push_sender(tx);
     let manager = redis::aio::ConnectionManager::new_with_config(client, config).await?;

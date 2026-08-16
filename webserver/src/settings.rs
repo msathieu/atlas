@@ -76,7 +76,7 @@ pub async fn restart_system(headers: HeaderMap, uri: OriginalUri, body: Bytes) -
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     notify_server("MASTER:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("API:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server("WEB:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("DEVPROXY:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
