@@ -7,10 +7,9 @@ use diesel::{
 };
 use rig_agent::agent::Text;
 use rig_core::{
-    OneOrMany,
     client::CompletionClient,
     completion::CompletionModel,
-    message::{AssistantContent, ReasoningContent, ToolFunction, ToolResult, ToolResultContent, UserContent},
+    message::{AssistantContent, ProviderCallId, ReasoningContent, ToolCallId, ToolFunction, ToolResult, ToolResultContent, UserContent},
     providers::{openai, openrouter},
 };
 use shared_api::ChatType;
@@ -83,7 +82,10 @@ pub async fn process_chats(pool: Pool<ConnectionManager<PgConnection>>) -> Resul
     }
     Ok(())
 }
-async fn process_chat<C: CompletionClient>(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, error_count: i32, provider: &str, client: C, model: String) -> Result<(), Box<dyn Error>> {
+async fn process_chat<C: CompletionClient>(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, error_count: i32, provider: &str, client: C, model: String) -> Result<(), Box<dyn Error>>
+where
+    C::CompletionModel: Clone,
+{
     let mut db = pool.get()?;
     let chat_id = chat.id.ok_or("Invalid chat")?;
     let messages: Vec<Message> = messages::table.filter(messages::chat.eq(chat_id)).order_by(messages::sequence.asc()).get_results(&mut db)?;
@@ -172,21 +174,22 @@ The servers you can access are: {}
             ai_messages.push(rig_core::message::Message::user(msg.content.clone()));
         } else {
             let tool_calls: Vec<ToolCall> = tool_calls::table.filter(tool_calls::chat.eq(chat_id).and(tool_calls::sequence.eq(msg.sequence))).get_results(&mut db)?;
-            let mut parts = OneOrMany::one(AssistantContent::Text(Text {
+            let mut parts = vec![AssistantContent::Text(Text {
                 text: msg.content.clone(),
                 additional_params: None,
-            }));
+            })];
             for call in &tool_calls {
                 let function = ToolFunction {
                     name: call.tool.clone(),
                     arguments: serde_json::from_str(&call.request)?,
                 };
+                let provider = if let Some(provider_id) = &call.provider_id { ProviderCallId::new(provider_id) } else { None };
                 parts.push(AssistantContent::ToolCall(rig_core::message::ToolCall {
-                    id: call.call_id.clone(),
-                    call_id: call.provider_id.clone(),
+                    id: ToolCallId::new(call.call_id.clone()).ok_or("Invalid call ID")?,
                     function,
                     additional_params: None,
                     signature: None,
+                    provider,
                 }));
             }
             if let Some(reasoning) = msg.reasoning {
@@ -197,16 +200,17 @@ The servers you can access are: {}
                 let mut parts = Vec::new();
                 for call in &tool_calls {
                     let response = call.response.clone().ok_or("Invalid tool call")?;
+                    let provider = if let Some(provider_id) = &call.provider_id { ProviderCallId::new(provider_id) } else { None };
                     parts.push(UserContent::ToolResult(ToolResult {
-                        id: call.call_id.clone(),
-                        call_id: call.provider_id.clone(),
-                        content: OneOrMany::one(ToolResultContent::Text(Text {
+                        call: ToolCallId::new(call.call_id.clone()).ok_or("Invalid call ID")?,
+                        provider,
+                        content: vec![ToolResultContent::Text(Text {
                             text: response,
                             additional_params: None,
-                        })),
+                        })],
+                        name: call.tool.clone(),
                     }));
                 }
-                let parts = OneOrMany::many(parts)?;
                 ai_messages.push(rig_core::message::Message::User { content: parts });
             }
         }
@@ -252,13 +256,13 @@ The servers you can access are: {}
                 calls.push(ToolCall {
                     chat: chat_id,
                     sequence: last_sequence + 1,
-                    call_id: call.id,
+                    call_id: call.id.into_string(),
                     tool: call.function.name,
                     request,
                     response: None,
                     user_consented: consent,
                     initiated: false,
-                    provider_id: call.call_id,
+                    provider_id: call.provider.map(|provider| provider.call_id),
                 });
             }
             AssistantContent::Reasoning(reasoning_arg) => {
@@ -274,7 +278,6 @@ The servers you can access are: {}
                     ReasoningContent::Encrypted(_) => None,
                     ReasoningContent::Redacted { data: _ } => None,
                     ReasoningContent::Summary(text) => Some(text),
-                    _ => return Err("Invalid LLM response".into()),
                 };
             }
             AssistantContent::Image(_) => {

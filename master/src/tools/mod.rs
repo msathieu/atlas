@@ -15,15 +15,15 @@ pub mod summary;
 pub mod time;
 
 pub fn get_toolset(user: Uuid, chat: Uuid, sequence: i32, tool_call_id: String) -> ToolSet {
-    ToolSet::builder()
-        .static_tool(DeviceInfoTool {})
-        .static_tool(EmailTool { user })
-        .static_tool(ExecuteCodeTool { user, chat, sequence, tool_call_id })
-        .static_tool(PreapproveCodeTool { chat })
-        .static_tool(ThinkTool {})
-        .static_tool(TimeTool {})
-        .static_tool(SleepTool {})
-        .static_tool(CompactTool { chat, sequence })
-        .static_tool(SummaryTool { chat })
-        .build()
+    let mut toolset = ToolSet::default();
+    toolset.add_tool(DeviceInfoTool {});
+    toolset.add_tool(EmailTool { user });
+    toolset.add_tool(ExecuteCodeTool { user, chat, sequence, tool_call_id });
+    toolset.add_tool(PreapproveCodeTool { chat });
+    toolset.add_tool(ThinkTool {});
+    toolset.add_tool(TimeTool {});
+    toolset.add_tool(SleepTool {});
+    toolset.add_tool(CompactTool { chat, sequence });
+    toolset.add_tool(SummaryTool { chat });
+    toolset
 }
