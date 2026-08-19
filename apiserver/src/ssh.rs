@@ -39,14 +39,13 @@ pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStr
         return Err("Timeout waiting for user approval".into());
     }
     let response_key = format!("SSH_FORWARD_APPROVAL:{}", signing_id);
-    let response: Option<String> = valkey_client.get(&response_key).await.or(Err("Failed to get response from valkey"))?;
-    if response != Some("APPROVED".to_string()) {
-        return Err("User did not approve SSH forwarding".into());
+    let valkey_response: Option<String> = valkey_client.get(&response_key).await.or(Err("Failed to get response from valkey"))?;
+    let mut response = ForwardSshAgentResponse { signature: vec![], accepted: false };
+    if valkey_response == Some("APPROVED".to_string()) {
+        let signature = key.try_sign(&msg.data)?;
+        response.accepted = true;
+        response.signature = signature.as_bytes().to_vec();
     }
-    let signature = key.try_sign(&msg.data)?;
-    let response = ForwardSshAgentResponse {
-        signature: signature.as_bytes().to_vec(),
-    };
     write_message(MessageType::ForwardSSHAgentResponse, response, stream).await?;
     Ok(())
 }

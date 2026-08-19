@@ -35,13 +35,16 @@ struct SSHAgent {
 static SSH_TASK: LazyLock<Mutex<Option<JoinHandle<()>>>> = LazyLock::new(|| Mutex::new(None));
 static SSH_HEALTH_NOTIFY: Notify = Notify::const_new();
 
-async fn sign_internal(agent: &mut SSHAgent, request: SignRequest) -> Result<Signature, Box<dyn Error>> {
+async fn sign_internal(agent: &mut SSHAgent, request: SignRequest) -> Result<Option<Signature>, Box<dyn Error>> {
     let mut stream = agent.stream.lock().await;
     write_message(MessageType::ForwardSSHAgentRequest, ForwardSshAgentRequest { data: request.data }, &mut *stream).await?;
     let (_, buf) = read_message(&mut *stream, Some(MessageType::ForwardSSHAgentResponse)).await?;
     let response = ForwardSshAgentResponse::decode(&*buf)?;
+    if !response.accepted {
+        return Ok(None);
+    }
     let signature = Signature::new(Algorithm::Ed25519, response.signature)?;
-    Ok(signature)
+    Ok(Some(signature))
 }
 #[async_trait]
 impl Session for SSHAgent {
@@ -55,12 +58,16 @@ impl Session for SSHAgent {
         if request.credential.key_data() != self.key.key_data() {
             return Err(AgentError::Failure);
         }
-        match sign_internal(self, request).await {
-            Ok(signature) => Ok(signature),
+        let signature = match sign_internal(self, request).await {
+            Ok(signature) => signature,
             Err(_) => {
                 SSH_HEALTH_NOTIFY.notify_one();
                 return Err(AgentError::Failure);
             }
+        };
+        match signature {
+            Some(signature) => Ok(signature),
+            None => Err(AgentError::Failure),
         }
     }
 }

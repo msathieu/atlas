@@ -169,6 +169,9 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Stopped as i32 && (container.requested_state == ContainerState::Started as i32 || container.requested_state == ContainerState::Running as i32) {
         let pod_api = Api::namespaced(client, namespace);
+        if pod_api.get_opt(&container_name).await?.is_some() {
+            pod_api.delete(&container_name, &DeleteParams::default()).await?;
+        }
         let mut pod = Pod::default();
         pod.metadata.name = Some(container_name.clone());
         let mut labels = BTreeMap::new();
