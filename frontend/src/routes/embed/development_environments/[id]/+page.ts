@@ -1,12 +1,14 @@
 import { authenticatedFetch } from "$lib/auth.ts";
 import type { PageLoad } from "./$types.ts";
+import { parse, stringify } from "uuid";
 
 export const prerender = false;
 
 export const load: PageLoad = async ({ fetch, params, url }) => {
+  const id = stringify(parse(params.id));
   const development_environments = await authenticatedFetch(`/api/development_environments`, {}, fetch);
   for (const environment of await development_environments.json()) {
-    if (environment.id === params.id) {
+    if (environment.id === id) {
       if (environment.state === "Running") {
         const port = url.searchParams.get("port");
         let query = "";
@@ -14,7 +16,7 @@ export const load: PageLoad = async ({ fetch, params, url }) => {
           const portNumber = parseInt(port);
           query = `?port=${portNumber}`;
         }
-        const urlRes = await authenticatedFetch(`/api/development_environments/${params.id}/open${query}`, {
+        const urlRes = await authenticatedFetch(`/api/development_environments/${id}/open${query}`, {
           method: "POST",
         }, fetch);
         const data = await urlRes.json();
@@ -26,7 +28,7 @@ export const load: PageLoad = async ({ fetch, params, url }) => {
           globalThis.location.href = url.href;
         }
       } else if (!environment.pending) {
-        await authenticatedFetch(`/api/development_environments/${params.id}/start`, {
+        await authenticatedFetch(`/api/development_environments/${id}/start`, {
           method: "POST",
         }, fetch);
       }

@@ -1,13 +1,13 @@
 <script lang="ts">
 import { authenticatedFetch } from "$lib/auth.ts";
-let { data, params } = $props();
+let { data } = $props();
 
 setTimeout(() => {
   globalThis.close();
 }, 60000);
 
 async function approveRequest(approved: boolean) {
-  await authenticatedFetch(`/api/development_environments/ssh_forward/approve/${params.id}`, {
+  await authenticatedFetch(`/api/development_environments/ssh_forward/approve/${data.id}`, {
     method: "POST",
     body: JSON.stringify({ approved }),
   });

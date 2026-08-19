@@ -6,7 +6,7 @@
     "npm:@capacitor/cli@^8.5.0": "8.5.0",
     "npm:@capacitor/core@^8.5.0": "8.5.0",
     "npm:@capawesome/capacitor-passkeys@~0.1.1": "0.1.1_@capacitor+core@8.5.0",
-    "npm:@lucide/svelte@^1.31.0": "1.31.0_svelte@5.56.9",
+    "npm:@lucide/svelte@^1.32.0": "1.32.0_svelte@5.56.9",
     "npm:@sveltejs/adapter-static@^3.0.10": "3.0.10_@sveltejs+kit@2.70.2__@sveltejs+vite-plugin-svelte@7.3.0___svelte@5.56.9___vite@8.2.1____@types+node@26.2.0__svelte@5.56.9__typescript@6.0.3__vite@8.2.1___@types+node@26.2.0_svelte@5.56.9",
     "npm:@sveltejs/kit@^2.70.2": "2.70.2_@sveltejs+vite-plugin-svelte@7.3.0__svelte@5.56.9__vite@8.2.1___@types+node@26.2.0_svelte@5.56.9_typescript@6.0.3_vite@8.2.1__@types+node@26.2.0",
     "npm:@sveltejs/vite-plugin-svelte@^7.3.0": "7.3.0_svelte@5.56.9_vite@8.2.1__@types+node@26.2.0",
@@ -25,6 +25,7 @@
     "npm:svelte@^5.56.9": "5.56.9",
     "npm:tailwindcss@^4.3.3": "4.3.3",
     "npm:typescript@^6.0.3": "6.0.3",
+    "npm:uuid@^14.0.1": "14.0.1",
     "npm:vite@^8.2.1": "8.2.1_@types+node@26.2.0"
   },
   "npm": {
@@ -204,8 +205,8 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "@lucide/svelte@1.31.0_svelte@5.56.9": {
-      "integrity": "sha512-pgPuLEJdF0UpsajG9eSw0YvqXVuDxB+/x58BRiC4xE/KEHiopOqT1id3KCUvRN/PUmQkN1F26sslcs/1jutlBQ==",
+    "@lucide/svelte@1.32.0_svelte@5.56.9": {
+      "integrity": "sha512-fiiaK7PSIndDmYxxf1otAl1rlybF+x1pUxFFJr0Ov7OCgp/CKOXum90t/1YaRbadGAi25Mue+UgifZmufUi+Cw==",
       "dependencies": [
         "svelte"
       ]
@@ -1481,6 +1482,10 @@
     "util-deprecate@1.0.2": {
       "integrity": "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw=="
     },
+    "uuid@14.0.1": {
+      "integrity": "sha512-6ZxzVpzDXDa3bJWaHilVayA+BH/1zmxCJoVgvmqJnid/gPoKHxUrS/aC/T6LGQtNHT+XHG9fXPJB4d+IrU30Ew==",
+      "bin": true
+    },
     "uuid@7.0.3": {
       "integrity": "sha512-DPSke0pXhTZgoF/d+WSt2QaKMCFSfx7QegxEWT+JOuHF5aWrKEn0G+ztjuJg/gG8/ItK+rbPCD/yNv8yyih6Cg==",
       "deprecated": true,
@@ -1532,7 +1537,7 @@
       "integrity": "sha512-kCz5k7J7XbJtjABOvkc5lJmkiDh8VhjVCGNiqdKCscmVpdVUpEAyXv1xmCLkQJ5dsHqx3IPO4XW+NTDhU/fatA==",
       "dependencies": [
         "simple-plist",
-        "uuid"
+        "uuid@7.0.3"
       ]
     },
     "xml2js@0.6.2": {
@@ -1570,7 +1575,7 @@
         "npm:@capacitor/cli@^8.5.0",
         "npm:@capacitor/core@^8.5.0",
         "npm:@capawesome/capacitor-passkeys@~0.1.1",
-        "npm:@lucide/svelte@^1.31.0",
+        "npm:@lucide/svelte@^1.32.0",
         "npm:@sveltejs/adapter-static@^3.0.10",
         "npm:@sveltejs/kit@^2.70.2",
         "npm:@sveltejs/vite-plugin-svelte@^7.3.0",
@@ -1589,6 +1594,7 @@
         "npm:svelte@^5.56.9",
         "npm:tailwindcss@^4.3.3",
         "npm:typescript@^6.0.3",
+        "npm:uuid@^14.0.1",
         "npm:vite@^8.2.1"
       ]
     }

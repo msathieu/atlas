@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 use shared_server::{Claims, authenticate_jwt, models::User, parse_pubkey, schema::users};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::Semaphore;
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
@@ -34,6 +35,8 @@ pub struct LoginResponse {
 pub const JWT_EXPIRY: usize = 8 * 60 * 60;
 #[cfg(not(debug_assertions))]
 pub const JWT_EXPIRY: usize = 2 * 60 * 60;
+
+static HASHING_SEMAPHORE: Semaphore = Semaphore::const_new(5);
 
 pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) -> Result<String, StatusCode> {
     if let Some(pubkey) = &pubkey {
@@ -56,6 +59,7 @@ pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) 
 pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), StatusCode> {
     let request: LoginRequest = serde_json::from_slice(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
     validate_timestamp(request.timestamp)?;
+    let lock = HASHING_SEMAPHORE.acquire().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut db = get_db()?;
     let user: User = users::table
         .filter(users::username.eq(request.username).and(users::enabled.eq(true)).and(users::password_enabled.eq(true)))
@@ -63,6 +67,7 @@ pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), Stat
         .or(Err(StatusCode::UNAUTHORIZED))?;
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::UNAUTHORIZED))?;
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::UNAUTHORIZED))?;
+    drop(lock);
     let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
     diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .set(users::last_login.eq(Some(SystemTime::now())))

@@ -162,6 +162,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         return Ok(());
     }
     let mut device: Device = devices::table.find(uuid).first(&mut db)?;
+    drop(db);
     if device.pubkey != handshake_request.pubkey {
         return Err("Invalid pubkey".into());
     }
@@ -171,9 +172,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
     let challenge: [u8; 128] = rand::random();
     handshake_response.auth_challenge = challenge.to_vec();
     write_message(MessageType::HandshakeResponse, handshake_response, &mut stream).await?;
-    drop(db);
     let (_, buf) = read_message(&mut stream, Some(MessageType::HandshakeFinish)).await?;
-    let mut db = pool.get()?;
     let handshake_finish = HandshakeFinish::decode(&*buf)?;
     let public_key = UnparsedPublicKey::new(&ED25519, &device.pubkey);
     public_key.verify(&challenge, &handshake_finish.auth_response)?;
@@ -184,17 +183,20 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
     device.last_connection = SystemTime::now();
     device.ip = ip;
     device.agent_hash = handshake_request.agent_hash;
+    db = pool.get()?;
     diesel::update(devices::table.find(uuid)).set(&device).execute(&mut db)?;
+    drop(db);
     notify_server("WEB:REFRESH").await?;
 
     if handshake_request.purpose == HandshakePurpose::SSHAgent as u32 {
-        handle_ssh_agent(stream, db, uuid).await?;
+        handle_ssh_agent(stream, pool, uuid).await?;
         return Ok(());
     }
     if handshake_request.purpose != HandshakePurpose::General as u32 {
         return Err("Invalid handshake purpose".into());
     }
 
+    db = pool.get()?;
     if let Ok(agent) = personalize_binary(&mut db, &device.arch, &device.os).await.map_err(|_| "Failed to get agent") {
         let hash = Sha512::digest(&agent).to_vec();
         if hash != device.agent_hash {
