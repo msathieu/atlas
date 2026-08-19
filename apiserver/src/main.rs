@@ -232,7 +232,10 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         if !device_exists {
             return Err("Device no longer exists".into());
         }
-        let command: Option<Command> = commands::table.filter(commands::device.eq(uuid).and(commands::completed.eq(false))).first(&mut db).optional()?;
+        let command: Option<Command> = commands::table
+            .filter(commands::device.eq(uuid).and(commands::completed.eq(false)).and(commands::transient.eq(false)))
+            .first(&mut db)
+            .optional()?;
         if let Some(mut command) = command {
             if command.initiated {
                 command.completed = true;

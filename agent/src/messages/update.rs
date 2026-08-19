@@ -26,7 +26,9 @@ pub async fn handle_update(msg: UpdateRequest, stream: &mut TlsStream<TcpStream>
     }
     self_replace(&tempfile)?;
     tempfile.close()?;
-    write_message(MessageType::UpdateResponse, UpdateResponse { success: true }, stream).await?;
+    if let Some(err) = write_message(MessageType::UpdateResponse, UpdateResponse { success: true }, stream).await.err() {
+        eprintln!("Error during update: {}", err);
+    }
     exit(0);
 }
 

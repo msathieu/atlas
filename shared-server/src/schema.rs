@@ -34,6 +34,7 @@ diesel::table! {
         chat_tool_call_id -> Nullable<Varchar>,
         initiated -> Bool,
         language -> Int4,
+        transient -> Bool,
     }
 }
 

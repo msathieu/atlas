@@ -25,6 +25,7 @@ pub struct Command {
     pub chat_tool_call_id: Option<String>,
     pub initiated: bool,
     pub language: i32,
+    pub transient: bool,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]

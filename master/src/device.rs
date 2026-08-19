@@ -104,6 +104,7 @@ async fn process_device(device: Device, pool: Pool<ConnectionManager<PgConnectio
                 chat_sequence: None,
                 chat_tool_call_id: None,
                 language: i.1 as i32,
+                transient: false,
             };
             diesel::insert_into(commands::table).values(command).execute(db)?;
             added_cmd = true;

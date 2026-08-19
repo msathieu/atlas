@@ -107,6 +107,7 @@ pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -
         chat_sequence: None,
         chat_tool_call_id: None,
         language: CommandLanguage::Lua as i32,
+        transient: false,
     };
     cmd = diesel::insert_into(commands::table).values(cmd).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
     notify_server(&format!("API:DEVICE:{}", request.device)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

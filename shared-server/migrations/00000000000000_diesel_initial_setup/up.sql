@@ -117,6 +117,7 @@ CREATE TABLE commands(
     chat_tool_call_id varchar,
     initiated boolean NOT NULL,
     language integer NOT NULL,
+    transient boolean NOT NULL,
     FOREIGN KEY (chat_id, chat_sequence, chat_tool_call_id) REFERENCES tool_calls ON DELETE CASCADE
 );
 CREATE TABLE development_environments(

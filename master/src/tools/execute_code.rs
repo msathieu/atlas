@@ -62,7 +62,7 @@ impl ExecuteCodeTool {
             device: args.device,
             uid: Some(self.user),
             code,
-            completed: true,
+            completed: false,
             status_code: 0,
             stdout: "".to_owned(),
             stderr: "".to_owned(),
@@ -75,14 +75,16 @@ impl ExecuteCodeTool {
             chat_tool_call_id: Some(self.tool_call_id.clone()),
             initiated: false,
             language: CommandLanguage::Lua as i32,
+            transient: true,
         };
         let cmd: Command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
         let cmd_id = cmd.id.ok_or("Invalid command")?;
         let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
         pubsub_client.subscribe(format!("MASTER:CMD:{}", cmd_id)).await?;
-        diesel::update(commands::table.find(cmd_id)).set(commands::completed.eq(false)).execute(&mut db)?;
-        notify_server(&format!("API:DEVICE:{}", args.device)).await?;
+        diesel::update(commands::table.find(cmd_id)).set(commands::transient.eq(false)).execute(&mut db)?;
         drop(db);
+        notify_server(&format!("API:DEVICE:{}", args.device)).await?;
+        notify_server(&format!("WEB:REFRESH:{}", self.user)).await?;
         wait_for_pubsub_msg(&mut receiver).await;
         let mut db = pool.get()?;
         let cmd: Command = commands::table.find(cmd_id).get_result(&mut db)?;

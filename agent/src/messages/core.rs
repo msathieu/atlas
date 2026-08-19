@@ -15,6 +15,7 @@ pub async fn handle_command(msg: CommandRequest, stream: &mut TlsStream<TcpStrea
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .kill_on_drop(true)
         .spawn()?;
     cmd.stdin.take().ok_or("Invalid FD")?.write_all(msg.code.as_bytes()).await?;
     while timeout(Duration::from_secs(30), async {

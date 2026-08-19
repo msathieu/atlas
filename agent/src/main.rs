@@ -17,12 +17,11 @@ use shared_api::{CommandRequest, HandshakePurpose, HeartbeatRequest, MessageType
 use std::env::args;
 use std::ffi::CStr;
 use std::io::stdin;
-use std::process::{Stdio, exit};
+use std::os::unix::process::CommandExt;
+use std::process::{Command, exit};
 use std::ptr;
 use std::{env, error::Error, io::Read, sync::Arc, time::Duration};
 use tokio::fs::DirBuilder;
-use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
 use tokio::time::sleep;
 use tokio_rustls::rustls::pki_types::CertificateDer;
 use tokio_rustls::rustls::pki_types::pem::PemObject;
@@ -65,12 +64,8 @@ async fn main() {
             lua.load(code).exec().unwrap();
             return;
         } else if cmd == "execute-python" {
-            let mut code = String::new();
-            stdin().read_to_string(&mut code).unwrap();
-            let mut cmd = Command::new("/usr/bin/env").arg("python3").arg("-").stdin(Stdio::piped()).spawn().unwrap();
-            cmd.stdin.take().unwrap().write_all(code.as_bytes()).await.unwrap();
-            let result = cmd.wait().await.unwrap();
-            exit(result.code().unwrap());
+            let _ = Command::new("/usr/bin/env").arg("python3").arg("-").exec();
+            exit(1);
         } else if cmd == "self-test" {
             println!("OK");
             return;

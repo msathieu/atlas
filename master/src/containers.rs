@@ -109,7 +109,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         let storageclass = env::var("STORAGE_CLASS")?;
         let pvc_api = Api::namespaced(client.clone(), namespace);
         let mut pvc = PersistentVolumeClaim::default();
-        pvc.metadata.name = Some(pvc_name);
+        pvc.metadata.name = Some(pvc_name.clone());
         let mut resources = BTreeMap::new();
         resources.insert("storage".to_string(), Quantity(format!("{}Gi", container.storage_size)));
         pvc.spec = Some(PersistentVolumeClaimSpec {
@@ -121,14 +121,13 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             }),
             ..Default::default()
         });
-        pvc_api.create(&PostParams::default(), &pvc).await?;
-        diesel::update(containers::table.find(container_id))
-            .set(containers::state.eq(ContainerState::Stopped as i32))
-            .execute(&mut db)?;
+        if pvc_api.get_opt(&pvc_name).await?.is_none() {
+            pvc_api.create(&PostParams::default(), &pvc).await?;
+        }
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let service_api = Api::namespaced(client, namespace);
             let mut service = Service::default();
-            service.metadata.name = Some(service_name);
+            service.metadata.name = Some(service_name.clone());
             let mut selector = BTreeMap::new();
             selector.insert("app".to_string(), container_name);
             service.spec = Some(ServiceSpec {
@@ -136,16 +135,23 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 ports: Some(vec![ServicePort { port: 9000, ..Default::default() }]),
                 ..Default::default()
             });
-            service_api.create(&PostParams::default(), &service).await?;
-            pvc.metadata.name = Some(nix_pvc_name);
+            if service_api.get_opt(&service_name).await?.is_none() {
+                service_api.create(&PostParams::default(), &service).await?;
+            }
+            pvc.metadata.name = Some(nix_pvc_name.clone());
             let mut resources = BTreeMap::new();
             resources.insert("storage".to_string(), Quantity("25Gi".to_string()));
             pvc.spec.as_mut().ok_or("Invalid PVC")?.resources = Some(VolumeResourceRequirements {
                 limits: None,
                 requests: Some(resources),
             });
-            pvc_api.create(&PostParams::default(), &pvc).await?;
+            if pvc_api.get_opt(&nix_pvc_name).await?.is_none() {
+                pvc_api.create(&PostParams::default(), &pvc).await?;
+            }
         }
+        diesel::update(containers::table.find(container_id))
+            .set(containers::state.eq(ContainerState::Stopped as i32))
+            .execute(&mut db)?;
         notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Stopped as i32 && container.requested_state == ContainerState::NonExistent as i32 {
@@ -421,6 +427,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 chat_tool_call_id: None,
                 initiated: false,
                 language: CommandLanguage::Python as i32,
+                transient: false,
             };
             command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
             diesel::update(development_environments::table.find(container_id))
