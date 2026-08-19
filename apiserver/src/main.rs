@@ -20,8 +20,8 @@ use rustls::{
 };
 use sha2::{Digest, Sha512};
 use shared_api::{
-    API_VERSION, CommandOrigin, CommandRequest, CommandResponse, ContainerOrigin, HandshakeFinish, HandshakePurpose, HandshakeRequest, HandshakeResponse, HeartbeatRequest, HeartbeatResponse, MAGIC,
-    MessageType, SUPPORTED_ARCH, SUPPORTED_OS, StartSshAgentRequest, UpdateRequest, UpdateResponse, handle_heartbeat, print_startup, read_message, write_message,
+    API_VERSION, CommandOrigin, CommandRequest, CommandResponse, ContainerOrigin, HandshakeFinish, HandshakePurpose, HandshakeRequest, HandshakeResponse, HeartbeatRequest, MAGIC, MessageType,
+    SUPPORTED_ARCH, SUPPORTED_OS, StartSshAgentRequest, UpdateRequest, UpdateResponse, handle_heartbeat, print_startup, read_message, send_heartbeat, write_message,
 };
 use shared_server::{
     binary::personalize_binary,
@@ -282,13 +282,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         .await
         .is_err()
         {
-            let heartbeat = HeartbeatRequest { random: rand::random() };
-            write_message(MessageType::HeartbeatRequest, heartbeat, &mut stream).await?;
-            let (_, buf) = read_message(&mut stream, Some(MessageType::HeartbeatResponse)).await?;
-            let response = HeartbeatResponse::decode(&*buf)?;
-            if response.random != heartbeat.random {
-                return Err("Invalid heartbeat response".into());
-            }
+            send_heartbeat(&mut stream).await?;
             diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db)?;
         }
     }

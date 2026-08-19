@@ -124,3 +124,13 @@ pub async fn handle_heartbeat(msg: HeartbeatRequest, stream: &mut TlsStream<TcpS
     write_message(MessageType::HeartbeatResponse, response, stream).await?;
     Ok(())
 }
+pub async fn send_heartbeat(stream: &mut TlsStream<TcpStream>) -> Result<(), Box<dyn Error>> {
+    let heartbeat = HeartbeatRequest { random: rand::random() };
+    write_message(MessageType::HeartbeatRequest, heartbeat, stream).await?;
+    let (_, buf) = read_message(stream, Some(MessageType::HeartbeatResponse)).await?;
+    let response = HeartbeatResponse::decode(&*buf)?;
+    if response.random != heartbeat.random {
+        return Err("Invalid heartbeat response".into());
+    }
+    Ok(())
+}

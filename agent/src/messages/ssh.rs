@@ -1,7 +1,7 @@
 use crate::{DATABASE_URL, misc::start_connection};
 use diesel::{Connection, SqliteConnection};
 use prost::Message;
-use shared_api::{ForwardSshAgentRequest, ForwardSshAgentResponse, HandshakePurpose, MessageType, StartSshAgentRequest, StartSshAgentResponse, read_message, write_message};
+use shared_api::{ForwardSshAgentRequest, ForwardSshAgentResponse, HandshakePurpose, MessageType, StartSshAgentRequest, StartSshAgentResponse, read_message, send_heartbeat, write_message};
 use ssh_agent_lib::{
     agent::{Session, listen},
     async_trait,
@@ -69,19 +69,25 @@ async fn check_health() -> Result<(), Box<dyn Error>> {
     SSH_HEALTH_NOTIFY.notified().await;
     Err("SSH Agent is unhealthy".into())
 }
+async fn heartbeat_loop(stream: Arc<Mutex<TlsStream<TcpStream>>>) -> Result<(), Box<dyn Error>> {
+    loop {
+        sleep(Duration::from_secs(60)).await;
+        let mut stream_locked = stream.lock().await;
+        send_heartbeat(&mut stream_locked).await?;
+    }
+}
 async fn ssh_agent(key: PublicKey, host: &str, tls_connector: &TlsConnector, db: &mut SqliteConnection) -> Result<(), Box<dyn Error>> {
     let stream = start_connection(host, tls_connector, db, HandshakePurpose::SSHAgent).await?.ok_or("Invalid device state")?;
     let path = "/run/ssh.sock";
     remove_file(path).await.ok();
     let listener = UnixListener::bind(path)?;
     set_permissions(path, Permissions::from_mode(0o777)).await?;
-    let agent = SSHAgent {
-        key,
-        stream: Arc::new(Mutex::new(stream)),
-    };
+    let stream = Arc::new(Mutex::new(stream));
+    let agent = SSHAgent { key, stream: stream.clone() };
     select! {
         result = listen(listener, agent) => result?,
         result = check_health() => result?,
+        result = heartbeat_loop(stream) => result?,
     };
     Ok(())
 }
