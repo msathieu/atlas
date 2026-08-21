@@ -23,7 +23,7 @@ use std::{env, sync::OnceLock};
 use tokio::net::lookup_host;
 use uuid::Uuid;
 
-struct DevProxy;
+struct Proxy;
 struct RestartService;
 
 struct ProxyContext {
@@ -38,7 +38,7 @@ static VALKEY_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
 #[async_trait]
 impl BackgroundService for RestartService {
     async fn start(&self, mut _shutdown: ShutdownWatch) {
-        listen_for_restarts("DEVPROXY".to_string()).await;
+        listen_for_restarts("PROXY".to_string()).await;
     }
 }
 fn get_login_body(id: Uuid) -> Result<String> {
@@ -54,7 +54,7 @@ fn get_login_body(id: Uuid) -> Result<String> {
     Ok(format!("password={}", command.stdout))
 }
 #[async_trait]
-impl ProxyHttp for DevProxy {
+impl ProxyHttp for Proxy {
     type CTX = ProxyContext;
     fn new_ctx(&self) -> Self::CTX {
         ProxyContext {
@@ -98,9 +98,9 @@ impl ProxyHttp for DevProxy {
             let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
             let jwt = uri.query().ok_or(Error::new_down(InvalidHTTPHeader))?.strip_prefix("jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
             if port.is_some() {
-                authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+                authenticate_jwt(jwt, &format!("proxy-devproxy-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
             } else {
-                authenticate_jwt(jwt, &format!("devproxy-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+                authenticate_jwt(jwt, &format!("proxy-dev-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
             }
             let cookie = format!("atlas_jwt={}; HttpOnly; Secure; SameSite=Strict", jwt);
             response.append_header("Set-Cookie", cookie).or(Err(Error::new(InternalError)))?;
@@ -116,9 +116,9 @@ impl ProxyHttp for DevProxy {
                     if cookie.starts_with("atlas_jwt=") {
                         let jwt = cookie.strip_prefix("atlas_jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
                         let auth_result = if port.is_some() {
-                            authenticate_jwt(jwt, &format!("devproxy-proxy-{}", uuid), None, true)
+                            authenticate_jwt(jwt, &format!("proxy-devproxy-{}", uuid), None, true)
                         } else {
-                            authenticate_jwt(jwt, &format!("devproxy-{}", uuid), None, true)
+                            authenticate_jwt(jwt, &format!("proxy-dev-{}", uuid), None, true)
                         };
                         if auth_result.is_ok() {
                             authenticated = true;
@@ -210,14 +210,14 @@ impl ProxyHttp for DevProxy {
 }
 
 fn main() {
-    print_startup("devproxy", env!("CARGO_PKG_VERSION"));
+    print_startup("proxy", env!("CARGO_PKG_VERSION"));
     dotenvy::dotenv().ok();
     DB_POOL.set(get_db_pool().unwrap()).unwrap();
     let mut db = DB_POOL.get().unwrap().get().unwrap();
     authenticate_jwt("", "", Some(&mut db), false).ok(); // Prefetch JWT_KEY
     let mut server = Server::new_with_opt_and_conf(None, ServerConf { threads: 4, ..Default::default() });
     server.bootstrap();
-    let mut proxy = http_proxy_service(&server.configuration, DevProxy);
+    let mut proxy = http_proxy_service(&server.configuration, Proxy);
     proxy.add_tcp("0.0.0.0:8001");
     let restart_service = background_service("restart", RestartService);
     server.add_service(proxy);

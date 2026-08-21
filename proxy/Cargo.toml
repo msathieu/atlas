@@ -1,5 +1,5 @@
 [package]
-name = "devproxy"
+name = "proxy"
 version.workspace = true
 edition = "2024"
 license = "Unlicense"

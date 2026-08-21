@@ -56,4 +56,4 @@ spec:
           kubernetes.io/metadata.name: {{ .Values.namespace }}
       podSelector:
         matchLabels:
-          app: atlas-devproxy
+          app: atlas-proxy

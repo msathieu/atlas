@@ -57,4 +57,4 @@ spec:
           app: atlas-web
     - podSelector:
         matchLabels:
-          app: atlas-devproxy
+          app: atlas-proxy
