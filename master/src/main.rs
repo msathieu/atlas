@@ -18,7 +18,7 @@ use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use rcgen::{CertificateParams, KeyPair, PKCS_ECDSA_P521_SHA512};
 use shared_api::{CommandOrigin, print_startup};
 use shared_server::models::{Setting, User};
-use shared_server::schema::{commands, settings, users};
+use shared_server::schema::{commands, settings, tool_calls, users};
 use shared_server::{get_db_pool, get_valkey_client, hash_password, listen_for_restarts, notify_server, wait_for_pubsub_msg};
 use std::error::Error;
 use std::sync::OnceLock;
@@ -50,6 +50,10 @@ async fn main() {
         db.run_pending_migrations(MIGRATIONS).unwrap();
         create_settings(&mut db);
         diesel::delete(commands::table.filter(commands::origin.eq(CommandOrigin::LLMTool as i32))).execute(&mut db).unwrap();
+        diesel::update(tool_calls::table.filter(tool_calls::initiated.eq(true).and(tool_calls::response.is_null())))
+            .set(tool_calls::response.eq(Some("Tool call was interrupted")))
+            .execute(&mut db)
+            .unwrap();
     }
     let device_pool = pool.clone();
     let llm_pool = pool.clone();
