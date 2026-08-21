@@ -191,3 +191,11 @@ pub struct UserSetting {
     pub name: String,
     pub value: String,
 }
+
+#[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
+#[diesel(table_name = crate::schema::agents)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Agent {
+    pub id: Uuid,
+    pub name: String,
+}

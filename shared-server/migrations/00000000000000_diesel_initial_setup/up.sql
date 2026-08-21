@@ -135,3 +135,7 @@ CREATE TABLE user_settings(
     value varchar NOT NULL,
     PRIMARY KEY(uid, name)
 );
+CREATE TABLE agents(
+    id uuid PRIMARY KEY REFERENCES containers ON DELETE CASCADE,
+    name varchar NOT NULL
+);

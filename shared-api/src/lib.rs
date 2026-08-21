@@ -57,6 +57,7 @@ pub enum ChatType {
 #[repr(u32)]
 pub enum ContainerOrigin {
     DevelopmentEnvironment = 0,
+    Agent = 1,
 }
 #[derive(PartialEq, TryFromPrimitive)]
 #[repr(u32)]

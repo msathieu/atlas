@@ -187,7 +187,12 @@ pub async fn start_development_environment(headers: HeaderMap, Path(id): Path<Uu
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db()?;
     containers::table
-        .filter(containers::id.eq(id).and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
+        .filter(
+            containers::id
+                .eq(id)
+                .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+                .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
+        )
         .first::<Container>(&mut db)
         .or(Err(StatusCode::NOT_FOUND))?;
     let key = format!("DEVELOPMENT_ENVIRONMENT:{}", id);

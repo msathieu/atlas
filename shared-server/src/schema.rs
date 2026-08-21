@@ -1,6 +1,13 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    agents (id) {
+        id -> Uuid,
+        name -> Varchar,
+    }
+}
+
+diesel::table! {
     chats (id) {
         id -> Uuid,
         uid -> Uuid,
@@ -170,6 +177,7 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(agents -> containers (id));
 diesel::joinable!(chats -> users (uid));
 diesel::joinable!(commands -> devices (device));
 diesel::joinable!(commands -> users (uid));
@@ -184,6 +192,7 @@ diesel::joinable!(preapproved_code -> chats (chat));
 diesel::joinable!(user_settings -> users (uid));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    agents,
     chats,
     commands,
     containers,

@@ -23,10 +23,18 @@ use std::{env, sync::OnceLock};
 use tokio::net::lookup_host;
 use uuid::Uuid;
 
+#[derive(PartialEq, Clone, Copy)]
+enum ProxyType {
+    Unknown = 0,
+    DevelopmentEnvironment = 1,
+    Agent = 2,
+}
+
 struct Proxy;
 struct RestartService;
 
 struct ProxyContext {
+    request_type: ProxyType,
     id: Uuid,
     port: Option<u16>,
     login_upstream: bool,
@@ -53,25 +61,55 @@ fn get_login_body(id: Uuid) -> Result<String> {
     }
     Ok(format!("password={}", command.stdout))
 }
+fn authenticate_proxy_jwt(request_type: ProxyType, port: Option<u16>, jwt: &str, uuid: Uuid) -> Result<()> {
+    if request_type == ProxyType::DevelopmentEnvironment {
+        if port.is_some() {
+            authenticate_jwt(jwt, &format!("proxy-devproxy-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+        } else {
+            authenticate_jwt(jwt, &format!("proxy-dev-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+        }
+    } else if request_type == ProxyType::Agent {
+        authenticate_jwt(jwt, &format!("proxy-agent-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+    } else {
+        return Err(Error::new(InternalError));
+    }
+    Ok(())
+}
 #[async_trait]
 impl ProxyHttp for Proxy {
     type CTX = ProxyContext;
     fn new_ctx(&self) -> Self::CTX {
         ProxyContext {
+            request_type: ProxyType::Unknown,
             id: Uuid::nil(),
             port: None,
             login_upstream: false,
         }
     }
     async fn upstream_peer(&self, _session: &mut Session, ctx: &mut Self::CTX) -> Result<Box<HttpPeer>> {
-        let domain_name = format!("atlas-dev-{}.atlas.svc.cluster.local:9000", ctx.id);
-        let address = lookup_host(domain_name)
-            .await
-            .or(Err(Error::new_down(InvalidHTTPHeader)))?
-            .next()
-            .ok_or(Error::new_down(InvalidHTTPHeader))?;
-        let upstream = HttpPeer::new(address, false, "".to_string());
-        Ok(Box::new(upstream))
+        match ctx.request_type {
+            ProxyType::Unknown => Err(Error::new(InternalError)),
+            ProxyType::DevelopmentEnvironment => {
+                let domain_name = format!("atlas-dev-{}.atlas.svc.cluster.local:9000", ctx.id);
+                let address = lookup_host(domain_name)
+                    .await
+                    .or(Err(Error::new_down(InvalidHTTPHeader)))?
+                    .next()
+                    .ok_or(Error::new_down(InvalidHTTPHeader))?;
+                let upstream = HttpPeer::new(address, false, "".to_string());
+                Ok(Box::new(upstream))
+            }
+            ProxyType::Agent => {
+                let domain_name = format!("atlas-agent-{}.atlas.svc.cluster.local:9119", ctx.id);
+                let address = lookup_host(domain_name)
+                    .await
+                    .or(Err(Error::new_down(InvalidHTTPHeader)))?
+                    .next()
+                    .ok_or(Error::new_down(InvalidHTTPHeader))?;
+                let upstream = HttpPeer::new(address, false, "".to_string());
+                Ok(Box::new(upstream))
+            }
+        }
     }
     async fn request_filter(&self, session: &mut Session, ctx: &mut Self::CTX) -> Result<bool> {
         let host = session.get_header("Host");
@@ -80,9 +118,12 @@ impl ProxyHttp for Proxy {
 
         let mut uuid = None;
         let mut port: Option<u16> = None;
+        let mut request_type = ProxyType::Unknown;
         if let Some(subdomain) = host.strip_suffix(&format!(".dev.{}", webserver_host)) {
+            request_type = ProxyType::DevelopmentEnvironment;
             uuid = Some(Uuid::parse_str(subdomain).or(Err(Error::new_down(InvalidHTTPHeader)))?);
         } else if let Some(stripped_host) = host.strip_suffix(&format!(".devproxy.{}", webserver_host)) {
+            request_type = ProxyType::DevelopmentEnvironment;
             let (uuid_str, port_str) = stripped_host.rsplit_once('-').ok_or(Error::new_down(InvalidHTTPHeader))?;
             uuid = Some(Uuid::parse_str(uuid_str).or(Err(Error::new_down(InvalidHTTPHeader)))?);
             let parsed_port = port_str.parse().or(Err(Error::new_down(InvalidHTTPHeader)))?;
@@ -90,6 +131,9 @@ impl ProxyHttp for Proxy {
                 return Err(Error::new_down(InvalidHTTPHeader));
             }
             port = Some(parsed_port);
+        } else if let Some(subdomain) = host.strip_suffix(&format!(".agent.{}", webserver_host)) {
+            request_type = ProxyType::Agent;
+            uuid = Some(Uuid::parse_str(subdomain).or(Err(Error::new_down(InvalidHTTPHeader)))?);
         }
         let uuid = uuid.ok_or(Error::new_down(InvalidHTTPHeader))?;
 
@@ -97,11 +141,7 @@ impl ProxyHttp for Proxy {
         if uri.path() == "/atlas_setup" {
             let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
             let jwt = uri.query().ok_or(Error::new_down(InvalidHTTPHeader))?.strip_prefix("jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
-            if port.is_some() {
-                authenticate_jwt(jwt, &format!("proxy-devproxy-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
-            } else {
-                authenticate_jwt(jwt, &format!("proxy-dev-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
-            }
+            authenticate_proxy_jwt(request_type, port, jwt, uuid)?;
             let cookie = format!("atlas_jwt={}; HttpOnly; Secure; SameSite=Strict", jwt);
             response.append_header("Set-Cookie", cookie).or(Err(Error::new(InternalError)))?;
             response.append_header("Set-Cookie", "code-server-session=; Max-Age=-1").or(Err(Error::new(InternalError)))?;
@@ -115,12 +155,7 @@ impl ProxyHttp for Proxy {
                     let cookie = cookie.trim();
                     if cookie.starts_with("atlas_jwt=") {
                         let jwt = cookie.strip_prefix("atlas_jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
-                        let auth_result = if port.is_some() {
-                            authenticate_jwt(jwt, &format!("proxy-devproxy-{}", uuid), None, true)
-                        } else {
-                            authenticate_jwt(jwt, &format!("proxy-dev-{}", uuid), None, true)
-                        };
-                        if auth_result.is_ok() {
+                        if authenticate_proxy_jwt(request_type, port, jwt, uuid).is_ok() {
                             authenticated = true;
                         }
                         break;
@@ -140,13 +175,20 @@ impl ProxyHttp for Proxy {
                 if let Some(port) = port {
                     query = format!("?port={}", port);
                 }
-                response
-                    .insert_header("Location", format!("https://{}/embed/development_environments/{}{}", webserver_host, uuid, query))
-                    .or(Err(Error::new(InternalError)))?;
+                if request_type == ProxyType::DevelopmentEnvironment {
+                    response
+                        .insert_header("Location", format!("https://{}/embed/development_environments/{}{}", webserver_host, uuid, query))
+                        .or(Err(Error::new(InternalError)))?;
+                } else if request_type == ProxyType::Agent {
+                    response
+                        .insert_header("Location", format!("https://{}/embed/agents/{}{}", webserver_host, uuid, query))
+                        .or(Err(Error::new(InternalError)))?;
+                }
                 session.write_response_header(Box::new(response), false).await.or(Err(Error::new(InternalError)))?;
                 return Ok(true);
             }
         }
+        ctx.request_type = request_type;
         ctx.id = uuid;
         ctx.port = port;
         if ctx.port.is_none() {
@@ -167,7 +209,9 @@ impl ProxyHttp for Proxy {
     }
     async fn upstream_request_filter(&self, session: &mut Session, upstream_request: &mut RequestHeader, ctx: &mut Self::CTX) -> Result<()> {
         let uri = &session.req_header().uri;
-        if let Some(port) = ctx.port {
+        if ctx.request_type == ProxyType::DevelopmentEnvironment
+            && let Some(port) = ctx.port
+        {
             let upstream_host = format!("{}.localhost", port);
             upstream_request.insert_header("Host", &upstream_host).or(Err(Error::new(InternalError)))?;
             if let Some(upgrade_header) = session.get_header("Upgrade")
@@ -176,28 +220,30 @@ impl ProxyHttp for Proxy {
                 upstream_request.insert_header("Origin", format!("https://{}", upstream_host)).or(Err(Error::new(InternalError)))?;
             }
         }
-        let mut is_logged_in = false;
-        if let Some(cookie_header) = session.get_header("Cookie") {
-            let mut new_cookie_header = String::new();
-            for header in cookie_header.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?.split(";") {
-                let header = header.trim();
-                if !header.starts_with("atlas_jwt=") {
-                    if !new_cookie_header.is_empty() {
-                        new_cookie_header.push_str("; ");
+        if ctx.request_type == ProxyType::DevelopmentEnvironment {
+            let mut is_logged_in = false;
+            if let Some(cookie_header) = session.get_header("Cookie") {
+                let mut new_cookie_header = String::new();
+                for header in cookie_header.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?.split(";") {
+                    let header = header.trim();
+                    if !header.starts_with("atlas_jwt=") {
+                        if !new_cookie_header.is_empty() {
+                            new_cookie_header.push_str("; ");
+                        }
+                        new_cookie_header.push_str(header);
                     }
-                    new_cookie_header.push_str(header);
+                    if header.starts_with("code-server-session=") {
+                        is_logged_in = true;
+                    }
                 }
-                if header.starts_with("code-server-session=") {
-                    is_logged_in = true;
-                }
+                upstream_request.insert_header("Cookie", new_cookie_header).or(Err(Error::new(InternalError)))?;
             }
-            upstream_request.insert_header("Cookie", new_cookie_header).or(Err(Error::new(InternalError)))?;
-        }
-        if (!is_logged_in || ctx.port.is_none()) && uri.path() == "/login" {
-            upstream_request.set_method(Method::POST);
-            upstream_request.insert_header("Content-Type", "application/x-www-form-urlencoded").or(Err(Error::new(InternalError)))?;
-            upstream_request.insert_header("Content-Length", get_login_body(ctx.id)?.len()).or(Err(Error::new(InternalError)))?;
-            ctx.login_upstream = true;
+            if (!is_logged_in || ctx.port.is_none()) && uri.path() == "/login" {
+                upstream_request.set_method(Method::POST);
+                upstream_request.insert_header("Content-Type", "application/x-www-form-urlencoded").or(Err(Error::new(InternalError)))?;
+                upstream_request.insert_header("Content-Length", get_login_body(ctx.id)?.len()).or(Err(Error::new(InternalError)))?;
+                ctx.login_upstream = true;
+            }
         }
         Ok(())
     }

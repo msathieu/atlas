@@ -1,4 +1,4 @@
-use crate::code::PY_DEVELOPMENT_ENVIRONMENT;
+use crate::code::{PY_AGENT, PY_DEVELOPMENT_ENVIRONMENT};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use diesel::prelude::*;
@@ -71,7 +71,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
     let container_name = format!("atlas-{}", container_id);
     let pvc_name = format!("atlas-state-{}", container_id);
     let nix_pvc_name = format!("atlas-nix-{}", container_id);
-    let service_name = format!("atlas-dev-{}", container_id);
+    let service_name_dev = format!("atlas-dev-{}", container_id);
+    let service_name_agent = format!("atlas-agent-{}", container_id);
     let namespace = "atlas";
     if container.state == ContainerState::Running as i32 || container.state == ContainerState::Started as i32 {
         let pod_api: Api<Pod> = Api::namespaced(client.clone(), namespace);
@@ -127,7 +128,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let service_api = Api::namespaced(client, namespace);
             let mut service = Service::default();
-            service.metadata.name = Some(service_name.clone());
+            service.metadata.name = Some(service_name_dev.clone());
             let mut selector = BTreeMap::new();
             selector.insert("app".to_string(), container_name);
             service.spec = Some(ServiceSpec {
@@ -135,7 +136,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 ports: Some(vec![ServicePort { port: 9000, ..Default::default() }]),
                 ..Default::default()
             });
-            if service_api.get_opt(&service_name).await?.is_none() {
+            if service_api.get_opt(&service_name_dev).await?.is_none() {
                 service_api.create(&PostParams::default(), &service).await?;
             }
             pvc.metadata.name = Some(nix_pvc_name.clone());
@@ -147,6 +148,20 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             });
             if pvc_api.get_opt(&nix_pvc_name).await?.is_none() {
                 pvc_api.create(&PostParams::default(), &pvc).await?;
+            }
+        } else if container.origin == ContainerOrigin::Agent as i32 {
+            let service_api = Api::namespaced(client, namespace);
+            let mut service = Service::default();
+            service.metadata.name = Some(service_name_agent.clone());
+            let mut selector = BTreeMap::new();
+            selector.insert("app".to_string(), container_name);
+            service.spec = Some(ServiceSpec {
+                selector: Some(selector),
+                ports: Some(vec![ServicePort { port: 9119, ..Default::default() }]),
+                ..Default::default()
+            });
+            if service_api.get_opt(&service_name_agent).await?.is_none() {
+                service_api.create(&PostParams::default(), &service).await?;
             }
         }
         diesel::update(containers::table.find(container_id))
@@ -161,11 +176,16 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         }
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let service_api: Api<Service> = Api::namespaced(client, namespace);
-            if service_api.get_opt(&service_name).await?.is_some() {
-                service_api.delete(&service_name, &DeleteParams::default()).await?;
+            if service_api.get_opt(&service_name_dev).await?.is_some() {
+                service_api.delete(&service_name_dev, &DeleteParams::default()).await?;
             }
             if pvc_api.get_opt(&nix_pvc_name).await?.is_some() {
                 pvc_api.delete(&nix_pvc_name, &DeleteParams::default()).await?;
+            }
+        } else if container.origin == ContainerOrigin::Agent as i32 {
+            let service_api: Api<Service> = Api::namespaced(client, namespace);
+            if service_api.get_opt(&service_name_agent).await?.is_some() {
+                service_api.delete(&service_name_agent, &DeleteParams::default()).await?;
             }
         }
         diesel::update(containers::table.find(container_id))
@@ -184,6 +204,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         labels.insert("app".to_string(), container_name);
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             labels.insert("atlas-type".to_string(), "development-environment".to_string());
+        } else if container.origin == ContainerOrigin::Agent as i32 {
+            labels.insert("atlas-type".to_string(), "agent".to_string());
         }
         pod.metadata.labels = Some(labels);
         let volume = Volume {
@@ -433,6 +455,28 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             diesel::update(development_environments::table.find(container_id))
                 .set(development_environments::ide_password.eq(command.id.ok_or("Invalid command")?))
                 .execute(&mut db)?;
+        } else if container.origin == ContainerOrigin::Agent as i32 {
+            let command = Command {
+                id: None,
+                device: device.id.ok_or("Invalid device")?,
+                uid: Some(container.uid),
+                code: PY_AGENT.to_string(),
+                completed: false,
+                status_code: 0,
+                stdout: "".to_owned(),
+                stderr: "".to_owned(),
+                requested_timestamp: SystemTime::now(),
+                completed_timestamp: None,
+                origin: CommandOrigin::SystemInitiated as i32,
+                device_info_type: None,
+                chat_id: None,
+                chat_sequence: None,
+                chat_tool_call_id: None,
+                initiated: false,
+                language: CommandLanguage::Python as i32,
+                transient: false,
+            };
+            diesel::insert_into(commands::table).values(command).execute(&mut db)?;
         }
         notify_server("WEB:REFRESH").await?;
         notify_server("MASTER:CONTAINERS").await?;

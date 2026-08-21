@@ -2,6 +2,7 @@
 
 use crate::{
     agent::{download_agent, download_auth, get_agent_script},
+    agents::{agents_list, create_agent, delete_agent, open_agent, start_agent, stop_agent},
     auth::login,
     chat::{chats_list, create_chat, delete_chat, delete_message, get_chat, manage_tool_call_consent, send_message},
     commands::{commands_list, create_command, delete_command},
@@ -39,6 +40,7 @@ use tower_http::{
 };
 
 mod agent;
+mod agents;
 mod auth;
 mod chat;
 mod commands;
@@ -133,6 +135,12 @@ async fn main() {
         .route("/api/development_environments/{id}/stop", post(stop_development_environment))
         .route("/api/development_environments/ssh_forward/{id}", post(get_ssh_forward_request))
         .route("/api/development_environments/ssh_forward/approve/{id}", post(approve_ssh_forward_request))
+        .route("/api/agents", get(agents_list))
+        .route("/api/agents", post(create_agent))
+        .route("/api/agents/{id}", delete(delete_agent))
+        .route("/api/agents/{id}/open", post(open_agent))
+        .route("/api/agents/{id}/start", post(start_agent))
+        .route("/api/agents/{id}/stop", post(stop_agent))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any).expose_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();
