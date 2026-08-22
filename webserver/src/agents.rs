@@ -95,7 +95,7 @@ pub async fn create_agent(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
         origin: ContainerOrigin::Agent as i32,
         state: ContainerState::NonExistent as i32,
         requested_state: ContainerState::Stopped as i32,
-        image: "docker.io/nousresearch/hermes-agent:v2026.8.19".to_string(),
+        image: "[AGENT]".to_string(),
         storage_size: 25,
         memory_limit: 16,
     };

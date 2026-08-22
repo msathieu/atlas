@@ -125,7 +125,6 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
         return Err(StatusCode::FORBIDDEN);
     }
     let mut db = get_db()?;
-    let image = env::var("IMAGE_IDE").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut container = Container {
         id: None,
         created_at: SystemTime::now(),
@@ -133,7 +132,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
         origin: ContainerOrigin::DevelopmentEnvironment as i32,
         state: ContainerState::NonExistent as i32,
         requested_state: ContainerState::Stopped as i32,
-        image,
+        image: "[IDE]".to_string(),
         storage_size: 25,
         memory_limit: 16,
     };

@@ -23,8 +23,6 @@ spec:
               value: {{ .Values.apiserverHost }}
             - name: WEBSERVER_HOST
               value: {{ .Values.webserverHost }}
-            - name: IMAGE_IDE
-              value: {{ .Values.imageIDE }}
             - name: VALKEY_HOST
               value: atlas-valkey
             - name: DATABASE_HOST

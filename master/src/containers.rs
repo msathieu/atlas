@@ -326,9 +326,15 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         requests.insert("memory".to_string(), Quantity("1Gi".to_string()));
         limits.insert("ephemeral-storage".to_string(), Quantity("64Gi".to_string()));
         requests.insert("ephemeral-storage".to_string(), Quantity("4Gi".to_string()));
+        let mut image = container.image;
+        if image == "[AGENT]" {
+            image = "docker.io/nousresearch/hermes-agent:v2026.8.19".to_string();
+        } else if image == "[IDE]" {
+            image = env::var("IMAGE_IDE")?;
+        }
         let k8s_container = k8s_openapi::api::core::v1::Container {
             name: "main".to_string(),
-            image: Some(container.image),
+            image: Some(image),
             command: Some(vec!["/usr/bin/sleep".to_string(), "infinity".to_string()]),
             volume_mounts: Some(volume_mounts),
             security_context: Some(security_context),
