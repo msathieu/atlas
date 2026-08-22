@@ -66,6 +66,7 @@ pub async fn agents_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
                 ContainerState::Started => "Started",
                 ContainerState::Running => "Running",
                 ContainerState::Stopped => "Stopped",
+                ContainerState::Restarting => "Restarting",
             }
             .to_string();
             Ok(APIAgent {

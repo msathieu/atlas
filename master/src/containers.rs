@@ -74,34 +74,38 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
     let service_name_dev = format!("atlas-dev-{}", container_id);
     let service_name_agent = format!("atlas-agent-{}", container_id);
     let namespace = "atlas";
-    if container.state == ContainerState::Running as i32 || container.state == ContainerState::Started as i32 {
+    if container.requested_state == ContainerState::Running as i32 && (container.state == ContainerState::Running as i32 || container.state == ContainerState::Started as i32) {
         let pod_api: Api<Pod> = Api::namespaced(client.clone(), namespace);
-        let mut request_stop = false;
+        let mut request_restart = false;
         match pod_api.get_opt(&container_name).await? {
             Some(pod) => {
                 if let Some(status) = pod.status
                     && (status.phase == Some("Succeeded".to_string()) || status.phase == Some("Failed".to_string()))
                 {
-                    request_stop = true;
+                    request_restart = true;
                 }
             }
             None => {
-                request_stop = true;
+                request_restart = true;
             }
+        }
+        if request_restart {
+            diesel::update(containers::table.find(container_id))
+                .set(containers::requested_state.eq(ContainerState::Restarting as i32))
+                .execute(&mut db)?;
+            container.requested_state = ContainerState::Restarting as i32;
+            notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         }
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let key = format!("DEVELOPMENT_ENVIRONMENT:{}", container_id);
             let exists = get_valkey_client().await?.0.exists(key).await?;
             if !exists {
-                request_stop = true;
+                diesel::update(containers::table.find(container_id))
+                    .set(containers::requested_state.eq(ContainerState::Stopped as i32))
+                    .execute(&mut db)?;
+                container.requested_state = ContainerState::Stopped as i32;
+                notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
             }
-        }
-        if request_stop {
-            diesel::update(containers::table.find(container_id))
-                .set(containers::requested_state.eq(ContainerState::Stopped as i32))
-                .execute(&mut db)?;
-            container.requested_state = ContainerState::Stopped as i32;
-            notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         }
     }
     if container.state == ContainerState::NonExistent as i32
@@ -361,14 +365,26 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             .execute(&mut db)?;
         notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
-    } else if container.state == ContainerState::Started as i32 && (container.requested_state == ContainerState::Stopped as i32 || container.requested_state == ContainerState::NonExistent as i32) {
+    } else if container.state == ContainerState::Started as i32
+        && (container.requested_state == ContainerState::Stopped as i32
+            || container.requested_state == ContainerState::Restarting as i32
+            || container.requested_state == ContainerState::NonExistent as i32)
+    {
         let pod_api: Api<Pod> = Api::namespaced(client, namespace);
         if pod_api.get_opt(&container_name).await?.is_some() {
             pod_api.delete(&container_name, &DeleteParams::default()).await?;
         }
-        diesel::update(containers::table.find(container_id))
-            .set(containers::state.eq(ContainerState::Stopped as i32))
-            .execute(&mut db)?;
+        db.transaction(|db| {
+            diesel::update(containers::table.find(container_id))
+                .set(containers::state.eq(ContainerState::Stopped as i32))
+                .execute(db)?;
+            if container.requested_state == ContainerState::Restarting as i32 {
+                diesel::update(containers::table.find(container_id))
+                    .set(containers::requested_state.eq(ContainerState::Running as i32))
+                    .execute(db)?;
+            }
+            Ok::<(), Box<dyn Error>>(())
+        })?;
         notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Started as i32 && container.requested_state == ContainerState::Running as i32 {
@@ -500,6 +516,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
     } else if container.state == ContainerState::Running as i32
         && (container.requested_state == ContainerState::Started as i32
             || container.requested_state == ContainerState::Stopped as i32
+            || container.requested_state == ContainerState::Restarting as i32
             || container.requested_state == ContainerState::NonExistent as i32)
     {
         let pod_api: Api<Pod> = Api::namespaced(client, namespace);

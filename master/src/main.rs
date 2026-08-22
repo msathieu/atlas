@@ -48,7 +48,7 @@ async fn main() {
     {
         let mut db = pool.get().unwrap();
         db.run_pending_migrations(MIGRATIONS).unwrap();
-        create_settings(&mut db);
+        create_settings(&mut db).unwrap();
         diesel::delete(commands::table.filter(commands::origin.eq(CommandOrigin::LLMTool as i32))).execute(&mut db).unwrap();
         diesel::update(tool_calls::table.filter(tool_calls::initiated.eq(true).and(tool_calls::response.is_null())))
             .set(tool_calls::response.eq(Some("Tool call was interrupted")))
@@ -99,201 +99,196 @@ fn does_setting_exist(db: &mut PgConnection, name: &str) -> Result<bool, Box<dyn
     let setting_exists = settings::table.find(name).first::<Setting>(db).optional()?.is_some();
     Ok(setting_exists)
 }
-fn create_settings(db: &mut PgConnection) {
-    db.build_transaction()
-        .serializable()
-        .run(|db| {
-            if !does_setting_exist(db, "allow_new_devices")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "allow_new_devices".to_owned(),
-                        value: "true".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "llm_default_provider")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "llm_default_provider".to_owned(),
-                        value: "generic".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "llm_generic_endpoint")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "llm_generic_endpoint".to_owned(),
-                        value: "".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "llm_generic_key")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "llm_generic_key".to_owned(),
-                        value: "".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "llm_generic_model")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "llm_generic_model".to_owned(),
-                        value: "".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "llm_openrouter_key")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "llm_openrouter_key".to_owned(),
-                        value: "".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "llm_openrouter_model")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "llm_openrouter_model".to_owned(),
-                        value: "z-ai/glm-5.2".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "mail_server")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "mail_server".to_owned(),
-                        value: "".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "mail_username")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "mail_username".to_owned(),
-                        value: "".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "mail_password")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "mail_password".to_owned(),
-                        value: "".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "mail_from")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "mail_from".to_owned(),
-                        value: "".to_string(),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "tls_key")? {
-                println!("TLS key not found, generating...");
-                let key_pair = KeyPair::generate_for(&PKCS_ECDSA_P521_SHA512)?;
-                let mut cert_params = CertificateParams::new(vec!["apiserver".to_owned()])?;
-                cert_params.key_identifier_method = rcgen::KeyIdMethod::Sha512;
-                let cert = cert_params.self_signed(&key_pair)?;
-                let cert_pem = cert.pem().trim().to_string();
-                println!("{}", cert_pem);
+fn create_settings(db: &mut PgConnection) -> Result<(), Box<dyn Error>> {
+    if !does_setting_exist(db, "allow_new_devices")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "allow_new_devices".to_owned(),
+                value: "true".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "llm_default_provider")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "llm_default_provider".to_owned(),
+                value: "generic".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "llm_generic_endpoint")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "llm_generic_endpoint".to_owned(),
+                value: "".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "llm_generic_key")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "llm_generic_key".to_owned(),
+                value: "".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "llm_generic_model")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "llm_generic_model".to_owned(),
+                value: "".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "llm_openrouter_key")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "llm_openrouter_key".to_owned(),
+                value: "".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "llm_openrouter_model")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "llm_openrouter_model".to_owned(),
+                value: "z-ai/glm-5.2".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "mail_server")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "mail_server".to_owned(),
+                value: "".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "mail_username")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "mail_username".to_owned(),
+                value: "".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "mail_password")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "mail_password".to_owned(),
+                value: "".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "mail_from")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "mail_from".to_owned(),
+                value: "".to_string(),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "jwt_secret")? {
+        let jwt_secret: [u8; 64] = rand::random();
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "jwt_secret".to_owned(),
+                value: BASE64_STANDARD.encode(jwt_secret),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "registration_token")? {
+        let registration_token: [u8; 64] = rand::random();
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "registration_token".to_owned(),
+                value: BASE64_STANDARD.encode(registration_token),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "web_encryption_key")? {
+        let web_encryption_key = PrivateDecryptingKey::generate(KeySize::Rsa8192)?.as_der()?;
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "web_encryption_key".to_owned(),
+                value: BASE64_STANDARD.encode(web_encryption_key.as_ref()),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "web_signing_key")? {
+        let web_signing_key = Ed25519KeyPair::generate()?.to_pkcs8()?;
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "web_signing_key".to_owned(),
+                value: BASE64_STANDARD.encode(web_signing_key.as_ref()),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "fake_passkey_key")? {
+        let fake_passkey_key = WebauthnFakeCredentialGenerator::<FakePasskeyDistribution>::new_hmac_key()?;
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "fake_passkey_key".to_owned(),
+                value: BASE64_STANDARD.encode(fake_passkey_key),
+            })
+            .execute(db)?;
+    }
+    if !does_setting_exist(db, "apk_hash")? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "apk_hash".to_owned(),
+                value: "".to_owned(),
+            })
+            .execute(db)?;
+    }
+    db.build_transaction().serializable().run(|db| {
+        if !does_setting_exist(db, "tls_key")? {
+            println!("TLS key not found, generating...");
+            let key_pair = KeyPair::generate_for(&PKCS_ECDSA_P521_SHA512)?;
+            let mut cert_params = CertificateParams::new(vec!["apiserver".to_owned()])?;
+            cert_params.key_identifier_method = rcgen::KeyIdMethod::Sha512;
+            let cert = cert_params.self_signed(&key_pair)?;
+            let cert_pem = cert.pem().trim().to_string();
+            println!("{}", cert_pem);
 
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "tls_key".to_owned(),
-                        value: key_pair.serialize_pem().trim().to_string(),
-                    })
-                    .execute(db)?;
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "tls_cert".to_owned(),
-                        value: cert_pem,
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "jwt_secret")? {
-                let jwt_secret: [u8; 64] = rand::random();
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "jwt_secret".to_owned(),
-                        value: BASE64_STANDARD.encode(jwt_secret),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "registration_token")? {
-                let registration_token: [u8; 64] = rand::random();
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "registration_token".to_owned(),
-                        value: BASE64_STANDARD.encode(registration_token),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "web_encryption_key")? {
-                let web_encryption_key = PrivateDecryptingKey::generate(KeySize::Rsa8192)?.as_der()?;
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "web_encryption_key".to_owned(),
-                        value: BASE64_STANDARD.encode(web_encryption_key.as_ref()),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "web_signing_key")? {
-                let web_signing_key = Ed25519KeyPair::generate()?.to_pkcs8()?;
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "web_signing_key".to_owned(),
-                        value: BASE64_STANDARD.encode(web_signing_key.as_ref()),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "fake_passkey_key")? {
-                let fake_passkey_key = WebauthnFakeCredentialGenerator::<FakePasskeyDistribution>::new_hmac_key()?;
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "fake_passkey_key".to_owned(),
-                        value: BASE64_STANDARD.encode(fake_passkey_key),
-                    })
-                    .execute(db)?;
-            }
-            if !does_setting_exist(db, "apk_hash")? {
-                diesel::insert_into(settings::table)
-                    .values(Setting {
-                        name: "apk_hash".to_owned(),
-                        value: "".to_owned(),
-                    })
-                    .execute(db)?;
-            }
-            Ok::<(), Box<dyn Error>>(())
-        })
-        .unwrap();
-    db.build_transaction()
-        .serializable()
-        .run(|db| {
-            let users_count: i64 = users::table.count().get_result(db)?;
-            if users_count != 0 {
-                return Ok(());
-            }
-            println!("No users found, creating admin account...");
-            let password: [u8; 64] = rand::random();
-            let password = BASE64_STANDARD.encode(password);
-            let hash = hash_password(password.clone())?;
-            diesel::insert_into(users::table)
-                .values(User {
-                    id: None,
-                    username: "admin".to_owned(),
-                    password: hash,
-                    admin: true,
-                    jwt_counter: 0,
-                    enabled: true,
-                    password_enabled: true,
-                    last_login: None,
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "tls_key".to_owned(),
+                    value: key_pair.serialize_pem().trim().to_string(),
                 })
                 .execute(db)?;
-            println!("Initial Credentials: admin / {}", password);
-            Ok::<(), Box<dyn Error>>(())
-        })
-        .unwrap();
+            diesel::insert_into(settings::table)
+                .values(Setting {
+                    name: "tls_cert".to_owned(),
+                    value: cert_pem,
+                })
+                .execute(db)?;
+        }
+        Ok::<(), Box<dyn Error>>(())
+    })?;
+    db.build_transaction().serializable().run(|db| {
+        let users_count: i64 = users::table.count().get_result(db)?;
+        if users_count != 0 {
+            return Ok(());
+        }
+        println!("No users found, creating admin account...");
+        let password: [u8; 64] = rand::random();
+        let password = BASE64_STANDARD.encode(password);
+        let hash = hash_password(password.clone())?;
+        diesel::insert_into(users::table)
+            .values(User {
+                id: None,
+                username: "admin".to_owned(),
+                password: hash,
+                admin: true,
+                jwt_counter: 0,
+                enabled: true,
+                password_enabled: true,
+                last_login: None,
+            })
+            .execute(db)?;
+        println!("Initial Credentials: admin / {}", password);
+        Ok::<(), Box<dyn Error>>(())
+    })?;
+    Ok(())
 }

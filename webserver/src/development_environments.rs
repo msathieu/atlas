@@ -87,6 +87,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
                 ContainerState::Started => "Started",
                 ContainerState::Running => "Running",
                 ContainerState::Stopped => "Stopped",
+                ContainerState::Restarting => "Restarting",
             }
             .to_string();
             let mut private_key = PrivateKey::from_openssh(&environment.ssh_key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

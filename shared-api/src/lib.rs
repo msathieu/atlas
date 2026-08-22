@@ -66,6 +66,7 @@ pub enum ContainerState {
     Stopped = 1,
     Started = 2,
     Running = 3,
+    Restarting = 4,
 }
 #[derive(PartialEq, TryFromPrimitive)]
 #[repr(u32)]
