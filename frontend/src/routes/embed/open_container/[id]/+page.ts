@@ -32,7 +32,7 @@ export const load: PageLoad = async ({ fetch, params, url }) => {
           globalThis.location.href = url.href;
         }
       } else if (!container.pending) {
-        await authenticatedFetch(`/api/${type}s/${id}/start`, {
+        await authenticatedFetch(`/api/${type}s/${id}/state?state=start`, {
           method: "POST",
         }, fetch);
       }

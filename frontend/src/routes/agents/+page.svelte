@@ -18,12 +18,12 @@ async function createAgent() {
   newName = "";
 }
 async function deleteAgent(id: string) {
-  await authenticatedFetch(`/api/agents/${id}`, {
-    method: "DELETE",
+  await authenticatedFetch(`/api/agents/${id}/state?state=delete`, {
+    method: "POST",
   });
 }
 async function stopAgent(id: string) {
-  await authenticatedFetch(`/api/agents/${id}/stop`, {
+  await authenticatedFetch(`/api/agents/${id}/state?state=stop`, {
     method: "POST",
   });
 }

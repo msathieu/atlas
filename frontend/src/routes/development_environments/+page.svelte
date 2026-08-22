@@ -24,12 +24,12 @@ async function createEnvironment() {
   newNestedContainers = false;
 }
 async function deleteEnvironment(id: string) {
-  await authenticatedFetch(`/api/development_environments/${id}`, {
-    method: "DELETE",
+  await authenticatedFetch(`/api/development_environments/${id}/state?state=delete`, {
+    method: "POST",
   });
 }
 async function stopEnvironment(id: string) {
-  await authenticatedFetch(`/api/development_environments/${id}/stop`, {
+  await authenticatedFetch(`/api/development_environments/${id}/state?state=stop`, {
     method: "POST",
   });
 }

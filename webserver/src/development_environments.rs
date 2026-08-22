@@ -64,6 +64,10 @@ pub struct GetSSHForwardRequestResponse {
 pub struct ApproveSSHForwardRequestRequest {
     approved: bool,
 }
+#[derive(Deserialize)]
+pub struct SetDevelopmentEnvironmentStateRequest {
+    state: String,
+}
 
 pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIDevelopmentEnvironment>>), StatusCode> {
     let user = authenticate(&headers)?.0;
@@ -161,48 +165,41 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let response = CreateDevelopmentEnvironmentResponse { id };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
-pub async fn delete_development_environment(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
-    let mut db = get_db()?;
-    diesel::update(
-        containers::table.filter(
-            containers::id
-                .eq(id)
-                .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-                .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
-        ),
-    )
-    .set(containers::requested_state.eq(ContainerState::NonExistent as i32))
-    .execute(&mut db)
-    .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-        .await
-        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    sign_response::<String>(signature, None)
-}
-pub async fn start_development_environment(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+pub async fn set_development_environment_state(
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    request: Query<SetDevelopmentEnvironmentStateRequest>,
+    uri: OriginalUri,
+    body: Bytes,
+) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db()?;
-    containers::table
-        .filter(
-            containers::id
-                .eq(id)
-                .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-                .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
-        )
-        .first::<Container>(&mut db)
-        .or(Err(StatusCode::NOT_FOUND))?;
-    let key = format!("DEVELOPMENT_ENVIRONMENT:{}", id);
-    get_valkey_client()
-        .await
-        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
-        .0
-        .set_ex(key, true, 16 * 60 * 60)
-        .await
-        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let state = match request.state.as_str() {
+        "stop" => ContainerState::Stopped,
+        "start" => ContainerState::Running,
+        "delete" => ContainerState::NonExistent,
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
+    if state == ContainerState::Running {
+        containers::table
+            .filter(
+                containers::id
+                    .eq(id)
+                    .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+                    .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
+            )
+            .first::<Container>(&mut db)
+            .or(Err(StatusCode::NOT_FOUND))?;
+        let key = format!("DEVELOPMENT_ENVIRONMENT:{}", id);
+        get_valkey_client()
+            .await
+            .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
+            .0
+            .set_ex(key, true, 16 * 60 * 60)
+            .await
+            .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    }
     diesel::update(
         containers::table.filter(
             containers::id
@@ -211,28 +208,7 @@ pub async fn start_development_environment(headers: HeaderMap, Path(id): Path<Uu
                 .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
         ),
     )
-    .set(containers::requested_state.eq(ContainerState::Running as i32))
-    .execute(&mut db)
-    .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-        .await
-        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    sign_response::<String>(signature, None)
-}
-pub async fn stop_development_environment(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let mut db = get_db()?;
-    diesel::update(
-        containers::table.filter(
-            containers::id
-                .eq(id)
-                .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-                .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
-        ),
-    )
-    .set(containers::requested_state.eq(ContainerState::Stopped as i32))
+    .set(containers::requested_state.eq(state as i32))
     .execute(&mut db)
     .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

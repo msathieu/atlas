@@ -6,7 +6,7 @@ use crate::{
 use axum::{
     Json,
     body::Bytes,
-    extract::{OriginalUri, Path},
+    extract::{OriginalUri, Path, Query},
     http::{HeaderMap, StatusCode},
 };
 use base64::Engine;
@@ -42,6 +42,10 @@ pub struct CreateAgentResponse {
 pub struct OpenAgentResponse {
     url: String,
     ready: bool,
+}
+#[derive(Deserialize)]
+pub struct SetAgentStateRequest {
+    state: String,
 }
 
 pub async fn agents_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIAgent>>), StatusCode> {
@@ -118,31 +122,16 @@ pub async fn create_agent(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
     let response = CreateAgentResponse { id };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
-pub async fn delete_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
-    let mut db = get_db()?;
-    diesel::update(
-        containers::table.filter(
-            containers::id
-                .eq(id)
-                .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-                .and(containers::origin.eq(ContainerOrigin::Agent as i32)),
-        ),
-    )
-    .set(containers::requested_state.eq(ContainerState::NonExistent as i32))
-    .execute(&mut db)
-    .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-        .await
-        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    sign_response::<String>(signature, None)
-}
-pub async fn start_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+pub async fn set_agent_state(headers: HeaderMap, Path(id): Path<Uuid>, request: Query<SetAgentStateRequest>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers)?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db()?;
+    let state = match request.state.as_str() {
+        "stop" => ContainerState::Stopped,
+        "start" => ContainerState::Running,
+        "delete" => ContainerState::NonExistent,
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
     diesel::update(
         containers::table.filter(
             containers::id
@@ -151,28 +140,7 @@ pub async fn start_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: Original
                 .and(containers::origin.eq(ContainerOrigin::Agent as i32)),
         ),
     )
-    .set(containers::requested_state.eq(ContainerState::Running as i32))
-    .execute(&mut db)
-    .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-        .await
-        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    sign_response::<String>(signature, None)
-}
-pub async fn stop_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let mut db = get_db()?;
-    diesel::update(
-        containers::table.filter(
-            containers::id
-                .eq(id)
-                .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-                .and(containers::origin.eq(ContainerOrigin::Agent as i32)),
-        ),
-    )
-    .set(containers::requested_state.eq(ContainerState::Stopped as i32))
+    .set(containers::requested_state.eq(state as i32))
     .execute(&mut db)
     .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
