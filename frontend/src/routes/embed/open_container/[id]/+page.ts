@@ -5,18 +5,22 @@ import { parse, stringify } from "uuid";
 export const prerender = false;
 
 export const load: PageLoad = async ({ fetch, params, url }) => {
+  const type = url.searchParams.get("type");
+  if (type !== "agent" && type !== "development_environment") {
+    throw new Error("Invalid container type");
+  }
   const id = stringify(parse(params.id));
-  const development_environments = await authenticatedFetch(`/api/development_environments`, {}, fetch);
-  for (const environment of await development_environments.json()) {
-    if (environment.id === id) {
-      if (environment.state === "Running") {
+  const containers = await authenticatedFetch(`/api/${type}s`, {}, fetch);
+  for (const container of await containers.json()) {
+    if (container.id === id) {
+      if (container.state === "Running") {
         const port = url.searchParams.get("port");
         let query = "";
-        if (port) {
+        if (type == "development_environment" && port) {
           const portNumber = parseInt(port);
           query = `?port=${portNumber}`;
         }
-        const urlRes = await authenticatedFetch(`/api/development_environments/${id}/open${query}`, {
+        const urlRes = await authenticatedFetch(`/api/${type}s/${id}/open${query}`, {
           method: "POST",
         }, fetch);
         const data = await urlRes.json();
@@ -27,13 +31,13 @@ export const load: PageLoad = async ({ fetch, params, url }) => {
           }
           globalThis.location.href = url.href;
         }
-      } else if (!environment.pending) {
-        await authenticatedFetch(`/api/development_environments/${id}/start`, {
+      } else if (!container.pending) {
+        await authenticatedFetch(`/api/${type}s/${id}/start`, {
           method: "POST",
         }, fetch);
       }
       return;
     }
   }
-  throw new Error(`Development environment doesn't exist`);
+  throw new Error(`Container doesn't exist`);
 };

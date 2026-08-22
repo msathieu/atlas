@@ -5,6 +5,6 @@
 </div>
 <div class="flex">
   <div class="m-auto">
-    <p>Starting agent...</p>
+    <p>Starting container...</p>
   </div>
 </div>

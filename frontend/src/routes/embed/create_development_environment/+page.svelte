@@ -12,7 +12,7 @@ async function createEnvironment() {
     body: JSON.stringify({ name: name, repo: data.repo, branch: "", nested_containers: nestedContainers }),
   });
   const json = await response.json();
-  globalThis.open(`/embed/development_environments/${json.id}`, "_blank", "noopener");
+  globalThis.open(`/embed/open_container/${json.id}?type=development_environment`, "_blank", "noopener");
   globalThis.close();
 }
 </script>

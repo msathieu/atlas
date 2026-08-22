@@ -28,7 +28,7 @@ async function stopAgent(id: string) {
   });
 }
 async function openAgent(id: string) {
-  globalThis.open(`/embed/agents/${id}`, "_blank", "noopener");
+  globalThis.open(`/embed/open_container/${id}?type=agent`, "_blank", "noopener");
 }
 </script>
 

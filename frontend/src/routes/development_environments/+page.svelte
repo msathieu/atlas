@@ -34,7 +34,7 @@ async function stopEnvironment(id: string) {
   });
 }
 async function openDevelopmentEnvironment(id: string) {
-  globalThis.open(`/embed/development_environments/${id}`, "_blank", "noopener");
+  globalThis.open(`/embed/open_container/${id}?type=development_environment`, "_blank", "noopener");
 }
 </script>
 

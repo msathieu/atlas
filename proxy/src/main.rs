@@ -181,17 +181,17 @@ impl ProxyHttp for Proxy {
             }
             if !authenticated {
                 let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
-                let mut query = "".to_string();
-                if let Some(port) = port {
-                    query = format!("?port={}", port);
-                }
                 if request_type == ProxyType::DevelopmentEnvironment {
+                    let mut query = "".to_string();
+                    if let Some(port) = port {
+                        query = format!("&port={}", port);
+                    }
                     response
-                        .insert_header("Location", format!("https://{}/embed/development_environments/{}{}", webserver_host, uuid, query))
+                        .insert_header("Location", format!("https://{}/embed/open_container/{}?type=development_environment{}", webserver_host, uuid, query))
                         .or(Err(Error::new(InternalError)))?;
                 } else if request_type == ProxyType::Agent {
                     response
-                        .insert_header("Location", format!("https://{}/embed/agents/{}{}", webserver_host, uuid, query))
+                        .insert_header("Location", format!("https://{}/embed/open_container/{}?type=agent", webserver_host, uuid))
                         .or(Err(Error::new(InternalError)))?;
                 }
                 session.write_response_header(Box::new(response), false).await.or(Err(Error::new(InternalError)))?;
