@@ -16,8 +16,8 @@ use kube::{Api, Client};
 use redis::AsyncTypedCommands;
 use shared_api::{CommandLanguage, CommandOrigin, ContainerOrigin, ContainerState};
 use shared_server::binary::personalize_binary;
-use shared_server::models::{Command, Container, DevelopmentEnvironment, Device};
-use shared_server::schema::{commands, containers, development_environments, devices};
+use shared_server::models::{Agent, Command, Container, DevelopmentEnvironment, Device};
+use shared_server::schema::{agents, commands, containers, development_environments, devices};
 use shared_server::{get_user_setting, get_valkey_client, notify_server};
 use std::collections::BTreeMap;
 use std::env;
@@ -295,6 +295,14 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 });
             }
         }
+        if container.origin == ContainerOrigin::Agent as i32 {
+            let agent: Agent = agents::table.find(container_id).first(&mut db)?;
+            envs.push(EnvVar {
+                name: "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD".to_string(),
+                value: Some(agent.password),
+                value_from: None,
+            });
+        }
         let mut security_context = SecurityContext {
             run_as_user: Some(0),
             run_as_group: Some(0),
@@ -453,10 +461,10 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             };
             command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
             diesel::update(development_environments::table.find(container_id))
-                .set(development_environments::ide_password.eq(command.id.ok_or("Invalid command")?))
+                .set(development_environments::command.eq(command.id.ok_or("Invalid command")?))
                 .execute(&mut db)?;
         } else if container.origin == ContainerOrigin::Agent as i32 {
-            let command = Command {
+            let mut command = Command {
                 id: None,
                 device: device.id.ok_or("Invalid device")?,
                 uid: Some(container.uid),
@@ -476,7 +484,10 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 language: CommandLanguage::Python as i32,
                 transient: false,
             };
-            diesel::insert_into(commands::table).values(command).execute(&mut db)?;
+            command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
+            diesel::update(agents::table.find(container_id))
+                .set(agents::command.eq(command.id.ok_or("Invalid command")?))
+                .execute(&mut db)?;
         }
         notify_server("WEB:REFRESH").await?;
         notify_server("MASTER:CONTAINERS").await?;
@@ -496,8 +507,10 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         }
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             diesel::update(development_environments::table.find(container_id))
-                .set(development_environments::ide_password.eq(None::<Uuid>))
+                .set(development_environments::command.eq(None::<Uuid>))
                 .execute(&mut db)?;
+        } else if container.origin == ContainerOrigin::Agent as i32 {
+            diesel::update(agents::table.find(container_id)).set(agents::command.eq(None::<Uuid>)).execute(&mut db)?;
         }
         diesel::delete(devices::table.filter(devices::container_id.eq(container_id))).execute(&mut db)?;
         diesel::update(containers::table.find(container_id))

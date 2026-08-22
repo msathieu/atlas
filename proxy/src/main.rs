@@ -6,6 +6,7 @@ use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, Pool},
 };
+use http::Uri;
 use pingora::{
     http::Method,
     prelude::*,
@@ -13,11 +14,12 @@ use pingora::{
     services::background::BackgroundService,
 };
 use redis::AsyncTypedCommands;
+use serde_json::json;
 use shared_api::{ContainerState, print_startup};
 use shared_server::{
     authenticate_jwt, get_db_pool, get_valkey_client, listen_for_restarts,
-    models::{Command, Container, DevelopmentEnvironment},
-    schema::{commands, containers, development_environments},
+    models::{Agent, Command, Container, DevelopmentEnvironment},
+    schema::{agents, commands, containers, development_environments},
 };
 use std::{env, sync::OnceLock};
 use tokio::net::lookup_host;
@@ -49,17 +51,25 @@ impl BackgroundService for RestartService {
         listen_for_restarts("PROXY".to_string()).await;
     }
 }
-fn get_login_body(id: Uuid) -> Result<String> {
+fn get_login_body(ctx: &ProxyContext) -> Result<String> {
     let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().or(Err(Error::new(InternalError)))?;
-    let development_environment: DevelopmentEnvironment = development_environments::table.find(id).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
-    let command: Command = commands::table
-        .find(development_environment.ide_password.ok_or(Error::new(InternalError))?)
-        .first(&mut db)
-        .or(Err(Error::new(InternalError)))?;
-    if command.stdout.is_empty() || !command.stdout.chars().all(|c| c.is_ascii_alphanumeric()) {
-        return Err(Error::new(InternalError));
+    if ctx.request_type == ProxyType::DevelopmentEnvironment {
+        let development_environment: DevelopmentEnvironment = development_environments::table.find(ctx.id).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+        let command: Command = commands::table
+            .find(development_environment.command.ok_or(Error::new(InternalError))?)
+            .first(&mut db)
+            .or(Err(Error::new(InternalError)))?;
+        if command.stdout.is_empty() || !command.stdout.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return Err(Error::new(InternalError));
+        }
+        Ok(format!("password={}", command.stdout))
+    } else if ctx.request_type == ProxyType::Agent {
+        let agent: Agent = agents::table.find(ctx.id).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+        let data = json!({"provider": "basic", "username": "admin", "password": agent.password});
+        Ok(data.to_string())
+    } else {
+        Err(Error::new(InternalError))
     }
-    Ok(format!("password={}", command.stdout))
 }
 fn authenticate_proxy_jwt(request_type: ProxyType, port: Option<u16>, jwt: &str, uuid: Uuid) -> Result<()> {
     if request_type == ProxyType::DevelopmentEnvironment {
@@ -220,36 +230,54 @@ impl ProxyHttp for Proxy {
                 upstream_request.insert_header("Origin", format!("https://{}", upstream_host)).or(Err(Error::new(InternalError)))?;
             }
         }
+        if let Some(cookie_header) = session.get_header("Cookie") {
+            let mut new_cookie_header = String::new();
+            for header in cookie_header.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?.split(";") {
+                let header = header.trim();
+                if !header.starts_with("atlas_jwt=") {
+                    if !new_cookie_header.is_empty() {
+                        new_cookie_header.push_str("; ");
+                    }
+                    new_cookie_header.push_str(header);
+                }
+            }
+            upstream_request.insert_header("Cookie", new_cookie_header).or(Err(Error::new(InternalError)))?;
+        }
         if ctx.request_type == ProxyType::DevelopmentEnvironment {
             let mut is_logged_in = false;
             if let Some(cookie_header) = session.get_header("Cookie") {
-                let mut new_cookie_header = String::new();
                 for header in cookie_header.to_str().or(Err(Error::new_down(InvalidHTTPHeader)))?.split(";") {
                     let header = header.trim();
-                    if !header.starts_with("atlas_jwt=") {
-                        if !new_cookie_header.is_empty() {
-                            new_cookie_header.push_str("; ");
-                        }
-                        new_cookie_header.push_str(header);
-                    }
                     if header.starts_with("code-server-session=") {
                         is_logged_in = true;
                     }
                 }
-                upstream_request.insert_header("Cookie", new_cookie_header).or(Err(Error::new(InternalError)))?;
             }
             if (!is_logged_in || ctx.port.is_none()) && uri.path() == "/login" {
                 upstream_request.set_method(Method::POST);
                 upstream_request.insert_header("Content-Type", "application/x-www-form-urlencoded").or(Err(Error::new(InternalError)))?;
-                upstream_request.insert_header("Content-Length", get_login_body(ctx.id)?.len()).or(Err(Error::new(InternalError)))?;
+                upstream_request.insert_header("Content-Length", get_login_body(ctx)?.len()).or(Err(Error::new(InternalError)))?;
                 ctx.login_upstream = true;
             }
+        } else if ctx.request_type == ProxyType::Agent && uri.path() == "/login" {
+            upstream_request.set_method(Method::POST);
+            upstream_request.set_uri(Uri::from_static("/auth/password-login"));
+            upstream_request.insert_header("Content-Type", "application/json").or(Err(Error::new(InternalError)))?;
+            upstream_request.insert_header("Content-Length", get_login_body(ctx)?.len()).or(Err(Error::new(InternalError)))?;
+            ctx.login_upstream = true;
         }
         Ok(())
     }
     async fn request_body_filter(&self, _session: &mut Session, body: &mut Option<Bytes>, end_of_stream: bool, ctx: &mut Self::CTX) -> Result<()> {
         if ctx.login_upstream && end_of_stream {
-            *body = Some(Bytes::from(get_login_body(ctx.id)?));
+            *body = Some(Bytes::from(get_login_body(ctx)?));
+        }
+        Ok(())
+    }
+    async fn response_filter(&self, _session: &mut Session, upstream_response: &mut ResponseHeader, ctx: &mut Self::CTX) -> Result<()> {
+        if ctx.request_type == ProxyType::Agent && ctx.login_upstream {
+            upstream_response.insert_header("Location", "/").or(Err(Error::new(InternalError)))?;
+            upstream_response.set_status(307).or(Err(Error::new(InternalError)))?;
         }
         Ok(())
     }

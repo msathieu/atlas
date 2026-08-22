@@ -9,13 +9,15 @@ use axum::{
     extract::{OriginalUri, Path},
     http::{HeaderMap, StatusCode},
 };
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use shared_api::{ContainerOrigin, ContainerState};
 use shared_server::{
-    models::{Agent, Container},
+    models::{Agent, Command, Container},
     notify_server,
-    schema::{agents, containers},
+    schema::{agents, commands, containers},
 };
 use std::{env, error::Error, time::SystemTime};
 use uuid::Uuid;
@@ -89,15 +91,22 @@ pub async fn create_agent(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
         origin: ContainerOrigin::Agent as i32,
         state: ContainerState::NonExistent as i32,
         requested_state: ContainerState::Stopped as i32,
-        image: "docker.io/nousresearch/hermes-agent:v2026.8.18".to_string(),
+        image: "docker.io/nousresearch/hermes-agent:v2026.8.19".to_string(),
         storage_size: 25,
         memory_limit: 16,
     };
     let mut id = Uuid::nil();
+    let password: [u8; 64] = rand::random();
+    let password = BASE64_STANDARD.encode(password);
     db.transaction(|db| {
         container = diesel::insert_into(containers::table).values(container).get_result(db)?;
         id = container.id.ok_or("Missing ID")?;
-        let agent = Agent { id, name: request.name };
+        let agent = Agent {
+            id,
+            name: request.name,
+            command: None,
+            password,
+        };
         diesel::insert_into(agents::table).values(agent).execute(db)?;
         Ok::<(), Box<dyn Error>>(())
     })
@@ -187,6 +196,15 @@ pub async fn open_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalU
         .or(Err(StatusCode::NOT_FOUND))?;
     let mut ready = true;
     if container.state != ContainerState::Running as i32 {
+        ready = false;
+    }
+    let agent: Agent = agents::table.find(id).first(&mut db).or(Err(StatusCode::NOT_FOUND))?;
+    if let Some(command) = agent.command {
+        let command: Command = commands::table.find(command).first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        if !command.completed {
+            ready = false;
+        }
+    } else {
         ready = false;
     }
     let webserver = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

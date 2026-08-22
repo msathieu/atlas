@@ -127,7 +127,7 @@ CREATE TABLE development_environments(
     branch varchar,
     nested_containers boolean NOT NULL,
     ssh_key varchar NOT NULL,
-    ide_password uuid REFERENCES commands ON DELETE SET NULL
+    command uuid REFERENCES commands ON DELETE SET NULL
 );
 CREATE TABLE user_settings(
     uid uuid REFERENCES users ON DELETE CASCADE,
@@ -137,5 +137,7 @@ CREATE TABLE user_settings(
 );
 CREATE TABLE agents(
     id uuid PRIMARY KEY REFERENCES containers ON DELETE CASCADE,
-    name varchar NOT NULL
+    name varchar NOT NULL,
+    command uuid REFERENCES commands ON DELETE SET NULL,
+    password varchar NOT NULL
 );

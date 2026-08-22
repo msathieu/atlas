@@ -180,7 +180,7 @@ pub struct DevelopmentEnvironment {
     pub branch: Option<String>,
     pub nested_containers: bool,
     pub ssh_key: String,
-    pub ide_password: Option<Uuid>,
+    pub command: Option<Uuid>,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
@@ -198,4 +198,6 @@ pub struct UserSetting {
 pub struct Agent {
     pub id: Uuid,
     pub name: String,
+    pub command: Option<Uuid>,
+    pub password: String,
 }

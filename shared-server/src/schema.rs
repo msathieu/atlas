@@ -4,6 +4,8 @@ diesel::table! {
     agents (id) {
         id -> Uuid,
         name -> Varchar,
+        command -> Nullable<Uuid>,
+        password -> Varchar,
     }
 }
 
@@ -67,7 +69,7 @@ diesel::table! {
         branch -> Nullable<Varchar>,
         nested_containers -> Bool,
         ssh_key -> Varchar,
-        ide_password -> Nullable<Uuid>,
+        command -> Nullable<Uuid>,
     }
 }
 
@@ -177,12 +179,13 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(agents -> commands (command));
 diesel::joinable!(agents -> containers (id));
 diesel::joinable!(chats -> users (uid));
 diesel::joinable!(commands -> devices (device));
 diesel::joinable!(commands -> users (uid));
 diesel::joinable!(containers -> users (uid));
-diesel::joinable!(development_environments -> commands (ide_password));
+diesel::joinable!(development_environments -> commands (command));
 diesel::joinable!(development_environments -> containers (id));
 diesel::joinable!(device_info -> devices (device));
 diesel::joinable!(devices -> containers (container_id));
