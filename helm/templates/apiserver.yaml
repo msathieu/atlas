@@ -37,6 +37,11 @@ spec:
                 secretKeyRef:
                   name: atlas-valkey-password
                   key: password
+            - name: DATABASE_CERT
+              valueFrom:
+                secretKeyRef:
+                  name: atlas-db-ca
+                  key: ca.crt
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
 ---
