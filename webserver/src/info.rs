@@ -9,6 +9,7 @@ use axum::{
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use gethostname::gethostname;
 use serde::Serialize;
 use serde_json::json;
@@ -47,8 +48,8 @@ pub async fn server_info() -> Result<(HeaderMap, Json<APIServerInfo>), StatusCod
     Ok((sign_response("info".to_string(), Some(&info))?, Json(info)))
 }
 pub async fn assetlinks() -> Result<Json<serde_json::Value>, StatusCode> {
-    let mut db = get_db()?;
-    let apk_hash: Setting = settings::table.find("apk_hash").get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let mut db = get_db().await?;
+    let apk_hash: Setting = settings::table.find("apk_hash").get_result(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut fingerprints = vec![];
     if !apk_hash.value.is_empty() {
         fingerprints.push(apk_hash.value);

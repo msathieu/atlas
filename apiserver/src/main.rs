@@ -5,10 +5,8 @@ use ::aws_lc_rs::{
     signature::{ED25519, UnparsedPublicKey},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
-use diesel::{
-    prelude::*,
-    r2d2::{ConnectionManager, Pool},
-};
+use diesel::prelude::*;
+use diesel_async::{AsyncPgConnection, RunQueryDsl, pooled_connection::deadpool::Pool};
 use prost::Message;
 use rustls::{
     ServerConfig,
@@ -64,12 +62,12 @@ async fn main() {
     }
     .install_default()
     .unwrap();
-    let pool = get_db_pool().unwrap();
+    let pool = get_db_pool().await.unwrap();
     let tls_acceptor;
     {
-        let mut db = pool.get().unwrap();
-        let tls_key: Setting = settings::table.find("tls_key").first(&mut db).unwrap();
-        let tls_cert: Setting = settings::table.find("tls_cert").first(&mut db).unwrap();
+        let mut db = pool.get().await.unwrap();
+        let tls_key: Setting = settings::table.find("tls_key").first(&mut db).await.unwrap();
+        let tls_cert: Setting = settings::table.find("tls_cert").first(&mut db).await.unwrap();
         let key_der = PrivateKeyDer::from_pem_slice(tls_key.value.as_bytes()).unwrap();
         let cert_der = CertificateDer::from_pem_slice(tls_cert.value.as_bytes()).unwrap();
         let tls_config = ServerConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
@@ -87,7 +85,7 @@ async fn main() {
     }
 }
 
-async fn accept_connection(listener: &TcpListener, tls_acceptor: TlsAcceptor, pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
+async fn accept_connection(listener: &TcpListener, tls_acceptor: TlsAcceptor, pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn Error>> {
     let (stream, addr) = listener.accept().await?;
     let ip = addr.ip().to_string();
     tokio::spawn(async {
@@ -98,7 +96,7 @@ async fn accept_connection(listener: &TcpListener, tls_acceptor: TlsAcceptor, po
     Ok(())
 }
 
-async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAcceptor, pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
+async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAcceptor, pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn Error>> {
     let mut stream = tls_acceptor.accept(stream).await?.into();
     let (_, buf) = read_message(&mut stream, Some(MessageType::HandshakeRequest)).await?;
     let handshake_request = HandshakeRequest::decode(&*buf)?;
@@ -121,13 +119,13 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         auth_challenge: vec![],
         reset: false,
     };
-    let mut db = pool.get()?;
+    let mut db = pool.get().await?;
     if handshake_request.register_device {
-        let allowed: Setting = settings::table.find("allow_new_devices").first(&mut db)?;
+        let allowed: Setting = settings::table.find("allow_new_devices").first(&mut db).await?;
         if allowed.value != "true" {
             return Err("No new devices are allowed".into());
         }
-        let registration_token: Setting = settings::table.find("registration_token").first(&mut db)?;
+        let registration_token: Setting = settings::table.find("registration_token").first(&mut db).await?;
         let registration_token = BASE64_STANDARD.decode(registration_token.value)?;
         if verify_slices_are_equal(&registration_token, &handshake_request.registration_token).is_err() {
             #[cfg(not(debug_assertions))]
@@ -148,20 +146,21 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
                 agent_hash: handshake_request.agent_hash,
                 container_id: None,
             })
-            .get_result(&mut db)?;
+            .get_result(&mut db)
+            .await?;
         handshake_response.device_id = device.id.ok_or("Invalid database result")?.to_string();
         write_message(MessageType::HandshakeResponse, handshake_response, &mut stream).await?;
         notify_server("WEB:REFRESH").await?;
         return Ok(());
     }
     let uuid = Uuid::from_str(&handshake_request.device_id)?;
-    let device_exists = devices::table.find(uuid).first::<Device>(&mut db).optional()?.is_some();
+    let device_exists = devices::table.find(uuid).first::<Device>(&mut db).await.optional()?.is_some();
     if !device_exists {
         handshake_response.reset = true;
         write_message(MessageType::HandshakeResponse, handshake_response, &mut stream).await?;
         return Ok(());
     }
-    let mut device: Device = devices::table.find(uuid).first(&mut db)?;
+    let mut device: Device = devices::table.find(uuid).first(&mut db).await?;
     drop(db);
     if device.pubkey != handshake_request.pubkey {
         return Err("Invalid pubkey".into());
@@ -183,8 +182,8 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
     device.last_connection = SystemTime::now();
     device.ip = ip;
     device.agent_hash = handshake_request.agent_hash;
-    db = pool.get()?;
-    diesel::update(devices::table.find(uuid)).set(&device).execute(&mut db)?;
+    db = pool.get().await?;
+    diesel::update(devices::table.find(uuid)).set(&device).execute(&mut db).await?;
     drop(db);
     notify_server("WEB:REFRESH").await?;
 
@@ -196,7 +195,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         return Err("Invalid handshake purpose".into());
     }
 
-    db = pool.get()?;
+    db = pool.get().await?;
     if let Ok(agent) = personalize_binary(&mut db, &device.arch, &device.os).await.map_err(|_| "Failed to get agent") {
         let hash = Sha512::digest(&agent).to_vec();
         if hash != device.agent_hash {
@@ -211,9 +210,9 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
     }
 
     if let Some(container_id) = device.container_id {
-        let container: Container = containers::table.find(container_id).first(&mut db)?;
+        let container: Container = containers::table.find(container_id).first(&mut db).await?;
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
-            let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db)?;
+            let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db).await?;
             let private_key = PrivateKey::from_openssh(development_environment.ssh_key)?;
             write_message(
                 MessageType::StartSSHAgentRequest,
@@ -230,13 +229,14 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
     let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
     pubsub_client.subscribe(format!("API:DEVICE:{}", uuid)).await?;
     loop {
-        let device_exists = devices::table.find(uuid).first::<Device>(&mut db).optional()?.is_some();
+        let device_exists = devices::table.find(uuid).first::<Device>(&mut db).await.optional()?.is_some();
         if !device_exists {
             return Err("Device no longer exists".into());
         }
         let command: Option<Command> = commands::table
             .filter(commands::device.eq(uuid).and(commands::completed.eq(false)).and(commands::transient.eq(false)))
             .first(&mut db)
+            .await
             .optional()?;
         if let Some(mut command) = command {
             if command.initiated {
@@ -245,10 +245,10 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
                 command.stdout = "".to_string();
                 command.stderr = "Command didn't complete".to_string();
                 command.completed_timestamp = Some(SystemTime::now());
-                diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
+                diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db).await?;
             } else {
                 command.initiated = true;
-                diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
+                diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db).await?;
                 let request = CommandRequest {
                     code: command.code.clone(),
                     language: command.language as u32,
@@ -272,8 +272,8 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
                 command.stdout = response.stdout.replace("\0", "");
                 command.stderr = response.stderr.replace("\0", "");
                 command.completed_timestamp = Some(SystemTime::now());
-                diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db)?;
-                diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db)?;
+                diesel::update(commands::table.find(command.id.ok_or("Invalid command")?)).set(&command).execute(&mut db).await?;
+                diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db).await?;
             }
             notify_server("WEB:REFRESH").await?;
             if command.origin == CommandOrigin::SystemIdentification as i32 {
@@ -288,7 +288,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         .is_err()
         {
             send_heartbeat(&mut stream).await?;
-            diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db)?;
+            diesel::update(devices::table.find(uuid)).set(devices::last_connection.eq(SystemTime::now())).execute(&mut db).await?;
         }
     }
 }

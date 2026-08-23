@@ -1,5 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -45,13 +46,13 @@ impl ExecuteCodeTool {
             code = code_arg;
         }
         let pool = DB_POOL.get().ok_or("Database connection failed")?;
-        let mut db = pool.get()?;
-        let user: User = users::table.find(self.user).first(&mut db)?;
+        let mut db = pool.get().await?;
+        let user: User = users::table.find(self.user).first(&mut db).await?;
         if !user.admin {
             return Err("Code execution is only available to administrators".into());
         }
         if let Some(preapproved_id) = args.preapproved_code_id {
-            let preapproved_code: PreapprovedCode = preapproved_code::table.find(Uuid::from_str(&preapproved_id)?).get_result(&mut db)?;
+            let preapproved_code: PreapprovedCode = preapproved_code::table.find(Uuid::from_str(&preapproved_id)?).get_result(&mut db).await?;
             if preapproved_code.chat != self.chat {
                 return Err("Invalid preapproved code".into());
             }
@@ -77,18 +78,18 @@ impl ExecuteCodeTool {
             language: CommandLanguage::Lua as i32,
             transient: true,
         };
-        let cmd: Command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
+        let cmd: Command = diesel::insert_into(commands::table).values(command).get_result(&mut db).await?;
         let cmd_id = cmd.id.ok_or("Invalid command")?;
         let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
         pubsub_client.subscribe(format!("MASTER:CMD:{}", cmd_id)).await?;
-        diesel::update(commands::table.find(cmd_id)).set(commands::transient.eq(false)).execute(&mut db)?;
+        diesel::update(commands::table.find(cmd_id)).set(commands::transient.eq(false)).execute(&mut db).await?;
         drop(db);
         notify_server(&format!("API:DEVICE:{}", args.device)).await?;
         notify_server(&format!("WEB:REFRESH:{}", self.user)).await?;
         wait_for_pubsub_msg(&mut receiver).await;
-        let mut db = pool.get()?;
-        let cmd: Command = commands::table.find(cmd_id).get_result(&mut db)?;
-        diesel::delete(commands::table.find(cmd_id)).execute(&mut db)?;
+        let mut db = pool.get().await?;
+        let cmd: Command = commands::table.find(cmd_id).get_result(&mut db).await?;
+        diesel::delete(commands::table.find(cmd_id)).execute(&mut db).await?;
         let stdout = if args.return_stdout { cmd.stdout } else { "".to_string() };
         let stderr = if args.return_stderr { cmd.stderr } else { "".to_string() };
         Ok(ExecuteCodeOutput {

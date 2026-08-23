@@ -25,18 +25,18 @@ pub struct StreamAuthResponse {
 }
 
 pub async fn stream_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<StreamAuthResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let jwt = generate_jwt("webserver-stream", &user, 60, None)?;
     let response = StreamAuthResponse { jwt };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
 pub async fn stream(query: Query<StreamAuth>, socket: WebSocketUpgrade) -> Response {
-    let mut db = match get_db() {
+    let mut db = match get_db().await {
         Ok(db) => db,
         Err(_) => return Response::new("Internal Server Error".into()),
     };
-    let user = match authenticate_jwt(&query.auth, "webserver-stream", Some(&mut db), false) {
+    let user = match authenticate_jwt(&query.auth, "webserver-stream", Some(&mut db), false).await {
         Ok(user) => user.0,
         Err(_) => return Response::new("Unauthorized".into()),
     };

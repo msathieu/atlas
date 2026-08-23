@@ -1,7 +1,5 @@
-use diesel::PgConnection;
 use diesel::prelude::*;
-use diesel::r2d2::ConnectionManager;
-use diesel::r2d2::Pool;
+use diesel_async::{AsyncPgConnection, RunQueryDsl, pooled_connection::deadpool::Pool};
 use prost::Message;
 use redis::AsyncTypedCommands;
 use shared_api::ForwardSshAgentRequest;
@@ -49,16 +47,16 @@ pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStr
     write_message(MessageType::ForwardSSHAgentResponse, response, stream).await?;
     Ok(())
 }
-pub async fn handle_ssh_agent(mut stream: TlsStream<TcpStream>, pool: Pool<ConnectionManager<PgConnection>>, device_uuid: Uuid) -> Result<(), Box<dyn Error>> {
-    let mut db = pool.get()?;
-    let device: Device = devices::table.find(device_uuid).first(&mut db)?;
-    let development_environment: DevelopmentEnvironment = development_environments::table.find(device.container_id.ok_or("Device is not a container")?).first(&mut db)?;
-    let container: Container = containers::table.find(development_environment.id).first(&mut db)?;
+pub async fn handle_ssh_agent(mut stream: TlsStream<TcpStream>, pool: Pool<AsyncPgConnection>, device_uuid: Uuid) -> Result<(), Box<dyn Error>> {
+    let mut db = pool.get().await?;
+    let device: Device = devices::table.find(device_uuid).first(&mut db).await?;
+    let development_environment: DevelopmentEnvironment = development_environments::table.find(device.container_id.ok_or("Device is not a container")?).first(&mut db).await?;
+    let container: Container = containers::table.find(development_environment.id).first(&mut db).await?;
     let private_key = PrivateKey::from_openssh(development_environment.ssh_key)?;
     drop(db);
     loop {
-        let mut db = pool.get()?;
-        let device_exists = devices::table.find(device_uuid).first::<Device>(&mut db).optional()?.is_some();
+        let mut db = pool.get().await?;
+        let device_exists = devices::table.find(device_uuid).first::<Device>(&mut db).await.optional()?.is_some();
         drop(db);
         if !device_exists {
             return Err("Device no longer exists".into());

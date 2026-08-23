@@ -36,9 +36,9 @@ pub struct GetAgentScriptResponse {
 }
 
 pub async fn get_agent_script(headers: HeaderMap, uri: OriginalUri, request: Query<GetAgentScriptRequest>, body: Bytes) -> Result<(HeaderMap, Json<GetAgentScriptResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let agent = match personalize_binary(&mut db, &request.arch, &request.os).await {
         Ok(agent) => agent,
         Err(_) => {
@@ -68,8 +68,8 @@ rm atlas-agent
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
 pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, StatusCode> {
-    let mut db = get_db()?;
-    authenticate_jwt(&query.auth, "webserver-download", Some(&mut db), false).or(Err(StatusCode::UNAUTHORIZED))?;
+    let mut db = get_db().await?;
+    authenticate_jwt(&query.auth, "webserver-download", Some(&mut db), false).await.or(Err(StatusCode::UNAUTHORIZED))?;
     if !SUPPORTED_ARCH.contains(&query.arch.as_str()) {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -80,7 +80,7 @@ pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, Statu
     Ok(binary)
 }
 pub async fn download_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<DownloadAuthResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let jwt = generate_jwt("webserver-download", &user, 10 * 60, None)?;
     let response = DownloadAuthResponse { jwt };

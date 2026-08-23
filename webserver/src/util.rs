@@ -62,7 +62,7 @@ pub async fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, met
     let nonce = Uuid::parse_str(headers.get("X-Request-Nonce").ok_or(StatusCode::UNAUTHORIZED)?.to_str().or(Err(StatusCode::UNAUTHORIZED))?).or(Err(StatusCode::UNAUTHORIZED))?;
     let timestamp: u64 = timestamp.parse().or(Err(StatusCode::UNAUTHORIZED))?;
     let signature = BASE64_STANDARD.decode(signature).or(Err(StatusCode::UNAUTHORIZED))?;
-    let pubkey = authenticate(headers)?.1.ok_or(StatusCode::UNAUTHORIZED)?;
+    let pubkey = authenticate(headers).await?.1.ok_or(StatusCode::UNAUTHORIZED)?;
     let uri_hashed = BASE64_STANDARD.encode(Sha512::digest(uri.to_string()));
     let body_hashed = BASE64_STANDARD.encode(Sha512::digest(body));
     let hash = format!("{}-{}-{}-{}-{}", method, timestamp, nonce, uri_hashed, body_hashed);

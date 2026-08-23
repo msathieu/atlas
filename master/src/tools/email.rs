@@ -1,5 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
     message::{Mailbox, header::ContentType},
@@ -42,24 +43,30 @@ impl PortableTool for EmailTool {
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let pool = DB_POOL.get().ok_or(ToolExecutionError::other("Database connection failed"))?;
-        let mut db = pool.get().map_err(|_| ToolExecutionError::other("Database connection failed"))?;
+        let mut db = pool.get().await.map_err(|_| ToolExecutionError::other("Database connection failed"))?;
         let mail_server: Setting = settings::table
             .find("mail_server")
             .get_result(&mut db)
+            .await
             .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
         let mail_username: Setting = settings::table
             .find("mail_username")
             .get_result(&mut db)
+            .await
             .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
         let mail_password: Setting = settings::table
             .find("mail_password")
             .get_result(&mut db)
+            .await
             .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
         let mail_from: Setting = settings::table
             .find("mail_from")
             .get_result(&mut db)
+            .await
             .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
-        let mail_to = get_user_setting(self.user, "mail_to".to_string(), &mut db).map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
+        let mail_to = get_user_setting(self.user, "mail_to".to_string(), &mut db)
+            .await
+            .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
         if mail_server.value.is_empty() || mail_username.value.is_empty() || mail_password.value.is_empty() || mail_from.value.is_empty() || mail_to.value.is_empty() {
             return Err(ToolExecutionError::other("Mail server isn't configured"));
         }

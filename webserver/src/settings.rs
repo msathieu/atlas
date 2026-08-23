@@ -10,6 +10,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use serde::Deserialize;
 use shared_server::{models::Setting, notify_server, schema::settings};
 use std::collections::HashMap;
@@ -20,9 +21,9 @@ pub struct UpdateSettingRequest {
 }
 
 pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<HashMap<String, String>>), StatusCode> {
-    require_admin(&headers)?;
+    require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let allowed_settings = [
         "allow_new_devices",
         "mail_server",
@@ -37,16 +38,16 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
     ];
     let mut settings = HashMap::new();
     for name in allowed_settings {
-        let setting: Setting = settings::table.find(name).get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        let setting: Setting = settings::table.find(name).get_result(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
         settings.insert(setting.name, setting.value);
     }
     Ok((sign_response(signature, Some(&settings))?, Json(settings)))
 }
 pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    require_admin(&headers)?;
+    require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "PUT").await?;
     let request: UpdateSettingRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let allowed_settings = [
         "allow_new_devices",
         "mail_server",
@@ -67,12 +68,13 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
     diesel::update(settings::table.find(&name))
         .set(settings::value.eq(request.value))
         .execute(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
 pub async fn restart_system(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    require_admin(&headers)?;
+    require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     notify_server("MASTER:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("API:RESTART").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

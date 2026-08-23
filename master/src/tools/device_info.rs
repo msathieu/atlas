@@ -1,5 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::Deserialize;
 use serde_json::json;
@@ -35,11 +36,12 @@ impl PortableTool for DeviceInfoTool {
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let pool = DB_POOL.get().ok_or(ToolExecutionError::other("Database connection failed"))?;
-        let mut db = pool.get().map_err(|_| ToolExecutionError::other("Database connection failed"))?;
+        let mut db = pool.get().await.map_err(|_| ToolExecutionError::other("Database connection failed"))?;
         let device_uuid = Uuid::parse_str(&args.device).map_err(|_| ToolExecutionError::other("Invalid device"))?;
         let info: DeviceInfo = device_info::table
             .filter(device_info::device.eq(device_uuid).and(device_info::info_type.eq(args.info_type)))
             .get_result(&mut db)
+            .await
             .map_err(|_| ToolExecutionError::other("Invalid device info"))?;
         if !info.success {
             return Err(ToolExecutionError::other("Obtaining device info failed"));

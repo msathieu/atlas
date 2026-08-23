@@ -12,6 +12,7 @@ use axum::{
 };
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use redis::AsyncTypedCommands;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
@@ -71,11 +72,11 @@ pub struct APIPasskey {
     name: String,
 }
 
-pub fn get_webauthn() -> Result<Webauthn, StatusCode> {
-    let mut db = get_db()?;
+pub async fn get_webauthn() -> Result<Webauthn, StatusCode> {
+    let mut db = get_db().await?;
     let web_host = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let url = Url::parse(&format!("https://{}", web_host)).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let apk_hash: Setting = settings::table.find("apk_hash").get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let apk_hash: Setting = settings::table.find("apk_hash").get_result(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut builder = WebauthnBuilder::new(&web_host, &url).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     if !apk_hash.value.is_empty() {
         let apk_hash = apk_hash.value.replace(":", "");
@@ -87,16 +88,17 @@ pub fn get_webauthn() -> Result<Webauthn, StatusCode> {
     builder.build().or(Err(StatusCode::INTERNAL_SERVER_ERROR))
 }
 pub async fn start_passkey_registration(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreationChallengeResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: StartPasskeyRegistrationRequest = serde_json::from_slice(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::FORBIDDEN))?;
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::FORBIDDEN))?;
-    let webauthn = get_webauthn()?;
-    let mut db = get_db()?;
+    let webauthn = get_webauthn().await?;
+    let mut db = get_db().await?;
     let passkeys_db: Vec<Passkey> = passkeys::table
         .filter(passkeys::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .load(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let credential_ids = passkeys_db.iter().map(|i| CredentialID::from(i.id.clone())).collect();
     let (challenge, registration) = webauthn
@@ -109,7 +111,7 @@ pub async fn start_passkey_registration(headers: HeaderMap, uri: OriginalUri, bo
     Ok((sign_response(signature, Some(&challenge))?, Json(challenge)))
 }
 pub async fn finish_passkey_registration(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: FinishPasskeyRegistrationRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
@@ -119,9 +121,9 @@ pub async fn finish_passkey_registration(headers: HeaderMap, uri: OriginalUri, b
         Some(json) => serde_json::from_str(&json).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?,
         None => return Err(StatusCode::BAD_REQUEST),
     };
-    let webauthn = get_webauthn()?;
+    let webauthn = get_webauthn().await?;
     let passkey = webauthn.finish_passkey_registration(&request.credential, &registration).or(Err(StatusCode::BAD_REQUEST))?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let passkey_json = serde_json::to_string(&passkey).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let passkey_db = Passkey {
         id: passkey.cred_id().to_vec(),
@@ -131,19 +133,20 @@ pub async fn finish_passkey_registration(headers: HeaderMap, uri: OriginalUri, b
         last_used: None,
         name: request.name,
     };
-    diesel::insert_into(passkeys::table).values(passkey_db).execute(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
+    diesel::insert_into(passkeys::table).values(passkey_db).execute(&mut db).await.or(Err(StatusCode::BAD_REQUEST))?;
     notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
 pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Json<StartPasskeyAuthenticationResponse>), StatusCode> {
-    let webauthn = get_webauthn()?;
+    let webauthn = get_webauthn().await?;
     let request: StartPasskeyAuthenticationRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let user_option: Option<User> = users::table
         .filter(users::username.eq(&request.username).and(users::enabled.eq(true)))
         .first(&mut db)
+        .await
         .optional()
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let (uid, passkeys_db) = match user_option {
@@ -151,6 +154,7 @@ pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Jso
             let passkeys_db: Vec<Passkey> = passkeys::table
                 .filter(passkeys::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
                 .load(&mut db)
+                .await
                 .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
             (user.id, passkeys_db)
         }
@@ -163,7 +167,7 @@ pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Jso
     }
     let (mut challenge, authentication) = webauthn.start_passkey_authentication(&passkeys).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     if uid.is_none() {
-        let fake_passkey_key: Setting = settings::table.find("fake_passkey_key").get_result(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        let fake_passkey_key: Setting = settings::table.find("fake_passkey_key").get_result(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
         let key = BASE64_STANDARD.decode(fake_passkey_key.value).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
         let fake_credential_ids = WebauthnFakeCredentialGenerator::<FakePasskeyDistribution>::new(&key)
             .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
@@ -192,7 +196,7 @@ pub async fn start_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Jso
 }
 pub async fn finish_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Json<FinishPasskeyAuthenticationResponse>), StatusCode> {
     let request: FinishPasskeyAuthenticationRequest = serde_json::from_slice(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
-    let webauthn = get_webauthn()?;
+    let webauthn = get_webauthn().await?;
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
     let key = format!("PASSKEY_AUTHENTICATION:{}", request.flow_id);
     let authentication_json: Option<String> = valkey_client.get_del(key).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
@@ -201,11 +205,12 @@ pub async fn finish_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Js
         .finish_passkey_authentication(&request.credential, &authentication.authentication)
         .or(Err(StatusCode::UNAUTHORIZED))?;
     let uid = authentication.uid.ok_or(StatusCode::UNAUTHORIZED)?;
-    let mut db = get_db()?;
-    let user: User = users::table.find(uid).get_result(&mut db).or(Err(StatusCode::UNAUTHORIZED))?;
+    let mut db = get_db().await?;
+    let user: User = users::table.find(uid).get_result(&mut db).await.or(Err(StatusCode::UNAUTHORIZED))?;
     let passkey_db: Passkey = passkeys::table
         .filter(passkeys::uid.eq(uid).and(passkeys::id.eq(result.cred_id().to_vec())))
         .first(&mut db)
+        .await
         .or(Err(StatusCode::UNAUTHORIZED))?;
     let mut passkey: webauthn_rs::prelude::Passkey = serde_json::from_str(&passkey_db.passkey).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     passkey.update_credential(&result);
@@ -215,10 +220,12 @@ pub async fn finish_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Js
             passkeys::last_used.eq(Some(SystemTime::now())),
         ))
         .execute(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     diesel::update(users::table.find(uid))
         .set(users::last_login.eq(Some(SystemTime::now())))
         .execute(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
@@ -229,12 +236,13 @@ pub async fn finish_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Js
     ))
 }
 pub async fn passkeys_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIPasskey>>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let passkeys: Vec<Passkey> = passkeys::table
         .filter(passkeys::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .get_results(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let passkeys: Result<Vec<APIPasskey>, StatusCode> = passkeys
         .iter()
@@ -251,12 +259,13 @@ pub async fn passkeys_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
     Ok((sign_response(signature, Some(&passkeys))?, Json(passkeys)))
 }
 pub async fn delete_passkey(headers: HeaderMap, Path(id): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let credential_id = hex::decode(id).or(Err(StatusCode::BAD_REQUEST))?;
     diesel::delete(passkeys::table.filter(passkeys::id.eq(credential_id).and(passkeys::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))))
         .execute(&mut db)
+        .await
         .or(Err(StatusCode::NOT_FOUND))?;
     notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .await

@@ -2,18 +2,19 @@ use crate::models::Setting;
 use crate::schema::settings;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
-use diesel::PgConnection;
 use diesel::prelude::*;
+use diesel_async::AsyncPgConnection;
+use diesel_async::RunQueryDsl;
 use object::{Object, ObjectSection};
 use std::env;
 use std::{error::Error, ffi::CString, str::FromStr};
 use tokio::fs;
 
-pub async fn personalize_binary(db: &mut PgConnection, arch: &str, os: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+pub async fn personalize_binary(db: &mut AsyncPgConnection, arch: &str, os: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     let host = env::var("APISERVER_HOST")?;
-    let tls_cert: Setting = settings::table.find("tls_cert").get_result(db)?;
+    let tls_cert: Setting = settings::table.find("tls_cert").get_result(db).await?;
     let tls_cert = tls_cert.value;
-    let registration_token: Setting = settings::table.find("registration_token").get_result(db)?;
+    let registration_token: Setting = settings::table.find("registration_token").get_result(db).await?;
     let registration_token = BASE64_STANDARD.decode(registration_token.value)?;
     if host.len() > 255 || tls_cert.len() > 1023 || registration_token.len() != 64 {
         return Err("Parameters are too long".into());

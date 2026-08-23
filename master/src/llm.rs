@@ -1,10 +1,6 @@
 use crate::tools::get_toolset;
-use diesel::{
-    PgConnection,
-    dsl::insert_into,
-    prelude::*,
-    r2d2::{ConnectionManager, Pool},
-};
+use diesel::{dsl::insert_into, prelude::*};
+use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl, pooled_connection::deadpool::Pool};
 use rig_agent::agent::Text;
 use rig_core::{
     client::CompletionClient,
@@ -21,10 +17,10 @@ use shared_server::{
 use std::{error::Error, time::SystemTime};
 use unicode_rs::security::{RiskLevel, analyze_text};
 
-pub async fn process_chats(pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
-    let mut db = pool.get()?;
-    let chats_vec: Vec<Chat> = chats::table.get_results(&mut db)?;
-    let llm_provider = settings::table.find("llm_default_provider").first::<Setting>(&mut db)?.value;
+pub async fn process_chats(pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn Error>> {
+    let mut db = pool.get().await?;
+    let chats_vec: Vec<Chat> = chats::table.get_results(&mut db).await?;
+    let llm_provider = settings::table.find("llm_default_provider").first::<Setting>(&mut db).await?.value;
     if llm_provider.is_empty() {
         return Ok(());
     }
@@ -43,17 +39,17 @@ pub async fn process_chats(pool: Pool<ConnectionManager<PgConnection>>) -> Resul
         let model;
         match llm_provider.as_str() {
             "openrouter" => {
-                let api_key = settings::table.find("llm_openrouter_key").first::<Setting>(&mut db)?;
-                model = settings::table.find("llm_openrouter_model").first::<Setting>(&mut db)?.value;
+                let api_key = settings::table.find("llm_openrouter_key").first::<Setting>(&mut db).await?;
+                model = settings::table.find("llm_openrouter_model").first::<Setting>(&mut db).await?.value;
                 if api_key.value.is_empty() || model.is_empty() {
                     return Ok(());
                 }
                 openrouter_client = Some(openrouter::Client::new(&api_key.value)?);
             }
             "generic" => {
-                let endpoint = settings::table.find("llm_generic_endpoint").first::<Setting>(&mut db)?;
-                let api_key = settings::table.find("llm_generic_key").first::<Setting>(&mut db)?;
-                model = settings::table.find("llm_generic_model").first::<Setting>(&mut db)?.value;
+                let endpoint = settings::table.find("llm_generic_endpoint").first::<Setting>(&mut db).await?;
+                let api_key = settings::table.find("llm_generic_key").first::<Setting>(&mut db).await?;
+                model = settings::table.find("llm_generic_model").first::<Setting>(&mut db).await?.value;
                 if endpoint.value.is_empty() || model.is_empty() {
                     return Ok(());
                 }
@@ -66,11 +62,12 @@ pub async fn process_chats(pool: Pool<ConnectionManager<PgConnection>>) -> Resul
                 "openrouter" => process_chat::<openrouter::Client>(chat, pool.clone(), error_count, &llm_provider, openrouter_client.unwrap(), model).await,
                 "generic" => process_chat::<openai::Client>(chat, pool.clone(), error_count, &llm_provider, generic_client.unwrap(), model).await,
                 _ => Err("Invalid LLM provider".into()),
-            };
+            }
+            .map_err(|e| e.to_string());
             if let Err(e) = result {
                 eprintln!("Error while processing chats: {}", e);
-                if let Ok(mut db) = pool.get() {
-                    diesel::update(chats::table.find(chat_id)).set(chats::error_count.eq(error_count + 1)).execute(&mut db).ok();
+                if let Ok(mut db) = pool.get().await {
+                    diesel::update(chats::table.find(chat_id)).set(chats::error_count.eq(error_count + 1)).execute(&mut db).await.ok();
                 }
             }
         }));
@@ -82,13 +79,14 @@ pub async fn process_chats(pool: Pool<ConnectionManager<PgConnection>>) -> Resul
     }
     Ok(())
 }
-async fn process_chat<C: CompletionClient>(chat: Chat, pool: Pool<ConnectionManager<PgConnection>>, error_count: i32, provider: &str, client: C, model: String) -> Result<(), Box<dyn Error>>
+#[allow(clippy::get_first)]
+async fn process_chat<C: CompletionClient>(chat: Chat, pool: Pool<AsyncPgConnection>, error_count: i32, provider: &str, client: C, model: String) -> Result<(), Box<dyn Error>>
 where
     C::CompletionModel: Clone,
 {
-    let mut db = pool.get()?;
+    let mut db = pool.get().await?;
     let chat_id = chat.id.ok_or("Invalid chat")?;
-    let messages: Vec<Message> = messages::table.filter(messages::chat.eq(chat_id)).order_by(messages::sequence.asc()).get_results(&mut db)?;
+    let messages: Vec<Message> = messages::table.filter(messages::chat.eq(chat_id)).order_by(messages::sequence.asc()).get_results(&mut db).await?;
     if messages.is_empty() {
         return Ok(());
     }
@@ -96,7 +94,11 @@ where
     if messages.last().ok_or("Invalid chat")?.user_message != messages.last().ok_or("Invalid chat")?.finished {
         return Ok(());
     }
-    let unfinished_tools: i64 = tool_calls::table.filter(tool_calls::response.is_null().and(tool_calls::chat.eq(chat_id))).count().get_result(&mut db)?;
+    let unfinished_tools: i64 = tool_calls::table
+        .filter(tool_calls::response.is_null().and(tool_calls::chat.eq(chat_id)))
+        .count()
+        .get_result(&mut db)
+        .await?;
     if unfinished_tools != 0 {
         return Ok(());
     }
@@ -119,11 +121,11 @@ where
         if error_count < 5 {
             reply.content = "Maximum number of consecutive LLM messages reached".into();
         }
-        insert_into(messages::table).values(reply).execute(&mut db)?;
+        insert_into(messages::table).values(reply).execute(&mut db).await?;
         notify_server(&format!("WEB:REFRESH:{}", chat.uid)).await?;
         return Ok(());
     }
-    let devices: Vec<Device> = devices::table.filter(devices::approved.eq(true)).get_results(&mut db)?;
+    let devices: Vec<Device> = devices::table.filter(devices::approved.eq(true)).get_results(&mut db).await?;
     let device_names: Vec<String> = devices
         .iter()
         .map(|device| {
@@ -173,7 +175,10 @@ The servers you can access are: {}
         if msg.user_message {
             ai_messages.push(rig_core::message::Message::user(msg.content.clone()));
         } else {
-            let tool_calls: Vec<ToolCall> = tool_calls::table.filter(tool_calls::chat.eq(chat_id).and(tool_calls::sequence.eq(msg.sequence))).get_results(&mut db)?;
+            let tool_calls: Vec<ToolCall> = tool_calls::table
+                .filter(tool_calls::chat.eq(chat_id).and(tool_calls::sequence.eq(msg.sequence)))
+                .get_results(&mut db)
+                .await?;
             let mut parts = vec![AssistantContent::Text(Text {
                 text: msg.content.clone(),
                 additional_params: None,
@@ -272,7 +277,7 @@ The servers you can access are: {}
                 if reasoning_arg.content.len() != 1 {
                     return Err("Invalid LLM response".into());
                 }
-                let reasoning_content = reasoning_arg.content.first().ok_or("Invalid LLM response")?.to_owned();
+                let reasoning_content = reasoning_arg.content.get(0).ok_or("Invalid LLM response")?.to_owned();
                 reasoning = match reasoning_content {
                     ReasoningContent::Text { text, signature: _ } => Some(text),
                     ReasoningContent::Encrypted(_) => None,
@@ -313,10 +318,10 @@ The servers you can access are: {}
             break;
         }
     }
-    db.transaction(|db| {
-        insert_into(messages::table).values(reply).execute(db)?;
+    db.transaction(async |db| {
+        insert_into(messages::table).values(reply).execute(db).await?;
         for i in &calls {
-            insert_into(tool_calls::table).values(i).execute(db)?;
+            insert_into(tool_calls::table).values(i).execute(db).await?;
         }
         diesel::update(chats::table.find(chat_id))
             .set((
@@ -324,9 +329,11 @@ The servers you can access are: {}
                 chats::error_count.eq(0),
                 chats::consecutive_llm_messages.eq(chat.consecutive_llm_messages + 1),
             ))
-            .execute(db)?;
-        Ok::<(), Box<dyn Error>>(())
-    })?;
+            .execute(db)
+            .await?;
+        Ok::<(), diesel::result::Error>(())
+    })
+    .await?;
     notify_server(&format!("WEB:REFRESH:{}", chat.uid)).await?;
     if !calls.is_empty() {
         notify_server("MASTER:TOOLS").await?;

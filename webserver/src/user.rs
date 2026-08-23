@@ -6,6 +6,7 @@ use axum::body::Bytes;
 use axum::extract::OriginalUri;
 use axum::http::{HeaderMap, StatusCode};
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use shared_server::schema::users;
 use shared_server::{hash_password, notify_server};
@@ -35,7 +36,7 @@ pub struct SetPasswordStateRequest {
 }
 
 pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: ChangePasswordRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     if request.new_password.is_empty() || request.new_password.len() < MIN_PASSWORD_LENGTH {
@@ -43,16 +44,17 @@ pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) 
     }
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::FORBIDDEN))?;
     Argon2::default().verify_password(request.old_password.as_bytes(), &hash).or(Err(StatusCode::FORBIDDEN))?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let hash = hash_password(request.new_password).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .set((users::password.eq(hash), users::jwt_counter.eq(user.jwt_counter + 1)))
         .execute(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
 pub async fn get_user_info(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<GetUserInfoResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let response = GetUserInfoResponse {
         id: user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
@@ -63,15 +65,16 @@ pub async fn get_user_info(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
 pub async fn set_password_state(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "PUT").await?;
     let request: SetPasswordStateRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::FORBIDDEN))?;
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::FORBIDDEN))?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .set(users::password_enabled.eq(request.enabled))
         .execute(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)

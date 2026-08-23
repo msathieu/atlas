@@ -10,6 +10,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use shared_api::{CommandLanguage, CommandOrigin};
 use shared_server::{
@@ -45,12 +46,13 @@ pub struct CreateCommandResponse {
 }
 
 pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APICommand>>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let commands: Vec<Command> = commands::table
         .filter(commands::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .get_results(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let commands: Result<Vec<APICommand>, StatusCode> = commands
         .iter()
@@ -84,11 +86,11 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
     Ok((sign_response(signature, Some(&commands))?, Json(commands)))
 }
 pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateCommandResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
-    require_admin(&headers)?;
+    let user = authenticate(&headers).await?.0;
+    require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateCommandRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let mut cmd = Command {
         id: None,
         device: request.device,
@@ -109,7 +111,7 @@ pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -
         language: CommandLanguage::Lua as i32,
         transient: false,
     };
-    cmd = diesel::insert_into(commands::table).values(cmd).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
+    cmd = diesel::insert_into(commands::table).values(cmd).get_result(&mut db).await.or(Err(StatusCode::BAD_REQUEST))?;
     notify_server(&format!("API:DEVICE:{}", request.device)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .await
@@ -120,18 +122,20 @@ pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
 pub async fn delete_command(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     if development_environments::table
         .filter(development_environments::command.eq(id))
         .first::<DevelopmentEnvironment>(&mut db)
+        .await
         .optional()
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
         .is_some()
         || agents::table
             .filter(agents::command.eq(id))
             .first::<Agent>(&mut db)
+            .await
             .optional()
             .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
             .is_some()
@@ -140,6 +144,7 @@ pub async fn delete_command(headers: HeaderMap, Path(id): Path<Uuid>, uri: Origi
     }
     diesel::delete(commands::table.filter(commands::id.eq(id).and(commands::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))))
         .execute(&mut db)
+        .await
         .or(Err(StatusCode::NOT_FOUND))?;
     notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .await

@@ -1,5 +1,6 @@
 use crate::DB_POOL;
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::Deserialize;
 use serde_json::json;
@@ -36,7 +37,7 @@ impl PortableTool for CompactTool {
     }
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let pool = DB_POOL.get().ok_or(ToolExecutionError::other("Database connection failed"))?;
-        let mut db = pool.get().map_err(|_| ToolExecutionError::other("Database connection failed"))?;
+        let mut db = pool.get().await.map_err(|_| ToolExecutionError::other("Database connection failed"))?;
         diesel::update(
             messages::table.filter(
                 messages::chat
@@ -47,6 +48,7 @@ impl PortableTool for CompactTool {
         )
         .set(messages::compacted.eq(true))
         .execute(&mut db)
+        .await
         .map_err(|_| ToolExecutionError::other("Updating messages failed"))?;
         Ok("OK".into())
     }

@@ -11,6 +11,7 @@ use axum::{
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use serde::Serialize;
 use shared_server::{models::Device, notify_server, schema::devices};
 use uuid::Uuid;
@@ -30,10 +31,10 @@ pub struct APIDevice {
 }
 
 pub async fn devices_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIDevice>>), StatusCode> {
-    authenticate(&headers)?;
+    authenticate(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
-    let mut db = get_db()?;
-    let devices: Vec<Device> = devices::table.get_results(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let mut db = get_db().await?;
+    let devices: Vec<Device> = devices::table.get_results(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let devices: Result<Vec<APIDevice>, StatusCode> = devices
         .iter()
         .map(|device| {
@@ -55,22 +56,23 @@ pub async fn devices_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
     Ok((sign_response(signature, Some(&devices))?, Json(devices)))
 }
 pub async fn approve_device(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    require_admin(&headers)?;
+    require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     diesel::update(devices::table.find(id))
         .set(devices::approved.eq(true))
         .execute(&mut db)
+        .await
         .or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:DEVICES").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
 pub async fn delete_device(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    require_admin(&headers)?;
+    require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
-    let mut db = get_db()?;
-    diesel::delete(devices::table.find(id)).execute(&mut db).or(Err(StatusCode::NOT_FOUND))?;
+    let mut db = get_db().await?;
+    diesel::delete(devices::table.find(id)).execute(&mut db).await.or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }

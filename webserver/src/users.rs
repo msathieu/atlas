@@ -7,6 +7,7 @@ use axum::body::Bytes;
 use axum::extract::{OriginalUri, Path};
 use axum::http::{HeaderMap, StatusCode};
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use shared_server::models::User;
 use shared_server::schema::users;
@@ -34,10 +35,10 @@ pub struct CreateUserResponse {
 }
 
 pub async fn users_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIUser>>), StatusCode> {
-    require_admin(&headers)?;
+    require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
-    let mut db = get_db()?;
-    let users: Vec<User> = users::table.get_results(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let mut db = get_db().await?;
+    let users: Vec<User> = users::table.get_results(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let users: Result<Vec<APIUser>, StatusCode> = users
         .iter()
         .map(|user| {
@@ -55,21 +56,21 @@ pub async fn users_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Re
     Ok((sign_response(signature, Some(&users))?, Json(users)))
 }
 pub async fn delete_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    require_admin(&headers)?;
+    require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
-    let mut db = get_db()?;
-    diesel::delete(users::table.find(id)).execute(&mut db).or(Err(StatusCode::NOT_FOUND))?;
+    let mut db = get_db().await?;
+    diesel::delete(users::table.find(id)).execute(&mut db).await.or(Err(StatusCode::NOT_FOUND))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
 pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateUserResponse>), StatusCode> {
-    require_admin(&headers)?;
+    require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateUserRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     if request.username.is_empty() || !request.username.chars().all(|c| c.is_ascii_alphanumeric()) || request.password.is_empty() || request.password.len() < MIN_PASSWORD_LENGTH {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let hash = hash_password(request.password).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut user = User {
         id: None,
@@ -81,7 +82,7 @@ pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
         password_enabled: true,
         last_login: None,
     };
-    user = diesel::insert_into(users::table).values(user).get_result(&mut db).or(Err(StatusCode::BAD_REQUEST))?;
+    user = diesel::insert_into(users::table).values(user).get_result(&mut db).await.or(Err(StatusCode::BAD_REQUEST))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let response = CreateUserResponse {
         id: user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,

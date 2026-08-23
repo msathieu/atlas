@@ -10,6 +10,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use diesel::prelude::*;
+use diesel_async::{AsyncConnection, RunQueryDsl};
 use redis::{AsyncTypedCommands, ExistenceCheck, SetExpiry, SetOptions};
 use serde::{Deserialize, Serialize};
 use shared_api::{ContainerOrigin, ContainerState};
@@ -20,7 +21,7 @@ use shared_server::{
     schema::{commands, containers, development_environments},
 };
 use ssh_key::{Algorithm::Ed25519, LineEnding, PrivateKey, rand_core::OsRng};
-use std::{env, error::Error, time::SystemTime};
+use std::{env, time::SystemTime};
 use uuid::Uuid;
 
 #[derive(Serialize)]
@@ -70,14 +71,15 @@ pub struct SetDevelopmentEnvironmentStateRequest {
 }
 
 pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIDevelopmentEnvironment>>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let environments: Vec<(DevelopmentEnvironment, Container)> = development_environments::table
         .inner_join(containers::table.on(development_environments::id.eq(containers::id)))
         .filter(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .select((DevelopmentEnvironment::as_select(), Container::as_select()))
         .get_results(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let environments: Result<Vec<APIDevelopmentEnvironment>, StatusCode> = environments
         .iter()
@@ -109,7 +111,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
     Ok((sign_response(signature, Some(&environments))?, Json(environments)))
 }
 pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateDevelopmentEnvironmentResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateDevelopmentEnvironmentRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     if request.name.is_empty()
@@ -125,7 +127,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     if request.nested_containers && !user.admin {
         return Err(StatusCode::FORBIDDEN);
     }
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let mut container = Container {
         id: None,
         created_at: SystemTime::now(),
@@ -142,9 +144,9 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let branch = if request.branch.is_empty() { None } else { Some(request.branch) };
     let ssh_key = PrivateKey::random(&mut OsRng, Ed25519).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let ssh_key_exported = ssh_key.to_openssh(LineEnding::LF).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    db.transaction(|db| {
-        container = diesel::insert_into(containers::table).values(container).get_result(db)?;
-        id = container.id.ok_or("Missing ID")?;
+    db.transaction(async |db| {
+        container = diesel::insert_into(containers::table).values(container).get_result(db).await?;
+        id = container.id.ok_or(diesel::result::Error::NotFound)?;
         let development_environment = DevelopmentEnvironment {
             id,
             name: request.name,
@@ -154,9 +156,10 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
             nested_containers: request.nested_containers,
             ssh_key: ssh_key_exported.to_string(),
         };
-        diesel::insert_into(development_environments::table).values(development_environment).execute(db)?;
-        Ok::<(), Box<dyn Error>>(())
+        diesel::insert_into(development_environments::table).values(development_environment).execute(db).await?;
+        Ok::<(), diesel::result::Error>(())
     })
+    .await
     .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
@@ -172,9 +175,9 @@ pub async fn set_development_environment_state(
     uri: OriginalUri,
     body: Bytes,
 ) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let state = match request.state.as_str() {
         "stop" => ContainerState::Stopped,
         "start" => ContainerState::Running,
@@ -190,6 +193,7 @@ pub async fn set_development_environment_state(
                     .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
             )
             .first::<Container>(&mut db)
+            .await
             .or(Err(StatusCode::NOT_FOUND))?;
         let key = format!("DEVELOPMENT_ENVIRONMENT:{}", id);
         get_valkey_client()
@@ -210,6 +214,7 @@ pub async fn set_development_environment_state(
     )
     .set(containers::requested_state.eq(state as i32))
     .execute(&mut db)
+    .await
     .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
@@ -224,9 +229,9 @@ pub async fn open_development_environment(
     request: Query<OpenDevelopmentEnvironmentRequest>,
     body: Bytes,
 ) -> Result<(HeaderMap, Json<OpenDevelopmentEnvironmentResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let container: Container = containers::table
         .filter(
             containers::uid
@@ -235,14 +240,15 @@ pub async fn open_development_environment(
                 .and(containers::id.eq(id)),
         )
         .first(&mut db)
+        .await
         .or(Err(StatusCode::NOT_FOUND))?;
     let mut ready = true;
     if container.state != ContainerState::Running as i32 {
         ready = false;
     }
-    let development_environment: DevelopmentEnvironment = development_environments::table.find(id).first(&mut db).or(Err(StatusCode::NOT_FOUND))?;
+    let development_environment: DevelopmentEnvironment = development_environments::table.find(id).first(&mut db).await.or(Err(StatusCode::NOT_FOUND))?;
     if let Some(command) = development_environment.command {
-        let command: Command = commands::table.find(command).first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        let command: Command = commands::table.find(command).first(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
         if !command.completed {
             ready = false;
         }
@@ -262,9 +268,9 @@ pub async fn open_development_environment(
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
 pub async fn get_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<GetSSHForwardRequestResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
     let development_environment_id: String = valkey_client
         .get(format!("SSH_FORWARD:{}", id))
@@ -274,10 +280,12 @@ pub async fn get_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid>, u
     let development_environment: DevelopmentEnvironment = development_environments::table
         .find(Uuid::parse_str(&development_environment_id).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?)
         .first(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     containers::table
         .filter(containers::id.eq(development_environment.id).and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
         .first::<Container>(&mut db)
+        .await
         .or(Err(StatusCode::NOT_FOUND))?;
     let requested_key = format!("SSH_FORWARD_REQUESTED:{}", id);
     let exists = valkey_client
@@ -294,10 +302,10 @@ pub async fn get_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid>, u
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
 pub async fn approve_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: ApproveSSHForwardRequestRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
     let development_environment_id: String = valkey_client
         .get(format!("SSH_FORWARD:{}", id))
@@ -311,6 +319,7 @@ pub async fn approve_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid
                 .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)),
         )
         .first::<Container>(&mut db)
+        .await
         .or(Err(StatusCode::NOT_FOUND))?;
     let data = if request.approved { "APPROVED" } else { "DENIED" };
     let valkey_key = format!("SSH_FORWARD_APPROVAL:{}", id);

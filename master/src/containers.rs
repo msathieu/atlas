@@ -2,10 +2,8 @@ use crate::code::{PY_AGENT, PY_DEVELOPMENT_ENVIRONMENT};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use diesel::prelude::*;
-use diesel::{
-    PgConnection,
-    r2d2::{ConnectionManager, Pool},
-};
+use diesel_async::AsyncConnection;
+use diesel_async::{AsyncPgConnection, RunQueryDsl, pooled_connection::deadpool::Pool};
 use k8s_openapi::api::core::v1::{
     EnvVar, LocalObjectReference, PersistentVolumeClaim, PersistentVolumeClaimSpec, PersistentVolumeClaimVolumeSource, Pod, PodSpec, ResourceRequirements, SeccompProfile, SecurityContext, Service,
     ServicePort, ServiceSpec, Volume, VolumeMount, VolumeResourceRequirements,
@@ -27,8 +25,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::sleep;
 use uuid::Uuid;
 
-pub async fn process_containers(pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
-    let mut db = pool.get()?;
+pub async fn process_containers(pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn Error>> {
+    let mut db = pool.get().await?;
     let removed = diesel::delete(
         containers::table.filter(
             containers::requested_state
@@ -36,7 +34,8 @@ pub async fn process_containers(pool: Pool<ConnectionManager<PgConnection>>) -> 
                 .and(containers::state.eq(ContainerState::NonExistent as i32)),
         ),
     )
-    .execute(&mut db)?;
+    .execute(&mut db)
+    .await?;
     if removed > 0 {
         notify_server("WEB:REFRESH").await?;
     }
@@ -47,7 +46,8 @@ pub async fn process_containers(pool: Pool<ConnectionManager<PgConnection>>) -> 
                 .or(containers::state.eq(ContainerState::Running as i32))
                 .or(containers::state.eq(ContainerState::Started as i32)),
         )
-        .get_results(&mut db)?;
+        .get_results(&mut db)
+        .await?;
     let mut tasks = Vec::new();
     for container in containers {
         let pool = pool.clone();
@@ -64,9 +64,9 @@ pub async fn process_containers(pool: Pool<ConnectionManager<PgConnection>>) -> 
     }
     Ok(())
 }
-async fn process_container(mut container: Container, pool: Pool<ConnectionManager<PgConnection>>) -> Result<(), Box<dyn Error>> {
+async fn process_container(mut container: Container, pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn Error>> {
     let client = Client::try_default().await?;
-    let mut db = pool.get()?;
+    let mut db = pool.get().await?;
     let container_id = container.id.ok_or("Invalid container")?;
     let container_name = format!("atlas-{}", container_id);
     let pvc_name = format!("atlas-state-{}", container_id);
@@ -92,7 +92,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         if request_restart {
             diesel::update(containers::table.find(container_id))
                 .set(containers::requested_state.eq(ContainerState::Restarting as i32))
-                .execute(&mut db)?;
+                .execute(&mut db)
+                .await?;
             container.requested_state = ContainerState::Restarting as i32;
             notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         }
@@ -102,7 +103,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             if !exists {
                 diesel::update(containers::table.find(container_id))
                     .set(containers::requested_state.eq(ContainerState::Stopped as i32))
-                    .execute(&mut db)?;
+                    .execute(&mut db)
+                    .await?;
                 container.requested_state = ContainerState::Stopped as i32;
                 notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
             }
@@ -170,7 +172,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         }
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::Stopped as i32))
-            .execute(&mut db)?;
+            .execute(&mut db)
+            .await?;
         notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Stopped as i32 && container.requested_state == ContainerState::NonExistent as i32 {
@@ -194,7 +197,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         }
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::NonExistent as i32))
-            .execute(&mut db)?;
+            .execute(&mut db)
+            .await?;
         notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Stopped as i32 && (container.requested_state == ContainerState::Started as i32 || container.requested_state == ContainerState::Running as i32) {
@@ -248,31 +252,31 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         }
         let mut envs = vec![];
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
-            let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db)?;
+            let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db).await?;
             envs.push(EnvVar {
                 name: "CODE_SERVER_APP_NAME".to_string(),
                 value: Some(format!("Atlas - {}", development_environment.name)),
                 value_from: None,
             });
-            let development_environment_settings = get_user_setting(container.uid, "development_environment_settings".to_string(), &mut db)?;
+            let development_environment_settings = get_user_setting(container.uid, "development_environment_settings".to_string(), &mut db).await?;
             envs.push(EnvVar {
                 name: "DEVELOPMENT_ENVIRONMENT_SETTINGS".to_string(),
                 value: Some(development_environment_settings.value),
                 value_from: None,
             });
-            let development_environment_extensions = get_user_setting(container.uid, "development_environment_extensions".to_string(), &mut db)?;
+            let development_environment_extensions = get_user_setting(container.uid, "development_environment_extensions".to_string(), &mut db).await?;
             envs.push(EnvVar {
                 name: "DEVELOPMENT_ENVIRONMENT_EXTENSIONS".to_string(),
                 value: Some(development_environment_extensions.value),
                 value_from: None,
             });
-            let development_environment_gitconfig = get_user_setting(container.uid, "development_environment_gitconfig".to_string(), &mut db)?;
+            let development_environment_gitconfig = get_user_setting(container.uid, "development_environment_gitconfig".to_string(), &mut db).await?;
             envs.push(EnvVar {
                 name: "DEVELOPMENT_ENVIRONMENT_GITCONFIG".to_string(),
                 value: Some(development_environment_gitconfig.value),
                 value_from: None,
             });
-            let development_environment_paths = get_user_setting(container.uid, "development_environment_paths".to_string(), &mut db)?;
+            let development_environment_paths = get_user_setting(container.uid, "development_environment_paths".to_string(), &mut db).await?;
             envs.push(EnvVar {
                 name: "DEVELOPMENT_ENVIRONMENT_PATHS".to_string(),
                 value: Some(development_environment_paths.value),
@@ -300,7 +304,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
             }
         }
         if container.origin == ContainerOrigin::Agent as i32 {
-            let agent: Agent = agents::table.find(container_id).first(&mut db)?;
+            let agent: Agent = agents::table.find(container_id).first(&mut db).await?;
             envs.push(EnvVar {
                 name: "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD".to_string(),
                 value: Some(agent.password),
@@ -315,7 +319,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         let mut limits = BTreeMap::new();
         let mut requests = BTreeMap::new();
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
-            let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db)?;
+            let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db).await?;
             if development_environment.nested_containers {
                 security_context.proc_mount = Some("Unmasked".to_string());
                 security_context.seccomp_profile = Some(SeccompProfile {
@@ -362,7 +366,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         pod_api.create(&PostParams::default(), &pod).await?;
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::Started as i32))
-            .execute(&mut db)?;
+            .execute(&mut db)
+            .await?;
         notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Started as i32
@@ -374,17 +379,20 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         if pod_api.get_opt(&container_name).await?.is_some() {
             pod_api.delete(&container_name, &DeleteParams::default()).await?;
         }
-        db.transaction(|db| {
+        db.transaction(async |db| {
             diesel::update(containers::table.find(container_id))
                 .set(containers::state.eq(ContainerState::Stopped as i32))
-                .execute(db)?;
+                .execute(db)
+                .await?;
             if container.requested_state == ContainerState::Restarting as i32 {
                 diesel::update(containers::table.find(container_id))
                     .set(containers::requested_state.eq(ContainerState::Running as i32))
-                    .execute(db)?;
+                    .execute(db)
+                    .await?;
             }
-            Ok::<(), Box<dyn Error>>(())
-        })?;
+            Ok::<(), diesel::result::Error>(())
+        })
+        .await?;
         notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Started as i32 && container.requested_state == ContainerState::Running as i32 {
@@ -402,7 +410,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         if !pod_started {
             diesel::update(containers::table.find(container_id))
                 .set(containers::requested_state.eq(ContainerState::Stopped as i32))
-                .execute(&mut db)?;
+                .execute(&mut db)
+                .await?;
             notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
             notify_server("MASTER:CONTAINERS").await?;
             return Ok(());
@@ -432,7 +441,7 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         process.join().await?;
         let mut device_found = false;
         for _ in 0..30 {
-            let device: Option<Device> = devices::table.filter(devices::hostname.eq(&container_name)).first(&mut db).optional()?;
+            let device: Option<Device> = devices::table.filter(devices::hostname.eq(&container_name)).first(&mut db).await.optional()?;
             if device.is_some() {
                 device_found = true;
                 break;
@@ -442,7 +451,8 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         if !device_found {
             diesel::update(containers::table.find(container_id))
                 .set(containers::requested_state.eq(ContainerState::Stopped as i32))
-                .execute(&mut db)?;
+                .execute(&mut db)
+                .await?;
             notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
             notify_server("MASTER:CONTAINERS").await?;
             return Ok(());
@@ -453,13 +463,15 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         process.stdout().ok_or("Invalid process")?.read_to_string(&mut pubkey).await?;
         process.join().await?;
         let pubkey = BASE64_STANDARD.decode(pubkey.trim())?;
-        let device: Device = devices::table.filter(devices::hostname.eq(container_name).and(devices::pubkey.eq(pubkey))).first(&mut db)?;
+        let device: Device = devices::table.filter(devices::hostname.eq(container_name).and(devices::pubkey.eq(pubkey))).first(&mut db).await?;
         diesel::update(devices::table.find(device.id.ok_or("Invalid device")?))
             .set((devices::container_id.eq(container_id), devices::approved.eq(true)))
-            .execute(&mut db)?;
+            .execute(&mut db)
+            .await?;
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::Running as i32))
-            .execute(&mut db)?;
+            .execute(&mut db)
+            .await?;
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let mut command = Command {
                 id: None,
@@ -481,10 +493,11 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 language: CommandLanguage::Python as i32,
                 transient: false,
             };
-            command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
+            command = diesel::insert_into(commands::table).values(command).get_result(&mut db).await?;
             diesel::update(development_environments::table.find(container_id))
                 .set(development_environments::command.eq(command.id.ok_or("Invalid command")?))
-                .execute(&mut db)?;
+                .execute(&mut db)
+                .await?;
         } else if container.origin == ContainerOrigin::Agent as i32 {
             let mut command = Command {
                 id: None,
@@ -506,10 +519,11 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
                 language: CommandLanguage::Python as i32,
                 transient: false,
             };
-            command = diesel::insert_into(commands::table).values(command).get_result(&mut db)?;
+            command = diesel::insert_into(commands::table).values(command).get_result(&mut db).await?;
             diesel::update(agents::table.find(container_id))
                 .set(agents::command.eq(command.id.ok_or("Invalid command")?))
-                .execute(&mut db)?;
+                .execute(&mut db)
+                .await?;
         }
         notify_server("WEB:REFRESH").await?;
         notify_server("MASTER:CONTAINERS").await?;
@@ -531,14 +545,16 @@ async fn process_container(mut container: Container, pool: Pool<ConnectionManage
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             diesel::update(development_environments::table.find(container_id))
                 .set(development_environments::command.eq(None::<Uuid>))
-                .execute(&mut db)?;
+                .execute(&mut db)
+                .await?;
         } else if container.origin == ContainerOrigin::Agent as i32 {
-            diesel::update(agents::table.find(container_id)).set(agents::command.eq(None::<Uuid>)).execute(&mut db)?;
+            diesel::update(agents::table.find(container_id)).set(agents::command.eq(None::<Uuid>)).execute(&mut db).await?;
         }
-        diesel::delete(devices::table.filter(devices::container_id.eq(container_id))).execute(&mut db)?;
+        diesel::delete(devices::table.filter(devices::container_id.eq(container_id))).execute(&mut db).await?;
         diesel::update(containers::table.find(container_id))
             .set(containers::state.eq(ContainerState::Started as i32))
-            .execute(&mut db)?;
+            .execute(&mut db)
+            .await?;
         notify_server("WEB:REFRESH").await?;
         notify_server("MASTER:CONTAINERS").await?;
     }

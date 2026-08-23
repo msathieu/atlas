@@ -24,11 +24,11 @@ use axum::{
     routing::{delete, get, post, put},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
-use diesel::{
-    PgConnection,
-    r2d2::{Pool, PooledConnection},
+use diesel::prelude::*;
+use diesel_async::{
+    AsyncPgConnection, RunQueryDsl,
+    pooled_connection::deadpool::{Object, Pool},
 };
-use diesel::{prelude::*, r2d2::ConnectionManager};
 use shared_api::print_startup;
 use shared_server::{get_db_pool, listen_for_restarts, models::Setting, schema};
 use std::sync::OnceLock;
@@ -57,10 +57,10 @@ mod util;
 static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 static ENCRYPTION_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 static SIGNING_KEY: OnceLock<Vec<u8>> = OnceLock::new();
-static DB_POOL: OnceLock<Pool<ConnectionManager<PgConnection>>> = OnceLock::new();
+static DB_POOL: OnceLock<Pool<AsyncPgConnection>> = OnceLock::new();
 
-fn get_db() -> Result<PooledConnection<ConnectionManager<PgConnection>>, StatusCode> {
-    DB_POOL.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?.get().or(Err(StatusCode::INTERNAL_SERVER_ERROR))
+async fn get_db() -> Result<Object<AsyncPgConnection>, StatusCode> {
+    DB_POOL.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?.get().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))
 }
 
 #[tokio::main]
@@ -68,24 +68,19 @@ async fn main() {
     print_startup("webserver", env!("CARGO_PKG_VERSION"));
     dotenvy::dotenv().ok();
     listen_for_restarts("WEB".to_string()).await;
-    DB_POOL.set(get_db_pool().unwrap()).unwrap();
-    let jwt_secret = schema::settings::table.find("jwt_secret").first::<Setting>(&mut DB_POOL.get().unwrap().get().unwrap()).unwrap().value;
-    let jwt_secret = BASE64_STANDARD.decode(jwt_secret).unwrap();
-    JWT_KEY.set(jwt_secret).unwrap();
-    let encryption_key = schema::settings::table
-        .find("web_encryption_key")
-        .first::<Setting>(&mut DB_POOL.get().unwrap().get().unwrap())
-        .unwrap()
-        .value;
-    let encryption_key = BASE64_STANDARD.decode(encryption_key).unwrap();
-    ENCRYPTION_KEY.set(encryption_key).unwrap();
-    let signing_key = schema::settings::table
-        .find("web_signing_key")
-        .first::<Setting>(&mut DB_POOL.get().unwrap().get().unwrap())
-        .unwrap()
-        .value;
-    let signing_key = BASE64_STANDARD.decode(signing_key).unwrap();
-    SIGNING_KEY.set(signing_key).unwrap();
+    DB_POOL.set(get_db_pool().await.unwrap()).ok();
+    {
+        let mut db = DB_POOL.get().unwrap().get().await.unwrap();
+        let jwt_secret = schema::settings::table.find("jwt_secret").first::<Setting>(&mut db).await.unwrap().value;
+        let jwt_secret = BASE64_STANDARD.decode(jwt_secret).unwrap();
+        JWT_KEY.set(jwt_secret).unwrap();
+        let encryption_key = schema::settings::table.find("web_encryption_key").first::<Setting>(&mut db).await.unwrap().value;
+        let encryption_key = BASE64_STANDARD.decode(encryption_key).unwrap();
+        ENCRYPTION_KEY.set(encryption_key).unwrap();
+        let signing_key = schema::settings::table.find("web_signing_key").first::<Setting>(&mut db).await.unwrap().value;
+        let signing_key = BASE64_STANDARD.decode(signing_key).unwrap();
+        SIGNING_KEY.set(signing_key).unwrap();
+    }
     let router = Router::new()
         .fallback_service(ServeDir::new("frontend").fallback(ServeFile::new("frontend/404.html")))
         .route("/api/info", get(server_info))

@@ -10,20 +10,27 @@ use argon2::{
 };
 use aws_lc_rs::signature::{ED25519, ParsedPublicKey, UnparsedPublicKey};
 use base64::{Engine, prelude::BASE64_STANDARD};
-use diesel::{
-    PgConnection,
-    r2d2::{ConnectionManager, Pool},
+use diesel::prelude::*;
+use diesel_async::{
+    AsyncPgConnection,
+    pooled_connection::{AsyncDieselConnectionManager, deadpool::Pool},
 };
-use diesel::{prelude::*, r2d2::PooledConnection};
+use diesel_async::{RunQueryDsl, pooled_connection::ManagerConfig};
+use futures_util::FutureExt;
 use jsonwebtoken::{DecodingKey, Validation, decode};
 use rand::random_range;
 use redis::{AsyncTypedCommands, Msg, PushInfo, PushKind, RedisError, aio::ConnectionManagerConfig};
+use rustls::{
+    ClientConfig, RootCertStore,
+    pki_types::{CertificateDer, pem::PemObject},
+};
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error, process::exit, sync::OnceLock, time::Duration};
 use tokio::{
     sync::mpsc::{UnboundedReceiver, unbounded_channel},
     time::sleep,
 };
+use tokio_postgres_rustls::MakeRustlsConnect;
 use uuid::Uuid;
 
 pub mod binary;
@@ -43,7 +50,7 @@ pub struct Claims {
 static PUBSUB_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
 static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 
-pub fn get_db_pool() -> Result<Pool<ConnectionManager<PgConnection>>, Box<dyn Error>> {
+pub async fn get_db_pool() -> Result<Pool<AsyncPgConnection>, Box<dyn Error>> {
     let url = format!(
         "postgres://{}:{}@{}/{}?sslmode=require",
         env::var("DATABASE_USER").unwrap_or("app".to_string()),
@@ -51,8 +58,23 @@ pub fn get_db_pool() -> Result<Pool<ConnectionManager<PgConnection>>, Box<dyn Er
         env::var("DATABASE_HOST").unwrap_or("localhost".to_string()),
         env::var("DATABASE_DB").unwrap_or("app".to_string())
     );
-    let connection_manager = ConnectionManager::new(url);
-    let pool = Pool::builder().build(connection_manager)?;
+    let mut cert_store = RootCertStore::empty();
+    let certificate = CertificateDer::from_pem_reader(env::var("DATABASE_CERT")?.trim().as_bytes())?;
+    cert_store.add(certificate)?;
+    let tls_config = ClientConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
+        .with_root_certificates(cert_store)
+        .with_no_client_auth();
+    let mut manager_config = ManagerConfig::default();
+    manager_config.custom_setup = Box::new(move |url| {
+        let pg_config = MakeRustlsConnect::new(tls_config.clone());
+        async {
+            let (client, connection) = tokio_postgres::connect(url, pg_config).await.map_err(|e| ConnectionError::BadConnection(e.to_string()))?;
+            AsyncPgConnection::try_from_client_and_connection(client, connection).await
+        }
+        .boxed()
+    });
+    let connection_manager = AsyncDieselConnectionManager::new_with_config(url, manager_config);
+    let pool = Pool::builder(connection_manager).build()?;
     Ok(pool)
 }
 pub async fn get_valkey_client() -> Result<(redis::aio::ConnectionManager, UnboundedReceiver<PushInfo>), RedisError> {
@@ -125,14 +147,9 @@ pub fn parse_pubkey(pubkey: String) -> Result<ParsedPublicKey, Box<dyn Error>> {
     let key = UnparsedPublicKey::new(&ED25519, BASE64_STANDARD.decode(pubkey)?).parse()?;
     Ok(key)
 }
-pub fn authenticate_jwt(
-    jwt: &str,
-    aud: &str,
-    mut db: Option<&mut PooledConnection<ConnectionManager<PgConnection>>>,
-    skip_db_checks: bool,
-) -> Result<(Option<User>, Option<ParsedPublicKey>), Box<dyn Error>> {
+pub async fn authenticate_jwt(jwt: &str, aud: &str, mut db: Option<&mut AsyncPgConnection>, skip_db_checks: bool) -> Result<(Option<User>, Option<ParsedPublicKey>), Box<dyn Error>> {
     if JWT_KEY.get().is_none() {
-        let jwt_secret: Setting = settings::table.find("jwt_secret").first(db.as_deref_mut().ok_or("No DB instance passed")?)?;
+        let jwt_secret: Setting = settings::table.find("jwt_secret").first(db.as_deref_mut().ok_or("No DB instance passed")?).await?;
         let jwt_secret = BASE64_STANDARD.decode(jwt_secret.value)?;
         JWT_KEY.set(jwt_secret).ok();
     }
@@ -144,7 +161,7 @@ pub fn authenticate_jwt(
     let token = decode::<Claims>(jwt, &key, &validation)?;
     let mut user = None;
     if !skip_db_checks {
-        let local_user: User = users::table.find(token.claims.sub).first(db.ok_or("No DB instance passed")?)?;
+        let local_user: User = users::table.find(token.claims.sub).first(db.ok_or("No DB instance passed")?).await?;
         if !local_user.enabled || local_user.jwt_counter as usize != token.claims.counter {
             return Err("Wrong JWT counter or user isn't enabled".into());
         }
@@ -156,10 +173,11 @@ pub fn authenticate_jwt(
     }
     Ok((user, pubkey))
 }
-pub fn get_user_setting(uid: Uuid, name: String, db: &mut PooledConnection<ConnectionManager<PgConnection>>) -> Result<UserSetting, Box<dyn Error>> {
+pub async fn get_user_setting(uid: Uuid, name: String, db: &mut AsyncPgConnection) -> Result<UserSetting, Box<dyn Error>> {
     let setting: UserSetting = user_settings::table
         .filter(user_settings::uid.eq(uid).and(user_settings::name.eq(&name)))
         .first(db)
+        .await
         .optional()?
         .unwrap_or(UserSetting { uid, name, value: "".to_string() });
     Ok(setting)

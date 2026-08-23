@@ -12,6 +12,7 @@ use axum::{
 use axum_extra::headers::{Authorization, HeaderMapExt, authorization::Bearer};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
@@ -60,10 +61,11 @@ pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), Stat
     let request: LoginRequest = serde_json::from_slice(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
     validate_timestamp(request.timestamp)?;
     let lock = HASHING_SEMAPHORE.acquire().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let user: User = users::table
         .filter(users::username.eq(request.username).and(users::enabled.eq(true)).and(users::password_enabled.eq(true)))
         .first(&mut db)
+        .await
         .or(Err(StatusCode::UNAUTHORIZED))?;
     let hash = PasswordHash::new(&user.password).or(Err(StatusCode::UNAUTHORIZED))?;
     Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::UNAUTHORIZED))?;
@@ -72,17 +74,19 @@ pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), Stat
     diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .set(users::last_login.eq(Some(SystemTime::now())))
         .execute(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let response = LoginResponse { jwt };
     Ok((sign_response(format!("login-{}", BASE64_STANDARD.encode(Sha512::digest(body))), Some(&response))?, Json(response)))
 }
-pub fn authenticate(headers: &HeaderMap) -> Result<(User, Option<ParsedPublicKey>), StatusCode> {
+pub async fn authenticate(headers: &HeaderMap) -> Result<(User, Option<ParsedPublicKey>), StatusCode> {
     let bearer: Authorization<Bearer> = headers.typed_get().ok_or(StatusCode::UNAUTHORIZED)?;
-    let (user, pubkey) = authenticate_jwt(bearer.token(), "webserver", Some(&mut get_db()?), false).or(Err(StatusCode::UNAUTHORIZED))?;
+    let mut db = get_db().await?;
+    let (user, pubkey) = authenticate_jwt(bearer.token(), "webserver", Some(&mut db), false).await.or(Err(StatusCode::UNAUTHORIZED))?;
     Ok((user.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?, pubkey))
 }
-pub fn require_admin(headers: &HeaderMap) -> Result<(), StatusCode> {
-    let user = authenticate(headers)?.0;
+pub async fn require_admin(headers: &HeaderMap) -> Result<(), StatusCode> {
+    let user = authenticate(headers).await?.0;
     if !user.admin {
         return Err(StatusCode::FORBIDDEN);
     }

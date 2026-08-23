@@ -2,10 +2,9 @@
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use diesel::{
-    prelude::*,
-    r2d2::{ConnectionManager, Pool},
-};
+use diesel::prelude::*;
+use diesel_async::pooled_connection::deadpool::Pool;
+use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use http::Uri;
 use pingora::{
     http::Method,
@@ -42,44 +41,50 @@ struct ProxyContext {
     login_upstream: bool,
 }
 
-static DB_POOL: OnceLock<Pool<ConnectionManager<PgConnection>>> = OnceLock::new();
+static DB_POOL: OnceLock<Pool<AsyncPgConnection>> = OnceLock::new();
 static VALKEY_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
 
 #[async_trait]
 impl BackgroundService for RestartService {
     async fn start(&self, mut _shutdown: ShutdownWatch) {
+        DB_POOL.set(get_db_pool().await.unwrap()).ok();
+        let mut db = DB_POOL.get().unwrap().get().await.unwrap();
+        authenticate_jwt("", "", Some(&mut db), false).await.ok(); // Prefetch JWT_KEY
         listen_for_restarts("PROXY".to_string()).await;
     }
 }
-fn get_login_body(ctx: &ProxyContext) -> Result<String> {
-    let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().or(Err(Error::new(InternalError)))?;
+async fn get_login_body(ctx: &ProxyContext) -> Result<String> {
+    let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().await.or(Err(Error::new(InternalError)))?;
     if ctx.request_type == ProxyType::DevelopmentEnvironment {
-        let development_environment: DevelopmentEnvironment = development_environments::table.find(ctx.id).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+        let development_environment: DevelopmentEnvironment = development_environments::table.find(ctx.id).first(&mut db).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
         let command: Command = commands::table
             .find(development_environment.command.ok_or(Error::new(InternalError))?)
             .first(&mut db)
+            .await
             .or(Err(Error::new(InternalError)))?;
         if command.stdout.is_empty() || !command.stdout.chars().all(|c| c.is_ascii_alphanumeric()) {
             return Err(Error::new(InternalError));
         }
         Ok(format!("password={}", command.stdout))
     } else if ctx.request_type == ProxyType::Agent {
-        let agent: Agent = agents::table.find(ctx.id).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+        let agent: Agent = agents::table.find(ctx.id).first(&mut db).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
         let data = json!({"provider": "basic", "username": "admin", "password": agent.password});
         Ok(data.to_string())
     } else {
         Err(Error::new(InternalError))
     }
 }
-fn authenticate_proxy_jwt(request_type: ProxyType, port: Option<u16>, jwt: &str, uuid: Uuid) -> Result<()> {
+async fn authenticate_proxy_jwt(request_type: ProxyType, port: Option<u16>, jwt: &str, uuid: Uuid) -> Result<()> {
     if request_type == ProxyType::DevelopmentEnvironment {
         if port.is_some() {
-            authenticate_jwt(jwt, &format!("proxy-devproxy-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+            authenticate_jwt(jwt, &format!("proxy-devproxy-{}", uuid), None, true)
+                .await
+                .or(Err(Error::new_down(InvalidHTTPHeader)))?;
         } else {
-            authenticate_jwt(jwt, &format!("proxy-dev-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+            authenticate_jwt(jwt, &format!("proxy-dev-{}", uuid), None, true).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
         }
     } else if request_type == ProxyType::Agent {
-        authenticate_jwt(jwt, &format!("proxy-agent-{}", uuid), None, true).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+        authenticate_jwt(jwt, &format!("proxy-agent-{}", uuid), None, true).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
     } else {
         return Err(Error::new(InternalError));
     }
@@ -151,7 +156,7 @@ impl ProxyHttp for Proxy {
         if uri.path() == "/atlas_setup" {
             let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
             let jwt = uri.query().ok_or(Error::new_down(InvalidHTTPHeader))?.strip_prefix("jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
-            authenticate_proxy_jwt(request_type, port, jwt, uuid)?;
+            authenticate_proxy_jwt(request_type, port, jwt, uuid).await?;
             let cookie = format!("atlas_jwt={}; HttpOnly; Secure; SameSite=Strict", jwt);
             response.append_header("Set-Cookie", cookie).or(Err(Error::new(InternalError)))?;
             response.append_header("Set-Cookie", "code-server-session=; Max-Age=-1").or(Err(Error::new(InternalError)))?;
@@ -165,7 +170,7 @@ impl ProxyHttp for Proxy {
                     let cookie = cookie.trim();
                     if cookie.starts_with("atlas_jwt=") {
                         let jwt = cookie.strip_prefix("atlas_jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
-                        if authenticate_proxy_jwt(request_type, port, jwt, uuid).is_ok() {
+                        if authenticate_proxy_jwt(request_type, port, jwt, uuid).await.is_ok() {
                             authenticated = true;
                         }
                         break;
@@ -173,8 +178,8 @@ impl ProxyHttp for Proxy {
                 }
             }
             if port.is_none() {
-                let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().or(Err(Error::new(InternalError)))?;
-                let container: Container = containers::table.find(uuid).first(&mut db).or(Err(Error::new_down(InvalidHTTPHeader)))?;
+                let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().await.or(Err(Error::new(InternalError)))?;
+                let container: Container = containers::table.find(uuid).first(&mut db).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
                 if container.state != ContainerState::Running as i32 {
                     authenticated = false;
                 }
@@ -256,21 +261,21 @@ impl ProxyHttp for Proxy {
             if (!is_logged_in || ctx.port.is_none()) && uri.path() == "/login" {
                 upstream_request.set_method(Method::POST);
                 upstream_request.insert_header("Content-Type", "application/x-www-form-urlencoded").or(Err(Error::new(InternalError)))?;
-                upstream_request.insert_header("Content-Length", get_login_body(ctx)?.len()).or(Err(Error::new(InternalError)))?;
+                upstream_request.insert_header("Content-Length", get_login_body(ctx).await?.len()).or(Err(Error::new(InternalError)))?;
                 ctx.login_upstream = true;
             }
         } else if ctx.request_type == ProxyType::Agent && uri.path() == "/login" {
             upstream_request.set_method(Method::POST);
             upstream_request.set_uri(Uri::from_static("/auth/password-login"));
             upstream_request.insert_header("Content-Type", "application/json").or(Err(Error::new(InternalError)))?;
-            upstream_request.insert_header("Content-Length", get_login_body(ctx)?.len()).or(Err(Error::new(InternalError)))?;
+            upstream_request.insert_header("Content-Length", get_login_body(ctx).await?.len()).or(Err(Error::new(InternalError)))?;
             ctx.login_upstream = true;
         }
         Ok(())
     }
     async fn request_body_filter(&self, _session: &mut Session, body: &mut Option<Bytes>, end_of_stream: bool, ctx: &mut Self::CTX) -> Result<()> {
         if ctx.login_upstream && end_of_stream {
-            *body = Some(Bytes::from(get_login_body(ctx)?));
+            *body = Some(Bytes::from(get_login_body(ctx).await?));
         }
         Ok(())
     }
@@ -286,9 +291,6 @@ impl ProxyHttp for Proxy {
 fn main() {
     print_startup("proxy", env!("CARGO_PKG_VERSION"));
     dotenvy::dotenv().ok();
-    DB_POOL.set(get_db_pool().unwrap()).unwrap();
-    let mut db = DB_POOL.get().unwrap().get().unwrap();
-    authenticate_jwt("", "", Some(&mut db), false).ok(); // Prefetch JWT_KEY
     let mut server = Server::new_with_opt_and_conf(None, ServerConf { threads: 4, ..Default::default() });
     server.bootstrap();
     let mut proxy = http_proxy_service(&server.configuration, Proxy);

@@ -12,6 +12,7 @@ use axum::{
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use diesel::prelude::*;
+use diesel_async::{AsyncConnection, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use shared_api::{ContainerOrigin, ContainerState};
 use shared_server::{
@@ -19,7 +20,7 @@ use shared_server::{
     notify_server,
     schema::{agents, commands, containers},
 };
-use std::{env, error::Error, time::SystemTime};
+use std::{env, time::SystemTime};
 use uuid::Uuid;
 
 #[derive(Serialize)]
@@ -49,14 +50,15 @@ pub struct SetAgentStateRequest {
 }
 
 pub async fn agents_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIAgent>>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let agents: Vec<(Agent, Container)> = agents::table
         .inner_join(containers::table.on(agents::id.eq(containers::id)))
         .filter(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .select((Agent::as_select(), Container::as_select()))
         .get_results(&mut db)
+        .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let agents: Result<Vec<APIAgent>, StatusCode> = agents
         .iter()
@@ -82,13 +84,13 @@ pub async fn agents_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
     Ok((sign_response(signature, Some(&agents))?, Json(agents)))
 }
 pub async fn create_agent(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateAgentResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateAgentRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     if request.name.is_empty() || !request.name.chars().all(|c| c.is_ascii_alphanumeric()) {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let mut container = Container {
         id: None,
         created_at: SystemTime::now(),
@@ -103,18 +105,19 @@ pub async fn create_agent(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
     let mut id = Uuid::nil();
     let password: [u8; 64] = rand::random();
     let password = BASE64_STANDARD.encode(password);
-    db.transaction(|db| {
-        container = diesel::insert_into(containers::table).values(container).get_result(db)?;
-        id = container.id.ok_or("Missing ID")?;
+    db.transaction(async |db| {
+        container = diesel::insert_into(containers::table).values(container).get_result(db).await?;
+        id = container.id.ok_or(diesel::result::Error::NotFound)?;
         let agent = Agent {
             id,
             name: request.name,
             command: None,
             password,
         };
-        diesel::insert_into(agents::table).values(agent).execute(db)?;
-        Ok::<(), Box<dyn Error>>(())
+        diesel::insert_into(agents::table).values(agent).execute(db).await?;
+        Ok::<(), diesel::result::Error>(())
     })
+    .await
     .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
@@ -124,9 +127,9 @@ pub async fn create_agent(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
 pub async fn set_agent_state(headers: HeaderMap, Path(id): Path<Uuid>, request: Query<SetAgentStateRequest>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let state = match request.state.as_str() {
         "stop" => ContainerState::Stopped,
         "start" => ContainerState::Running,
@@ -143,6 +146,7 @@ pub async fn set_agent_state(headers: HeaderMap, Path(id): Path<Uuid>, request: 
     )
     .set(containers::requested_state.eq(state as i32))
     .execute(&mut db)
+    .await
     .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("MASTER:CONTAINERS").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
@@ -151,9 +155,9 @@ pub async fn set_agent_state(headers: HeaderMap, Path(id): Path<Uuid>, request: 
     sign_response::<String>(signature, None)
 }
 pub async fn open_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<OpenAgentResponse>), StatusCode> {
-    let user = authenticate(&headers)?.0;
+    let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let mut db = get_db()?;
+    let mut db = get_db().await?;
     let container: Container = containers::table
         .filter(
             containers::uid
@@ -162,14 +166,15 @@ pub async fn open_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalU
                 .and(containers::id.eq(id)),
         )
         .first(&mut db)
+        .await
         .or(Err(StatusCode::NOT_FOUND))?;
     let mut ready = true;
     if container.state != ContainerState::Running as i32 {
         ready = false;
     }
-    let agent: Agent = agents::table.find(id).first(&mut db).or(Err(StatusCode::NOT_FOUND))?;
+    let agent: Agent = agents::table.find(id).first(&mut db).await.or(Err(StatusCode::NOT_FOUND))?;
     if let Some(command) = agent.command {
-        let command: Command = commands::table.find(command).first(&mut db).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        let command: Command = commands::table.find(command).first(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
         if !command.completed {
             ready = false;
         }
