@@ -30,3 +30,4 @@ webauthn-rs = {version = "0.5.5", features = ["danger-allow-state-serialisation"
 webauthn-rs-core = "0.5.5"
 ssh-key = {version = "0.6.7", features = ["ed25519"]}
 rand = "0.10.2"
+rustls = "0.23.43"

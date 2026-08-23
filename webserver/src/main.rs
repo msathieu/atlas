@@ -68,6 +68,7 @@ async fn main() {
     print_startup("webserver", env!("CARGO_PKG_VERSION"));
     dotenvy::dotenv().ok();
     listen_for_restarts("WEB".to_string()).await;
+    rustls::crypto::aws_lc_rs::default_provider().install_default().unwrap();
     DB_POOL.set(get_db_pool().await.unwrap()).ok();
     {
         let mut db = DB_POOL.get().unwrap().get().await.unwrap();

@@ -55,13 +55,7 @@ async fn main() {
     print_startup("apiserver", env!("CARGO_PKG_VERSION"));
     dotenvy::dotenv().ok();
     listen_for_restarts("API".to_string()).await;
-    CryptoProvider {
-        cipher_suites: vec![TLS13_AES_256_GCM_SHA384],
-        kx_groups: vec![X25519MLKEM768],
-        ..aws_lc_rs::default_provider()
-    }
-    .install_default()
-    .unwrap();
+    rustls::crypto::aws_lc_rs::default_provider().install_default().unwrap();
     let pool = get_db_pool().await.unwrap();
     let tls_acceptor;
     {
@@ -70,7 +64,14 @@ async fn main() {
         let tls_cert: Setting = settings::table.find("tls_cert").first(&mut db).await.unwrap();
         let key_der = PrivateKeyDer::from_pem_slice(tls_key.value.as_bytes()).unwrap();
         let cert_der = CertificateDer::from_pem_slice(tls_cert.value.as_bytes()).unwrap();
-        let tls_config = ServerConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
+        let provider = CryptoProvider {
+            cipher_suites: vec![TLS13_AES_256_GCM_SHA384],
+            kx_groups: vec![X25519MLKEM768],
+            ..aws_lc_rs::default_provider()
+        };
+        let tls_config = ServerConfig::builder_with_provider(provider.into())
+            .with_protocol_versions(&[&rustls::version::TLS13])
+            .unwrap()
             .with_no_client_auth()
             .with_single_cert(vec![cert_der], key_der)
             .unwrap();

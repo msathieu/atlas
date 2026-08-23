@@ -291,6 +291,7 @@ impl ProxyHttp for Proxy {
 fn main() {
     print_startup("proxy", env!("CARGO_PKG_VERSION"));
     dotenvy::dotenv().ok();
+    rustls::crypto::aws_lc_rs::default_provider().install_default().unwrap();
     let mut server = Server::new_with_opt_and_conf(None, ServerConf { threads: 4, ..Default::default() });
     server.bootstrap();
     let mut proxy = http_proxy_service(&server.configuration, Proxy);
