@@ -71,7 +71,7 @@ pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
         return Err(StatusCode::BAD_REQUEST);
     }
     let mut db = get_db().await?;
-    let hash = hash_password(request.password).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let hash = hash_password(request.password).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut user = User {
         id: None,
         username: request.username,

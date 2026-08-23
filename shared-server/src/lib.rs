@@ -5,7 +5,7 @@ use crate::{
     schema::{settings, user_settings, users},
 };
 use argon2::{
-    Algorithm, Argon2, Params, PasswordHasher, Version,
+    Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version,
     password_hash::{SaltString, rand_core::OsRng},
 };
 use aws_lc_rs::signature::{ED25519, ParsedPublicKey, UnparsedPublicKey};
@@ -27,7 +27,11 @@ use rustls::{
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error, process::exit, sync::OnceLock, time::Duration};
 use tokio::{
-    sync::mpsc::{UnboundedReceiver, unbounded_channel},
+    sync::{
+        Semaphore,
+        mpsc::{UnboundedReceiver, unbounded_channel},
+    },
+    task::spawn_blocking,
     time::sleep,
 };
 use tokio_postgres_rustls::MakeRustlsConnect;
@@ -49,6 +53,7 @@ pub struct Claims {
 
 static PUBSUB_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
 static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
+static HASHING_SEMAPHORE: Semaphore = Semaphore::const_new(5);
 
 pub async fn get_db_pool() -> Result<Pool<AsyncPgConnection>, Box<dyn Error>> {
     let url = format!(
@@ -136,12 +141,29 @@ pub async fn listen_for_restarts(component: String) {
         exit(0);
     });
 }
-pub fn hash_password(password: String) -> Result<String, Box<dyn Error>> {
+pub async fn hash_password(password: String) -> Result<String, Box<dyn Error>> {
     let salt = SaltString::generate(OsRng);
     let params = Params::new(128 * 1024, 1, 1, Some(64)).or(Err("Invalid argon2 parameters"))?;
     let argon = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
-    let hash = argon.hash_password(password.as_bytes(), &salt).or(Err("Couldn't hash password"))?;
-    Ok(hash.to_string())
+    let lock = HASHING_SEMAPHORE.acquire().await?;
+    let hash = spawn_blocking(move || {
+        let hash = argon.hash_password(password.as_bytes(), &salt).or(Err("Couldn't hash password"))?;
+        drop(lock);
+        Ok::<String, String>(hash.to_string())
+    })
+    .await??;
+    Ok(hash)
+}
+pub async fn verify_password(user_password: String, attempt_password: String) -> Result<(), Box<dyn Error>> {
+    let lock = HASHING_SEMAPHORE.acquire().await?;
+    spawn_blocking(move || {
+        let hash = PasswordHash::new(&user_password).map_err(|e| e.to_string())?;
+        Argon2::default().verify_password(attempt_password.as_bytes(), &hash).map_err(|e| e.to_string())?;
+        drop(lock);
+        Ok::<(), String>(())
+    })
+    .await??;
+    Ok(())
 }
 pub fn parse_pubkey(pubkey: String) -> Result<ParsedPublicKey, Box<dyn Error>> {
     let key = UnparsedPublicKey::new(&ED25519, BASE64_STANDARD.decode(pubkey)?).parse()?;

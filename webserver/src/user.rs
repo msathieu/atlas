@@ -1,6 +1,5 @@
 use crate::util::{decrypt_body, sign_response, validate_signature};
 use crate::{auth::authenticate, get_db};
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::OriginalUri;
@@ -9,7 +8,7 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use shared_server::schema::users;
-use shared_server::{hash_password, notify_server};
+use shared_server::{hash_password, notify_server, verify_password};
 use uuid::Uuid;
 
 #[cfg(debug_assertions)]
@@ -42,10 +41,9 @@ pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) 
     if request.new_password.is_empty() || request.new_password.len() < MIN_PASSWORD_LENGTH {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let hash = PasswordHash::new(&user.password).or(Err(StatusCode::FORBIDDEN))?;
-    Argon2::default().verify_password(request.old_password.as_bytes(), &hash).or(Err(StatusCode::FORBIDDEN))?;
+    verify_password(user.password, request.old_password).await.or(Err(StatusCode::FORBIDDEN))?;
     let mut db = get_db().await?;
-    let hash = hash_password(request.new_password).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let hash = hash_password(request.new_password).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .set((users::password.eq(hash), users::jwt_counter.eq(user.jwt_counter + 1)))
         .execute(&mut db)
@@ -68,8 +66,7 @@ pub async fn set_password_state(headers: HeaderMap, uri: OriginalUri, body: Byte
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "PUT").await?;
     let request: SetPasswordStateRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
-    let hash = PasswordHash::new(&user.password).or(Err(StatusCode::FORBIDDEN))?;
-    Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::FORBIDDEN))?;
+    verify_password(user.password, request.password).await.or(Err(StatusCode::FORBIDDEN))?;
     let mut db = get_db().await?;
     diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .set(users::password_enabled.eq(request.enabled))

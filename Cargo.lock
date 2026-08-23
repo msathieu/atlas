@@ -5880,7 +5880,6 @@ dependencies = [
 name = "webserver"
 version = "2026.8.22"
 dependencies = [
- "argon2",
  "aws-lc-rs",
  "axum",
  "axum-extra",

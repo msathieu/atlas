@@ -2,7 +2,6 @@ use crate::{
     JWT_KEY, get_db,
     util::{decrypt_body, sign_response, validate_timestamp},
 };
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use aws_lc_rs::signature::ParsedPublicKey;
 use axum::{
     Json,
@@ -16,9 +15,8 @@ use diesel_async::RunQueryDsl;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
-use shared_server::{Claims, authenticate_jwt, models::User, parse_pubkey, schema::users};
+use shared_server::{Claims, authenticate_jwt, models::User, parse_pubkey, schema::users, verify_password};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::Semaphore;
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
@@ -36,8 +34,6 @@ pub struct LoginResponse {
 pub const JWT_EXPIRY: usize = 8 * 60 * 60;
 #[cfg(not(debug_assertions))]
 pub const JWT_EXPIRY: usize = 2 * 60 * 60;
-
-static HASHING_SEMAPHORE: Semaphore = Semaphore::const_new(5);
 
 pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) -> Result<String, StatusCode> {
     if let Some(pubkey) = &pubkey {
@@ -60,16 +56,13 @@ pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) 
 pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), StatusCode> {
     let request: LoginRequest = serde_json::from_slice(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
     validate_timestamp(request.timestamp)?;
-    let lock = HASHING_SEMAPHORE.acquire().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut db = get_db().await?;
     let user: User = users::table
         .filter(users::username.eq(request.username).and(users::enabled.eq(true)).and(users::password_enabled.eq(true)))
         .first(&mut db)
         .await
         .or(Err(StatusCode::UNAUTHORIZED))?;
-    let hash = PasswordHash::new(&user.password).or(Err(StatusCode::UNAUTHORIZED))?;
-    Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::UNAUTHORIZED))?;
-    drop(lock);
+    verify_password(user.password.clone(), request.password).await.or(Err(StatusCode::UNAUTHORIZED))?;
     let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
     diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .set(users::last_login.eq(Some(SystemTime::now())))

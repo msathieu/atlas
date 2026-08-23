@@ -303,7 +303,7 @@ async fn create_settings(db: &mut AsyncPgConnection) -> Result<(), Box<dyn Error
             println!("No users found, creating admin account...");
             let password: [u8; 64] = rand::random();
             let password = BASE64_STANDARD.encode(password);
-            let hash = hash_password(password.clone())?;
+            let hash = hash_password(password.clone()).await?;
             diesel::insert_into(users::table)
                 .values(User {
                     id: None,

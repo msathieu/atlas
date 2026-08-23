@@ -3,7 +3,6 @@ use crate::{
     get_db,
     util::{convert_timestamp, decrypt_body, sign_response, validate_signature},
 };
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::{
     Json,
     body::Bytes,
@@ -21,6 +20,7 @@ use shared_server::{
     models::{Passkey, Setting, User},
     notify_server,
     schema::{passkeys, settings, users},
+    verify_password,
 };
 use std::{env, time::SystemTime};
 use uuid::Uuid;
@@ -91,8 +91,7 @@ pub async fn start_passkey_registration(headers: HeaderMap, uri: OriginalUri, bo
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: StartPasskeyRegistrationRequest = serde_json::from_slice(&decrypt_body(body.clone())?).or(Err(StatusCode::BAD_REQUEST))?;
-    let hash = PasswordHash::new(&user.password).or(Err(StatusCode::FORBIDDEN))?;
-    Argon2::default().verify_password(request.password.as_bytes(), &hash).or(Err(StatusCode::FORBIDDEN))?;
+    verify_password(user.password, request.password).await.or(Err(StatusCode::FORBIDDEN))?;
     let webauthn = get_webauthn().await?;
     let mut db = get_db().await?;
     let passkeys_db: Vec<Passkey> = passkeys::table
