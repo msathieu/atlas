@@ -5892,6 +5892,7 @@ dependencies = [
  "jsonwebtoken",
  "rand 0.10.2",
  "redis",
+ "reqwest",
  "rustls",
  "serde",
  "serde_json",

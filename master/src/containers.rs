@@ -163,7 +163,18 @@ async fn process_container(mut container: Container, pool: Pool<AsyncPgConnectio
             selector.insert("app".to_string(), container_name);
             service.spec = Some(ServiceSpec {
                 selector: Some(selector),
-                ports: Some(vec![ServicePort { port: 9119, ..Default::default() }]),
+                ports: Some(vec![
+                    ServicePort {
+                        port: 9119,
+                        name: Some("dashboard".to_string()),
+                        ..Default::default()
+                    },
+                    ServicePort {
+                        port: 8644,
+                        name: Some("webhook".to_string()),
+                        ..Default::default()
+                    },
+                ]),
                 ..Default::default()
             });
             if service_api.get_opt(&service_name_agent).await?.is_none() {

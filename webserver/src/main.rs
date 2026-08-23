@@ -2,7 +2,7 @@
 
 use crate::{
     agent::{download_agent, download_auth, get_agent_script},
-    agents::{agents_list, create_agent, open_agent, set_agent_state},
+    agents::{agents_list, create_agent, deliver_webhook, open_agent, set_agent_state},
     auth::login,
     chat::{chats_list, create_chat, delete_chat, delete_message, get_chat, manage_tool_call_consent, send_message},
     commands::{commands_list, create_command, delete_command},
@@ -132,6 +132,7 @@ async fn main() {
         .route("/api/agents", post(create_agent))
         .route("/api/agents/{id}/open", post(open_agent))
         .route("/api/agents/{id}/state", post(set_agent_state))
+        .route("/api/agents/{id}/webhook/{name}", post(deliver_webhook))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any).expose_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();

@@ -57,3 +57,9 @@ spec:
       podSelector:
         matchLabels:
           app: atlas-proxy
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.namespace }}
+      podSelector:
+        matchLabels:
+          app: atlas-web

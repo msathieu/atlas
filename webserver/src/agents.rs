@@ -13,6 +13,7 @@ use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use diesel::prelude::*;
 use diesel_async::{AsyncConnection, RunQueryDsl};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use shared_api::{ContainerOrigin, ContainerState};
 use shared_server::{
@@ -186,4 +187,41 @@ pub async fn open_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalU
     let url = format!("https://{}.agent.{}/atlas_setup?jwt={}", id, webserver, jwt);
     let response = OpenAgentResponse { url, ready };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
+}
+pub async fn deliver_webhook(headers: HeaderMap, Path((id, name)): Path<(Uuid, String)>, body: Bytes) -> Result<StatusCode, StatusCode> {
+    let mut db = get_db().await?;
+    let _: Container = containers::table
+        .filter(
+            containers::origin
+                .eq(ContainerOrigin::Agent as i32)
+                .and(containers::id.eq(id))
+                .and(containers::state.eq(ContainerState::Running as i32)),
+        )
+        .first(&mut db)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let mut request_headers = HeaderMap::new();
+    for i in headers {
+        if let Some(name) = i.0
+            && name.to_string().to_lowercase().starts_with("x-")
+        {
+            request_headers.append(name, i.1);
+        }
+    }
+    let client = Client::new();
+    let response = client
+        .post(format!("http://atlas-agent-{}.atlas.svc.cluster.local:8644/webhooks/{}", id, name))
+        .body(body)
+        .headers(request_headers)
+        .send()
+        .await
+        .or(Err(StatusCode::BAD_REQUEST))?;
+    if response.status().is_success() {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(StatusCode::BAD_REQUEST)
+    }
 }
