@@ -205,10 +205,10 @@ pub async fn deliver_webhook(headers: HeaderMap, Path((id, name)): Path<(Uuid, S
     }
     let mut request_headers = HeaderMap::new();
     for i in headers {
-        if let Some(name) = i.0
-            && name.to_string().to_lowercase().starts_with("x-")
+        if let Some(header_name) = i.0
+            && (header_name.to_string().to_lowercase().starts_with("x-") || header_name.to_string().to_lowercase() == "content-type")
         {
-            request_headers.append(name, i.1);
+            request_headers.append(header_name, i.1);
         }
     }
     let client = Client::new();

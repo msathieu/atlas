@@ -56,16 +56,20 @@ static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 static HASHING_SEMAPHORE: Semaphore = Semaphore::const_new(5);
 
 pub async fn get_db_pool() -> Result<Pool<AsyncPgConnection>, Box<dyn Error>> {
+    let sslmode = if cfg!(debug_assertions) { "disable" } else { "require" };
     let url = format!(
-        "postgres://{}:{}@{}/{}?sslmode=require",
+        "postgres://{}:{}@{}/{}?sslmode={}",
         env::var("DATABASE_USER").unwrap_or("app".to_string()),
         env::var("DATABASE_PASSWORD").unwrap_or("".to_string()),
         env::var("DATABASE_HOST").unwrap_or("localhost".to_string()),
-        env::var("DATABASE_DB").unwrap_or("app".to_string())
+        env::var("DATABASE_DB").unwrap_or("app".to_string()),
+        sslmode
     );
     let mut cert_store = RootCertStore::empty();
-    let certificate = CertificateDer::from_pem_reader(env::var("DATABASE_CERT")?.trim().as_bytes())?;
-    cert_store.add(certificate)?;
+    if let Ok(cert) = env::var("DATABASE_CERT") {
+        let certificate = CertificateDer::from_pem_reader(cert.trim().as_bytes())?;
+        cert_store.add(certificate)?;
+    }
     let tls_config = ClientConfig::builder_with_protocol_versions(&[&rustls::version::TLS13])
         .with_root_certificates(cert_store)
         .with_no_client_auth();

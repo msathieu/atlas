@@ -32,10 +32,7 @@ pub async fn server_info() -> Result<(HeaderMap, Json<APIServerInfo>), StatusCod
     let encryption_pubkey = encryption_key.public_key().as_der().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let signing_key = get_signing_key()?;
     let signing_pubkey = signing_key.public_key().as_der().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    #[cfg(not(debug_assertions))]
-    let environment = "production";
-    #[cfg(debug_assertions)]
-    let environment = "development";
+    let environment = if cfg!(debug_assertions) { "development" } else { "production" };
     let info = APIServerInfo {
         magic: MAGIC.to_string(),
         api_version: API_VERSION,

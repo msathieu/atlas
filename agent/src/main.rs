@@ -51,8 +51,7 @@ const DATABASE_URL: &str = "/var/lib/atlas/agent.db";
 
 #[tokio::main]
 async fn main() {
-    #[cfg(debug_assertions)]
-    {
+    if cfg!(debug_assertions) {
         dotenvy::dotenv().ok();
     }
     let args: Vec<String> = args().collect();
@@ -90,8 +89,7 @@ async fn main() {
     print_startup("agent", env!("CARGO_PKG_VERSION"));
     let mut dir_builder = DirBuilder::new();
     dir_builder.mode(0o700).recursive(true);
-    #[cfg(not(debug_assertions))]
-    {
+    if cfg!(not(debug_assertions)) {
         dir_builder.create("/var/lib/atlas").await.unwrap();
     }
     let mut db = SqliteConnection::establish(DATABASE_URL).unwrap();
@@ -102,8 +100,7 @@ async fn main() {
     let _tls_cert = unsafe { ptr::read_volatile(&TLS_CERT) };
     let mut _host = CStr::from_bytes_until_nul(&_host).unwrap().to_str().unwrap().to_string();
     let mut _tls_cert = CStr::from_bytes_until_nul(&_tls_cert).unwrap().to_str().unwrap().to_string();
-    #[cfg(debug_assertions)]
-    {
+    if cfg!(debug_assertions) {
         _host = "localhost".to_string();
         _tls_cert = env::var("APISERVER_CERT").unwrap();
     }

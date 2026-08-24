@@ -78,8 +78,9 @@ pub enum HandshakePurpose {
 pub fn print_startup(component: &str, version: &str) {
     println!("--------------------------------------------------");
     println!("Starting Atlas {} {}", component, version);
-    #[cfg(debug_assertions)]
-    println!("Running in debug mode, this is INSECURE");
+    if cfg!(debug_assertions) {
+        println!("Running in debug mode, this is INSECURE");
+    }
     println!("--------------------------------------------------");
 }
 pub async fn write_message<T: Message, U: AsyncWrite + Unpin>(message_type: MessageType, message: T, stream: &mut U) -> Result<(), Box<dyn Error>> {

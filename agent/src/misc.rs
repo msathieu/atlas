@@ -39,6 +39,7 @@ pub async fn start_connection(host: &str, tls_connector: &TlsConnector, db: &mut
         hash = Sha512::digest(file).to_vec();
     }
     let registration_token = unsafe { ptr::read_volatile(&REGISTRATION_TOKEN) };
+    let managed_installation = cfg!(debug_assertions) || env::var("ATLAS_MANAGED").is_ok();
     let mut handshake_request = HandshakeRequest {
         magic: MAGIC as u64,
         api_version: API_VERSION as u64,
@@ -52,6 +53,7 @@ pub async fn start_connection(host: &str, tls_connector: &TlsConnector, db: &mut
         agent_hash: hash,
         registration_token: vec![],
         purpose: purpose as u32,
+        managed_installation,
     };
     let device_id = settings::table.find("device_id").first::<Setting>(db).optional()?;
     match &device_id {

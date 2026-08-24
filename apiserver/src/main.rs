@@ -128,8 +128,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         }
         let registration_token: Setting = settings::table.find("registration_token").first(&mut db).await?;
         let registration_token = BASE64_STANDARD.decode(registration_token.value)?;
-        if verify_slices_are_equal(&registration_token, &handshake_request.registration_token).is_err() {
-            #[cfg(not(debug_assertions))]
+        if cfg!(not(debug_assertions)) && verify_slices_are_equal(&registration_token, &handshake_request.registration_token).is_err() {
             return Err("Incorrect registration token".into());
         }
         let device: Device = diesel::insert_into(devices::table)
@@ -197,7 +196,9 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
     }
 
     db = pool.get().await?;
-    if let Ok(agent) = personalize_binary(&mut db, &device.arch, &device.os).await.map_err(|_| "Failed to get agent") {
+    if !handshake_request.managed_installation
+        && let Ok(agent) = personalize_binary(&mut db, &device.arch, &device.os).await.map_err(|_| "Failed to get agent")
+    {
         let hash = Sha512::digest(&agent).to_vec();
         if hash != device.agent_hash {
             let request = UpdateRequest { agent, hash };

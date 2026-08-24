@@ -14,6 +14,7 @@ message HandshakeRequest {
   bytes agent_hash = 10;
   bytes registration_token = 11;
   uint32 purpose = 12;
+  bool managed_installation = 13;
 }
 message HandshakeResponse {
   uint64 magic = 1;
