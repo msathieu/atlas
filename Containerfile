@@ -6,7 +6,7 @@ ENV PATH="${PATH}:/root/.rustup/toolchains/stable-x86_64-unknown-linux-musl/bin/
 COPY . /build
 WORKDIR /build
 RUN cargo build --release -p agent
-FROM fedora:44 AS builder
+FROM fedora:45 AS builder
 RUN dnf up -y
 RUN dnf install -y cargo cmake libpq-devel openssl-devel protobuf-compiler unzip
 RUN curl -fL https://deno.land/install.sh | sh
@@ -16,7 +16,7 @@ RUN cargo build --release -p apiserver -p proxy -p master -p webserver
 WORKDIR /build/frontend
 RUN ~/.deno/bin/deno install
 RUN ~/.deno/bin/deno task build
-FROM fedora:44
+FROM fedora:45
 RUN dnf up -y
 RUN dnf install -y libpq tini
 COPY --from=agent-x86_64-linux-builder /build/target/release/agent agent-x86_64-linux
