@@ -1,4 +1,4 @@
-FROM quay.io/fedora/fedora-toolbox:44
+FROM quay.io/fedora/fedora-toolbox:46
 RUN dnf up -y
 RUN dnf install -y bash-color-prompt podman nix nix-daemon
 RUN dnf install -y https://github.com/coder/code-server/releases/download/v4.133.0/code-server-4.133.0-amd64.rpm
