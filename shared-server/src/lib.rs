@@ -173,9 +173,9 @@ pub fn parse_pubkey(pubkey: String) -> Result<ParsedPublicKey, Box<dyn Error>> {
     let key = UnparsedPublicKey::new(&ED25519, BASE64_STANDARD.decode(pubkey)?).parse()?;
     Ok(key)
 }
-pub async fn authenticate_jwt(jwt: &str, aud: &str, mut db: Option<&mut AsyncPgConnection>, skip_db_checks: bool) -> Result<(Option<User>, Option<ParsedPublicKey>), Box<dyn Error>> {
+pub async fn authenticate_jwt(jwt: &str, aud: &str, db: &mut AsyncPgConnection) -> Result<(User, Option<ParsedPublicKey>), Box<dyn Error>> {
     if JWT_KEY.get().is_none() {
-        let jwt_secret: Setting = settings::table.find("jwt_secret").first(db.as_deref_mut().ok_or("No DB instance passed")?).await?;
+        let jwt_secret: Setting = settings::table.find("jwt_secret").first(db).await?;
         let jwt_secret = BASE64_STANDARD.decode(jwt_secret.value)?;
         JWT_KEY.set(jwt_secret).ok();
     }
@@ -185,13 +185,9 @@ pub async fn authenticate_jwt(jwt: &str, aud: &str, mut db: Option<&mut AsyncPgC
     validation.set_audience(&[aud]);
     validation.set_required_spec_claims(&["aud", "sub", "nbf", "exp", "counter"]);
     let token = decode::<Claims>(jwt, &key, &validation)?;
-    let mut user = None;
-    if !skip_db_checks {
-        let local_user: User = users::table.find(token.claims.sub).first(db.ok_or("No DB instance passed")?).await?;
-        if !local_user.enabled || local_user.jwt_counter as usize != token.claims.counter {
-            return Err("Wrong JWT counter or user isn't enabled".into());
-        }
-        user = Some(local_user);
+    let user: User = users::table.find(token.claims.sub).first(db).await?;
+    if !user.enabled || user.jwt_counter as usize != token.claims.counter {
+        return Err("Wrong JWT counter or user isn't enabled".into());
     }
     let mut pubkey = None;
     if let Some(pubkey_claim) = token.claims.pubkey {

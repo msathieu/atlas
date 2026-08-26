@@ -75,8 +75,8 @@ pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), Stat
 pub async fn authenticate(headers: &HeaderMap) -> Result<(User, Option<ParsedPublicKey>), StatusCode> {
     let bearer: Authorization<Bearer> = headers.typed_get().ok_or(StatusCode::UNAUTHORIZED)?;
     let mut db = get_db().await?;
-    let (user, pubkey) = authenticate_jwt(bearer.token(), "webserver", Some(&mut db), false).await.or(Err(StatusCode::UNAUTHORIZED))?;
-    Ok((user.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?, pubkey))
+    let (user, pubkey) = authenticate_jwt(bearer.token(), "webserver", &mut db).await.or(Err(StatusCode::UNAUTHORIZED))?;
+    Ok((user, pubkey))
 }
 pub async fn require_admin(headers: &HeaderMap) -> Result<(), StatusCode> {
     let user = authenticate(headers).await?.0;

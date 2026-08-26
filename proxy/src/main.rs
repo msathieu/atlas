@@ -20,6 +20,7 @@ use shared_server::{
     models::{Agent, Command, Container, DevelopmentEnvironment},
     schema::{agents, commands, containers, development_environments},
 };
+use std::process::exit;
 use std::{env, sync::OnceLock};
 use tokio::net::lookup_host;
 use uuid::Uuid;
@@ -44,12 +45,19 @@ struct ProxyContext {
 static DB_POOL: OnceLock<Pool<AsyncPgConnection>> = OnceLock::new();
 static VALKEY_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
 
+async fn setup_connections() -> Result<(), Box<dyn std::error::Error>> {
+    DB_POOL.set(get_db_pool().await?).ok();
+    let client = get_valkey_client().await?;
+    VALKEY_POOL.set(client.0).ok();
+    Ok(())
+}
+
 #[async_trait]
 impl BackgroundService for RestartService {
     async fn start(&self, mut _shutdown: ShutdownWatch) {
-        DB_POOL.set(get_db_pool().await.unwrap()).ok();
-        let mut db = DB_POOL.get().unwrap().get().await.unwrap();
-        authenticate_jwt("", "", Some(&mut db), false).await.ok(); // Prefetch JWT_KEY
+        if setup_connections().await.is_err() {
+            exit(1);
+        }
         listen_for_restarts("PROXY".to_string()).await;
     }
 }
@@ -75,16 +83,15 @@ async fn get_login_body(ctx: &ProxyContext) -> Result<String> {
     }
 }
 async fn authenticate_proxy_jwt(request_type: ProxyType, port: Option<u16>, jwt: &str, uuid: Uuid) -> Result<()> {
+    let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().await.or(Err(Error::new(InternalError)))?;
     if request_type == ProxyType::DevelopmentEnvironment {
         if port.is_some() {
-            authenticate_jwt(jwt, &format!("proxy-devproxy-{}", uuid), None, true)
-                .await
-                .or(Err(Error::new_down(InvalidHTTPHeader)))?;
+            authenticate_jwt(jwt, &format!("proxy-devproxy-{}", uuid), &mut db).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
         } else {
-            authenticate_jwt(jwt, &format!("proxy-dev-{}", uuid), None, true).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
+            authenticate_jwt(jwt, &format!("proxy-dev-{}", uuid), &mut db).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
         }
     } else if request_type == ProxyType::Agent {
-        authenticate_jwt(jwt, &format!("proxy-agent-{}", uuid), None, true).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
+        authenticate_jwt(jwt, &format!("proxy-agent-{}", uuid), &mut db).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
     } else {
         return Err(Error::new(InternalError));
     }
@@ -177,7 +184,7 @@ impl ProxyHttp for Proxy {
                     }
                 }
             }
-            if port.is_none() {
+            {
                 let mut db = DB_POOL.get().ok_or(Error::new(InternalError))?.get().await.or(Err(Error::new(InternalError)))?;
                 let container: Container = containers::table.find(uuid).first(&mut db).await.or(Err(Error::new_down(InvalidHTTPHeader)))?;
                 if container.state != ContainerState::Running as i32 {
@@ -207,10 +214,6 @@ impl ProxyHttp for Proxy {
         ctx.id = uuid;
         ctx.port = port;
         if ctx.port.is_none() {
-            if VALKEY_POOL.get().is_none() {
-                let client = get_valkey_client().await.or(Err(Error::new(InternalError)))?;
-                VALKEY_POOL.set(client.0).ok();
-            }
             let key = format!("DEVELOPMENT_ENVIRONMENT:{}", uuid);
             VALKEY_POOL
                 .get()
