@@ -14,7 +14,7 @@
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.3.0",
     "daisyui": "^5.7.22",
     "date-fns": "^4.4.0",
     "dompurify": "^3.4.14",

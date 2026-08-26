@@ -9,9 +9,10 @@ use k8s_openapi::api::core::v1::{
     ServicePort, ServiceSpec, Volume, VolumeMount, VolumeResourceRequirements,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
-use kube::api::{AttachParams, DeleteParams, PostParams};
+use kube::api::{AttachParams, DeleteParams, Patch, PatchParams, PostParams};
 use kube::{Api, Client};
 use redis::AsyncTypedCommands;
+use serde_json::json;
 use shared_api::{CommandLanguage, CommandOrigin, ContainerOrigin, ContainerState};
 use shared_server::binary::personalize_binary;
 use shared_server::models::{Agent, Command, Container, DevelopmentEnvironment, Device};
@@ -213,6 +214,24 @@ async fn process_container(mut container: Container, pool: Pool<AsyncPgConnectio
         notify_server(&format!("WEB:REFRESH:{}", container.uid)).await?;
         notify_server("MASTER:CONTAINERS").await?;
     } else if container.state == ContainerState::Stopped as i32 && (container.requested_state == ContainerState::Started as i32 || container.requested_state == ContainerState::Running as i32) {
+        let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
+        let pvc = pvc_api.get(&pvc_name).await?;
+        if pvc
+            .spec
+            .ok_or("Invalid PVC")?
+            .resources
+            .ok_or("Invalid PVC")?
+            .requests
+            .ok_or("Invalid PVC")?
+            .get("storage")
+            .ok_or("Invalid PVC")?
+            .0
+            != format!("{}Gi", container.storage_size)
+        {
+            let storage_size = format!("{}Gi", container.storage_size);
+            let patch = json!({"spec": {"resources": {"requests": {"storage": storage_size}}}});
+            pvc_api.patch(&pvc_name, &PatchParams::default(), &Patch::Merge(patch)).await?;
+        }
         let pod_api = Api::namespaced(client, namespace);
         if pod_api.get_opt(&container_name).await?.is_some() {
             pod_api.delete(&container_name, &DeleteParams::default()).await?;
