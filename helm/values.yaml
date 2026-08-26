@@ -1,5 +1,6 @@
 image: ""
 imageIDE: ""
+imageAgent: ""
 replicas: 2
 imagePullSecret: ""
 namespace: ""

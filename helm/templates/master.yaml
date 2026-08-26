@@ -32,6 +32,8 @@ spec:
               value: {{ .Values.storageClass }}
             - name: IMAGE_IDE
               value: {{ .Values.imageIDE }}
+            - name: IMAGE_AGENT
+              value: {{ .Values.imageAgent }}
             - name: VALKEY_HOST
               value: atlas-valkey
             - name: DATABASE_HOST

@@ -347,7 +347,7 @@ async fn process_container(mut container: Container, pool: Pool<AsyncPgConnectio
         requests.insert("ephemeral-storage".to_string(), Quantity("4Gi".to_string()));
         let mut image = container.image;
         if image == "[AGENT]" {
-            image = "docker.io/nousresearch/hermes-agent:v2026.8.19".to_string();
+            image = env::var("IMAGE_AGENT")?;
         } else if image == "[IDE]" {
             image = env::var("IMAGE_IDE")?;
         }
