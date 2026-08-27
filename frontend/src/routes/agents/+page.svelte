@@ -1,8 +1,8 @@
 <script lang="ts">
 import { authenticatedFetch } from "$lib/auth";
-import { user } from "$lib/state.svelte";
+import { updateContainer } from "$lib/container.ts";
 import { formatTime } from "$lib/util.ts";
-import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, Trash } from "@lucide/svelte";
+import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, SquarePen, Trash } from "@lucide/svelte";
 
 let { data } = $props();
 let selectedAgent: any = $state();
@@ -17,13 +17,8 @@ async function createAgent() {
   });
   newName = "";
 }
-async function deleteAgent(id: string) {
-  await authenticatedFetch(`/api/agents/${id}/state?state=delete`, {
-    method: "POST",
-  });
-}
-async function stopAgent(id: string) {
-  await authenticatedFetch(`/api/agents/${id}/state?state=stop`, {
+async function setAgentState(id: string, state: string) {
+  await authenticatedFetch(`/api/agents/${id}/state?state=${state}`, {
     method: "POST",
   });
 }
@@ -84,7 +79,7 @@ async function openAgent(id: string) {
               class="btn"
               onclick={async (e) => {
                 e.stopPropagation();
-                await stopAgent(agent.id);
+                await setAgentState(agent.id, "stop");
               }}
             >
               <Power />
@@ -134,6 +129,34 @@ async function openAgent(id: string) {
             <td>Pending</td>
             <td>{selectedAgent.pending}</td>
           </tr>
+          <tr>
+            <td>Memory Limit</td>
+            <td
+              >{selectedAgent.memory_limit}
+              <button
+                class="btn"
+                onclick={async () => {
+                  await updateContainer(selectedAgent.id, parseInt(prompt("Enter requested memory size in GiB") || ""), 0);
+                }}
+              >
+                <SquarePen />
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Storage Size</td>
+            <td
+              >{selectedAgent.storage_size}
+              <button
+                class="btn"
+                onclick={async () => {
+                  await updateContainer(selectedAgent.id, 0, parseInt(prompt("Enter requested storage size in GiB") || ""));
+                }}
+              >
+                <SquarePen />
+              </button>
+            </td>
+          </tr>
         </tbody>
       </table>
       <div class="divider"></div>
@@ -141,7 +164,7 @@ async function openAgent(id: string) {
         <button
           class="btn"
           onclick={async () => {
-            await deleteAgent(selectedAgent.id);
+            await setAgentState(selectedAgent.id, "delete");
           }}
         >
           <Trash />

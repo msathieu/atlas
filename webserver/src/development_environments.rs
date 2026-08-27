@@ -35,6 +35,8 @@ pub struct APIDevelopmentEnvironment {
     pending: bool,
     nested_containers: bool,
     ssh_key: String,
+    memory_limit: i32,
+    storage_size: i32,
 }
 #[derive(Deserialize)]
 pub struct CreateDevelopmentEnvironmentRequest {
@@ -104,6 +106,8 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
                 pending: container.requested_state != container.state,
                 nested_containers: environment.nested_containers,
                 ssh_key: private_key.public_key().to_openssh().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?,
+                memory_limit: container.memory_limit,
+                storage_size: container.storage_size,
             })
         })
         .collect();

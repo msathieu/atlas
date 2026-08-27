@@ -6,6 +6,7 @@ use crate::{
     auth::login,
     chat::{chats_list, create_chat, delete_chat, delete_message, get_chat, manage_tool_call_consent, send_message},
     commands::{commands_list, create_command, delete_command},
+    containers::update_container,
     development_environments::{
         approve_ssh_forward_request, create_development_environment, development_environments_list, get_ssh_forward_request, open_development_environment, set_development_environment_state,
     },
@@ -21,7 +22,7 @@ use crate::{
 use axum::{
     Router,
     http::StatusCode,
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
@@ -43,6 +44,7 @@ mod agents;
 mod auth;
 mod chat;
 mod commands;
+mod containers;
 mod development_environments;
 mod devices;
 mod info;
@@ -133,6 +135,7 @@ async fn main() {
         .route("/api/agents/{id}/open", post(open_agent))
         .route("/api/agents/{id}/state", post(set_agent_state))
         .route("/api/agents/{id}/webhook/{name}", post(deliver_webhook))
+        .route("/api/containers/{id}", patch(update_container))
         .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any).expose_headers(Any));
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
     axum::serve(listener, router).await.unwrap();

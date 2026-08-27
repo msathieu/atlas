@@ -1,7 +1,7 @@
 FROM quay.io/fedora/fedora-toolbox:44
 RUN dnf up -y
 RUN dnf install -y bash-color-prompt podman nix nix-daemon
-RUN dnf install -y https://github.com/coder/code-server/releases/download/v4.134.0/code-server-4.134.0-amd64.rpm
+RUN dnf install -y https://github.com/coder/code-server/releases/download/v4.135.0/code-server-4.135.0-amd64.rpm
 RUN setcap cap_setuid=ep /usr/bin/newuidmap
 RUN setcap cap_setgid=ep /usr/bin/newgidmap
 RUN useradd ide

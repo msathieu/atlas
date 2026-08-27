@@ -71,7 +71,6 @@ async fn process_container(mut container: Container, pool: Pool<AsyncPgConnectio
     let container_id = container.id.ok_or("Invalid container")?;
     let container_name = format!("atlas-{}", container_id);
     let pvc_name = format!("atlas-state-{}", container_id);
-    let nix_pvc_name = format!("atlas-nix-{}", container_id);
     let service_name_dev = format!("atlas-dev-{}", container_id);
     let service_name_agent = format!("atlas-agent-{}", container_id);
     let namespace = "atlas";
@@ -146,16 +145,6 @@ async fn process_container(mut container: Container, pool: Pool<AsyncPgConnectio
             if service_api.get_opt(&service_name_dev).await?.is_none() {
                 service_api.create(&PostParams::default(), &service).await?;
             }
-            pvc.metadata.name = Some(nix_pvc_name.clone());
-            let mut resources = BTreeMap::new();
-            resources.insert("storage".to_string(), Quantity("25Gi".to_string()));
-            pvc.spec.as_mut().ok_or("Invalid PVC")?.resources = Some(VolumeResourceRequirements {
-                limits: None,
-                requests: Some(resources),
-            });
-            if pvc_api.get_opt(&nix_pvc_name).await?.is_none() {
-                pvc_api.create(&PostParams::default(), &pvc).await?;
-            }
         } else if container.origin == ContainerOrigin::Agent as i32 {
             let service_api = Api::namespaced(client, namespace);
             let mut service = Service::default();
@@ -197,9 +186,6 @@ async fn process_container(mut container: Container, pool: Pool<AsyncPgConnectio
             let service_api: Api<Service> = Api::namespaced(client, namespace);
             if service_api.get_opt(&service_name_dev).await?.is_some() {
                 service_api.delete(&service_name_dev, &DeleteParams::default()).await?;
-            }
-            if pvc_api.get_opt(&nix_pvc_name).await?.is_some() {
-                pvc_api.delete(&nix_pvc_name, &DeleteParams::default()).await?;
             }
         } else if container.origin == ContainerOrigin::Agent as i32 {
             let service_api: Api<Service> = Api::namespaced(client, namespace);
@@ -254,32 +240,18 @@ async fn process_container(mut container: Container, pool: Pool<AsyncPgConnectio
             }),
             ..Default::default()
         };
-        let mut volumes = vec![volume];
-        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
-            let nix_volume = Volume {
-                name: "nix".to_string(),
-                persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
-                    claim_name: nix_pvc_name,
-                    read_only: None,
-                }),
-                ..Default::default()
-            };
-            volumes.push(nix_volume);
-        }
         let volume_mount = VolumeMount {
             name: "state".to_string(),
             mount_path: "/state".to_string(),
             ..Default::default()
         };
-        let mut volume_mounts = vec![volume_mount];
-        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
-            let nix_volume_mount = VolumeMount {
-                name: "nix".to_string(),
-                mount_path: "/nix".to_string(),
-                ..Default::default()
-            };
-            volume_mounts.push(nix_volume_mount);
-        }
+        let volume_mount_nix = VolumeMount {
+            name: "state".to_string(),
+            mount_path: "/nix".to_string(),
+            sub_path: Some("nix".to_string()),
+            ..Default::default()
+        };
+        let volume_mounts = vec![volume_mount, volume_mount_nix];
         let mut envs = vec![];
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db).await?;
@@ -387,7 +359,7 @@ async fn process_container(mut container: Container, pool: Pool<AsyncPgConnectio
         let pull_secret = LocalObjectReference { name: "atlas-image-pull".to_string() };
         pod.spec = Some(PodSpec {
             share_process_namespace: Some(true),
-            volumes: Some(volumes),
+            volumes: Some(vec![volume]),
             containers: vec![k8s_container],
             image_pull_secrets: Some(vec![pull_secret]),
             host_users: Some(false),

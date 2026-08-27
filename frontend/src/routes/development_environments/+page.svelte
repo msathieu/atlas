@@ -2,7 +2,8 @@
 import { authenticatedFetch } from "$lib/auth";
 import { user } from "$lib/state.svelte";
 import { formatTime } from "$lib/util.ts";
-import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, Trash } from "@lucide/svelte";
+import { updateContainer } from "$lib/container.ts";
+import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, SquarePen, Trash } from "@lucide/svelte";
 
 let { data } = $props();
 let selectedEnvironment: any = $state();
@@ -23,13 +24,8 @@ async function createEnvironment() {
   newBranch = "";
   newNestedContainers = false;
 }
-async function deleteEnvironment(id: string) {
-  await authenticatedFetch(`/api/development_environments/${id}/state?state=delete`, {
-    method: "POST",
-  });
-}
-async function stopEnvironment(id: string) {
-  await authenticatedFetch(`/api/development_environments/${id}/state?state=stop`, {
+async function setEnvironmentState(id: string, state: string) {
+  await authenticatedFetch(`/api/development_environments/${id}/state?state=${state}`, {
     method: "POST",
   });
 }
@@ -94,7 +90,7 @@ async function openDevelopmentEnvironment(id: string) {
               class="btn"
               onclick={async (e) => {
                 e.stopPropagation();
-                await stopEnvironment(environment.id);
+                await setEnvironmentState(environment.id, "stop");
               }}
             >
               <Power />
@@ -158,7 +154,35 @@ async function openDevelopmentEnvironment(id: string) {
           </tr>
           <tr>
             <td>SSH Public Key</td>
-            <td>{selectedEnvironment.ssh_key}</td>
+            <td>{selectedEnvironment.ssh_key} </td>
+          </tr>
+          <tr>
+            <td>Memory Limit</td>
+            <td
+              >{selectedEnvironment.memory_limit}
+              <button
+                class="btn"
+                onclick={async () => {
+                  await updateContainer(selectedEnvironment.id, parseInt(prompt("Enter requested memory size in GiB") || ""), 0);
+                }}
+              >
+                <SquarePen />
+              </button>
+            </td>
+          </tr>
+          <tr>
+            <td>Storage Size</td>
+            <td
+              >{selectedEnvironment.storage_size}
+              <button
+                class="btn"
+                onclick={async () => {
+                  await updateContainer(selectedEnvironment.id, 0, parseInt(prompt("Enter requested storage size in GiB") || ""));
+                }}
+              >
+                <SquarePen />
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -167,7 +191,7 @@ async function openDevelopmentEnvironment(id: string) {
         <button
           class="btn"
           onclick={async () => {
-            await deleteEnvironment(selectedEnvironment.id);
+            await setEnvironmentState(selectedEnvironment.id, "delete");
           }}
         >
           <Trash />

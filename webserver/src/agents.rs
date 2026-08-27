@@ -31,6 +31,8 @@ pub struct APIAgent {
     created_at: u64,
     state: String,
     pending: bool,
+    memory_limit: i32,
+    storage_size: i32,
 }
 #[derive(Deserialize)]
 pub struct CreateAgentRequest {
@@ -78,6 +80,8 @@ pub async fn agents_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
                 created_at: convert_timestamp(container.created_at)?,
                 state,
                 pending: container.requested_state != container.state,
+                memory_limit: container.memory_limit,
+                storage_size: container.storage_size,
             })
         })
         .collect();
