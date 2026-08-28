@@ -163,7 +163,7 @@ async fn create_settings(db: &mut AsyncPgConnection) -> Result<(), Box<dyn Error
         diesel::insert_into(settings::table)
             .values(Setting {
                 name: "llm_openrouter_model".to_owned(),
-                value: "z-ai/glm-5.2".to_string(),
+                value: "z-ai/glm-5.3-flash".to_string(),
             })
             .execute(db)
             .await?;

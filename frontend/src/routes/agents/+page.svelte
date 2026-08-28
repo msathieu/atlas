@@ -137,6 +137,7 @@ async function openAgent(id: string) {
                 class="btn"
                 onclick={async () => {
                   await updateContainer(selectedAgent.id, parseInt(prompt("Enter requested memory size in GiB") || ""), 0);
+                  dialog.close();
                 }}
               >
                 <SquarePen />
@@ -151,6 +152,7 @@ async function openAgent(id: string) {
                 class="btn"
                 onclick={async () => {
                   await updateContainer(selectedAgent.id, 0, parseInt(prompt("Enter requested storage size in GiB") || ""));
+                  dialog.close();
                 }}
               >
                 <SquarePen />

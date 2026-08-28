@@ -20,7 +20,7 @@ use shared_server::{
     notify_server,
     schema::{commands, containers, development_environments},
 };
-use ssh_key::{Algorithm::Ed25519, LineEnding, PrivateKey, rand_core::OsRng};
+use ssh_key::{Algorithm::Ed25519, LineEnding, PrivateKey};
 use std::{env, time::SystemTime};
 use uuid::Uuid;
 
@@ -146,7 +146,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let mut id = Uuid::nil();
     let repo = if request.repo.is_empty() { None } else { Some(request.repo) };
     let branch = if request.branch.is_empty() { None } else { Some(request.branch) };
-    let ssh_key = PrivateKey::random(&mut OsRng, Ed25519).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let ssh_key = PrivateKey::random(&mut rand::rng(), Ed25519).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let ssh_key_exported = ssh_key.to_openssh(LineEnding::LF).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     db.transaction(async |db| {
         container = diesel::insert_into(containers::table).values(container).get_result(db).await?;

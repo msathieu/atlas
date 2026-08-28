@@ -4,10 +4,7 @@ use crate::{
     models::{Setting, User, UserSetting},
     schema::{settings, user_settings, users},
 };
-use argon2::{
-    Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version,
-    password_hash::{SaltString, rand_core::OsRng},
-};
+use argon2::{Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version};
 use aws_lc_rs::signature::{ED25519, ParsedPublicKey, UnparsedPublicKey};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
@@ -146,12 +143,11 @@ pub async fn listen_for_restarts(component: String) {
     });
 }
 pub async fn hash_password(password: String) -> Result<String, Box<dyn Error>> {
-    let salt = SaltString::generate(OsRng);
     let params = Params::new(128 * 1024, 1, 1, Some(64)).or(Err("Invalid argon2 parameters"))?;
     let argon = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let lock = HASHING_SEMAPHORE.acquire().await?;
     let hash = spawn_blocking(move || {
-        let hash = argon.hash_password(password.as_bytes(), &salt).or(Err("Couldn't hash password"))?;
+        let hash = argon.hash_password(password.as_bytes()).or(Err("Couldn't hash password"))?;
         drop(lock);
         Ok::<String, String>(hash.to_string())
     })
