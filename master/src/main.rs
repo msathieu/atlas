@@ -314,6 +314,7 @@ async fn create_settings(db: &mut AsyncPgConnection) -> Result<(), Box<dyn Error
                     enabled: true,
                     password_enabled: true,
                     last_login: None,
+                    email: None,
                 })
                 .execute(db)
                 .await?;

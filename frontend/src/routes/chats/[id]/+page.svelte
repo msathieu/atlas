@@ -1,62 +1,62 @@
 <script lang="ts">
-  import { authenticatedFetch } from "$lib/auth.ts";
-  import { BadgeCheck, BadgeX, Bot, CircleUser, SendHorizontal, Trash } from "@lucide/svelte";
-  import { marked } from "marked";
-  import DOMPurify from "dompurify";
-  import { formatTime } from "$lib/util";
-  let { data } = $props();
-  let content = $state("");
+import { authenticatedFetch } from "$lib/auth.ts";
+import { BadgeCheck, BadgeX, Bot, CircleUser, SendHorizontal, Trash } from "@lucide/svelte";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+import { formatTime } from "$lib/util";
+let { data } = $props();
+let content = $state("");
 
-  async function sendMessage() {
-    await authenticatedFetch(`/api/chats/${data.id}`, {
-      method: "POST",
-      body: JSON.stringify({ content }),
-    });
-    content = "";
-  }
-  async function deleteMessage(seq: number) {
-    await authenticatedFetch(`/api/chats/${data.id}/${seq}`, {
-      method: "DELETE",
-    });
-  }
-  function disableSend(): boolean {
-    if (data.chat.messages.length === 0) {
-      return false;
-    }
-    const last = data.chat.messages.at(-1);
-    return last.user_message === last.finished;
-  }
-  async function manageToolCallConsent(seq: number, callId: string, approved: boolean) {
-    let rejection_reason = "";
-    if (!approved) {
-      rejection_reason = prompt("Reason") || "no reason supplied";
-    }
-    await authenticatedFetch(`/api/chats/${data.id}/${seq}/${callId}/consent`, {
-      method: "POST",
-      body: JSON.stringify({ approved, rejection_reason }),
-    });
-  }
-  function isCallPendingConsent(toolCalls: any[]): boolean {
-    for (const call of toolCalls) {
-      if (call.user_consented === null) {
-        return true;
-      }
-    }
+async function sendMessage() {
+  await authenticatedFetch(`/api/chats/${data.id}`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
+  content = "";
+}
+async function deleteMessage(seq: number) {
+  await authenticatedFetch(`/api/chats/${data.id}/${seq}`, {
+    method: "DELETE",
+  });
+}
+function disableSend(): boolean {
+  if (data.chat.messages.length === 0) {
     return false;
   }
+  const last = data.chat.messages.at(-1);
+  return last.user_message === last.finished;
+}
+async function manageToolCallConsent(seq: number, callId: string, approved: boolean) {
+  let rejection_reason = "";
+  if (!approved) {
+    rejection_reason = prompt("Reason") || "no reason supplied";
+  }
+  await authenticatedFetch(`/api/chats/${data.id}/${seq}/${callId}/consent`, {
+    method: "POST",
+    body: JSON.stringify({ approved, rejection_reason }),
+  });
+}
+function isCallPendingConsent(toolCalls: any[]): boolean {
+  for (const call of toolCalls) {
+    if (call.user_consented === null) {
+      return true;
+    }
+  }
+  return false;
+}
 </script>
 
 {#each data.chat.messages as message}
   <div class="chat" class:chat-start={!message.user_message} class:chat-end={message.user_message}>
-    <div class="chat-image dropdown dropdown-hover" class:dropdown-end={message.user_message}>
-      <div>
+  <div class="chat-image dropdown dropdown-hover" class:dropdown-end={message.user_message}>
+    <div>
         {#if message.user_message}
           <CircleUser size="48" />
         {:else}
           <Bot size="48" />
         {/if}
       </div>
-      <div class="dropdown-content menu bg-base-200 w-50">
+    <div class="dropdown-content menu bg-base-200 w-50">
         <p>Time: {formatTime(message.sent_on)}</p>
         {#if !message.user_message}
           <p>Provider: {message.provider}</p>
@@ -76,8 +76,8 @@
           <Trash />
         </button>
       </div>
-    </div>
-    <div class="chat-bubble whitespace-pre-wrap break-all">
+  </div>
+  <div class="chat-bubble whitespace-pre-wrap break-all">
       {#if message.reasoning}
         <div class="border collapse collapse-arrow" role="button" tabindex="0">
           <div class="collapse-title">Reasoning</div>
@@ -137,7 +137,7 @@
       {/if}
       {@html DOMPurify.sanitize(marked(message.content) as string)}
     </div>
-  </div>
+</div>
 {/each}
 <br />
 <br />

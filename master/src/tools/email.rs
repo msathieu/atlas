@@ -9,7 +9,10 @@ use lettre::{
 use rig_core::tool::{PortableTool, ToolExecutionError};
 use serde::Deserialize;
 use serde_json::json;
-use shared_server::{get_user_setting, models::Setting, schema::settings};
+use shared_server::{
+    models::{Setting, User},
+    schema::{settings, users},
+};
 use uuid::Uuid;
 
 pub struct EmailTool {
@@ -64,10 +67,9 @@ impl PortableTool for EmailTool {
             .get_result(&mut db)
             .await
             .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
-        let mail_to = get_user_setting(self.user, "mail_to".to_string(), &mut db)
-            .await
-            .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
-        if mail_server.value.is_empty() || mail_username.value.is_empty() || mail_password.value.is_empty() || mail_from.value.is_empty() || mail_to.value.is_empty() {
+        let user: User = users::table.find(self.user).get_result(&mut db).await.map_err(|_| ToolExecutionError::other("Couldn't get user"))?;
+        let mail_to = user.email.ok_or(ToolExecutionError::other("User has no email address"))?;
+        if mail_server.value.is_empty() || mail_username.value.is_empty() || mail_password.value.is_empty() || mail_from.value.is_empty() || mail_to.is_empty() {
             return Err(ToolExecutionError::other("Mail server isn't configured"));
         }
         let message = Message::builder()
@@ -77,7 +79,7 @@ impl PortableTool for EmailTool {
             })
             .to(Mailbox {
                 name: None,
-                email: mail_to.value.parse().map_err(|_| ToolExecutionError::other("Invalid to address"))?,
+                email: mail_to.parse().map_err(|_| ToolExecutionError::other("Invalid to address"))?,
             })
             .header(ContentType::TEXT_PLAIN)
             .message_id(None)

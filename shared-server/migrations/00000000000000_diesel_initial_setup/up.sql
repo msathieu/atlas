@@ -10,7 +10,8 @@ CREATE TABLE users(
     admin boolean NOT NULL,
     enabled boolean NOT NULL,
     password_enabled boolean NOT NULL,
-    last_login timestamp
+    last_login timestamp,
+    email varchar
 );
 CREATE TABLE chats(
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

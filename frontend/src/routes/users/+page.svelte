@@ -44,6 +44,7 @@ async function deleteUser(id: string) {
     <tr>
       <th>Admin</th>
       <th>Username</th>
+      <th>Email</th>
       <th>Enabled</th>
       <th>Password Enabled</th>
       <th>Last Login</th>
@@ -66,6 +67,7 @@ async function deleteUser(id: string) {
           {/if}
         </td>
         <td>{user.username}</td>
+        <td>{user.email}</td>
         <td>
           {#if user.enabled}
             <Check />
@@ -117,6 +119,10 @@ async function deleteUser(id: string) {
           <tr>
             <td>Username</td>
             <td>{selectedUser.username}</td>
+          </tr>
+          <tr>
+            <td>Email</td>
+            <td>{selectedUser.email}</td>
           </tr>
           <tr>
             <td>Admin</td>

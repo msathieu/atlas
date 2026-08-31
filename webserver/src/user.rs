@@ -27,11 +27,13 @@ pub struct GetUserInfoResponse {
     username: String,
     admin: bool,
     password_enabled: bool,
+    email: Option<String>,
 }
 #[derive(Deserialize)]
-pub struct SetPasswordStateRequest {
+pub struct UpdateUserInfoRequest {
+    email: Option<String>,
+    password_state: Option<bool>,
     password: String,
-    enabled: bool,
 }
 
 pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
@@ -59,20 +61,31 @@ pub async fn get_user_info(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
         username: user.username,
         admin: user.admin,
         password_enabled: user.password_enabled,
+        email: user.email,
     };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }
-pub async fn set_password_state(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+pub async fn update_user_info(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers).await?.0;
-    let signature = validate_signature(&headers, uri.0, &body, "PUT").await?;
-    let request: SetPasswordStateRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let signature = validate_signature(&headers, uri.0, &body, "PATCH").await?;
+    let request: UpdateUserInfoRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     verify_password(user.password, request.password).await.or(Err(StatusCode::FORBIDDEN))?;
     let mut db = get_db().await?;
-    diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-        .set(users::password_enabled.eq(request.enabled))
-        .execute(&mut db)
-        .await
-        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    if let Some(password_state) = request.password_state {
+        diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+            .set(users::password_enabled.eq(password_state))
+            .execute(&mut db)
+            .await
+            .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    }
+    if let Some(email) = request.email {
+        diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+            .set(users::email.eq(email))
+            .execute(&mut db)
+            .await
+            .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    }
     sign_response::<String>(signature, None)
 }

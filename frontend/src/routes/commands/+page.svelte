@@ -1,41 +1,41 @@
 <script lang="ts">
-  import { authenticatedFetch } from "$lib/auth";
-  import { user } from "$lib/state.svelte.ts";
-  import { formatTime, getHostnameForDevice } from "$lib/util.ts";
-  import { Check, Loader, Plus, Trash, X } from "@lucide/svelte";
-  import DOMPurify from "dompurify";
-  import hljs from "highlight.js";
-  import "highlight.js/styles/github-dark.css";
+import { authenticatedFetch } from "$lib/auth";
+import { user } from "$lib/state.svelte.ts";
+import { formatTime, getHostnameForDevice } from "$lib/util.ts";
+import { Check, Loader, Plus, Trash, X } from "@lucide/svelte";
+import DOMPurify from "dompurify";
+import hljs from "highlight.js";
+import "highlight.js/styles/github-dark.css";
 
-  let { data } = $props();
-  let selectedCommand: any = $state();
-  let dialog: any = $state();
-  let creationDialog: any = $state();
-  let newDevice = $state("");
-  let newCode = $state("");
+let { data } = $props();
+let selectedCommand: any = $state();
+let dialog: any = $state();
+let creationDialog: any = $state();
+let newDevice = $state("");
+let newCode = $state("");
 
-  async function createCommand() {
-    await authenticatedFetch(`/api/commands`, {
-      method: "POST",
-      body: JSON.stringify({ device: newDevice, code: newCode }),
-    });
-    newDevice = "";
-    newCode = "";
+async function createCommand() {
+  await authenticatedFetch(`/api/commands`, {
+    method: "POST",
+    body: JSON.stringify({ device: newDevice, code: newCode }),
+  });
+  newDevice = "";
+  newCode = "";
+}
+async function deleteCommand(id: string) {
+  await authenticatedFetch(`/api/commands/${id}`, {
+    method: "DELETE",
+  });
+}
+function matchHighlightLanguage(language: string): string {
+  switch (language) {
+    case "Lua":
+      return "lua";
+    case "Python":
+      return "python";
   }
-  async function deleteCommand(id: string) {
-    await authenticatedFetch(`/api/commands/${id}`, {
-      method: "DELETE",
-    });
-  }
-  function matchHighlightLanguage(language: string): string {
-    switch (language) {
-      case "Lua":
-        return "lua";
-      case "Python":
-        return "python";
-    }
-    throw new Error(`Unsupported language`);
-  }
+  throw new Error(`Unsupported language`);
+}
 </script>
 
 <table class="border border-base-content/10 table">
@@ -76,15 +76,15 @@
 </table>
 {#if user.admin}
   <div class="fab">
-    <button
-      class="btn btn-circle btn-xl btn-accent"
-      onclick={() => {
+  <button
+    class="btn btn-circle btn-xl btn-accent"
+    onclick={() => {
         creationDialog.showModal();
       }}
-    >
-      <Plus />
-    </button>
-  </div>
+  >
+    <Plus />
+  </button>
+</div>
 {/if}
 <dialog bind:this={dialog} class="modal">
   <form class="modal-backdrop" method="dialog">

@@ -11,6 +11,7 @@ let oldPassword = $state("");
 let newPassword = $state("");
 let passwordConfirmation = $state("");
 let passwordEnabled = $derived(data.user.password_enabled);
+let email = $derived(data.user.email);
 
 async function changePassword() {
   if (newPassword != passwordConfirmation) {
@@ -37,17 +38,32 @@ async function changePassword() {
   }
 }
 async function setPasswordEnabled() {
-  const body = JSON.stringify({ password: prompt("Enter your password:"), enabled: passwordEnabled });
+  const body = JSON.stringify({ password: prompt("Enter your password:"), password_state: passwordEnabled });
   const encryptedBody = await encryptToServer(body);
   await authenticatedFetch(
-    `/api/user/set_password_state`,
+    `/api/user/info`,
     {
-      method: "PUT",
+      method: "PATCH",
       body: encryptedBody,
     },
     undefined,
     "application/octet-stream",
   );
+  toast.success("Changed password state");
+}
+async function updateEmail() {
+  const body = JSON.stringify({ password: prompt("Enter your password:"), email });
+  const encryptedBody = await encryptToServer(body);
+  await authenticatedFetch(
+    `/api/user/info`,
+    {
+      method: "PATCH",
+      body: encryptedBody,
+    },
+    undefined,
+    "application/octet-stream",
+  );
+  toast.success("Changed email");
 }
 async function registerPasskey() {
   const body = JSON.stringify({ password: prompt("Enter your password to register a new passkey:") });
@@ -113,6 +129,16 @@ async function deletePasskey(id: string) {
 >
   Allow Password Login:
   <input id="passwordEnabled" type="checkbox" class="checkbox" bind:checked={passwordEnabled} />
+  <button class="btn"><Check /></button>
+</form>
+<form
+  onsubmit={async (e) => {
+    e.preventDefault();
+    await updateEmail();
+  }}
+>
+  Email:
+  <input id="email" type="email" class="input" required bind:value={email} />
   <button class="btn"><Check /></button>
 </form>
 <div class="divider"></div>

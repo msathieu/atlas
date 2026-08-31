@@ -79,6 +79,7 @@ pub struct User {
     pub enabled: bool,
     pub password_enabled: bool,
     pub last_login: Option<SystemTime>,
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]

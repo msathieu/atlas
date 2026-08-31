@@ -22,6 +22,7 @@ pub struct APIUser {
     enabled: bool,
     password_enabled: bool,
     last_login: Option<u64>,
+    email: Option<String>,
 }
 #[derive(Deserialize)]
 pub struct CreateUserRequest {
@@ -49,6 +50,7 @@ pub async fn users_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Re
                 enabled: user.enabled,
                 password_enabled: user.password_enabled,
                 last_login: user.last_login.map(|timestamp| convert_timestamp(timestamp).unwrap_or(0)),
+                email: user.email.clone(),
             })
         })
         .collect();
@@ -81,6 +83,7 @@ pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
         enabled: true,
         password_enabled: true,
         last_login: None,
+        email: None,
     };
     user = diesel::insert_into(users::table).values(user).get_result(&mut db).await.or(Err(StatusCode::BAD_REQUEST))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

@@ -1,42 +1,41 @@
 <script lang="ts">
-  import { authenticatedFetch } from "$lib/auth.ts";
-  import { updateSetting } from "$lib/settings.ts";
-  import { API_HOST } from "$lib/util.ts";
-  import { Check } from "@lucide/svelte";
-  import Setting from "./Setting.svelte";
-  import { user } from "$lib/state.svelte.ts";
+import { authenticatedFetch } from "$lib/auth.ts";
+import { updateSetting } from "$lib/settings.ts";
+import { API_HOST } from "$lib/util.ts";
+import { Check } from "@lucide/svelte";
+import Setting from "./Setting.svelte";
+import { user } from "$lib/state.svelte.ts";
 
-  let { data } = $props();
-  let defaultProvider = $derived(data.defaultProvider);
-  let openrouterModel = $derived(data.openrouterModel);
-  let openrouterKey = $state("");
-  let genericEndpoint = $derived(data.genericEndpoint);
-  let genericModel = $derived(data.genericModel);
-  let genericKey = $state("");
-  let allowNewDevices = $derived(data.allowNewDevices === "true");
-  let mailServer = $derived(data.mailServer);
-  let mailUsername = $derived(data.mailUsername);
-  let mailPassword = $state("");
-  let mailFrom = $derived(data.mailFrom);
-  let mailTo = $derived(data.mailTo);
-  let apkHash = $derived(data.apkHash);
-  let developmentEnvironmentSettings = $derived(data.developmentEnvironmentSettings);
-  let developmentEnvironmentExtensions = $derived(data.developmentEnvironmentExtensions);
-  let developmentEnvironmentGitconfig = $derived(data.developmentEnvironmentGitconfig);
-  let developmentEnvironmentPaths = $derived(data.developmentEnvironmentPaths);
-  let downloadLink: any = $state();
-  let actuallyDownload = false;
+let { data } = $props();
+let defaultProvider = $derived(data.defaultProvider);
+let openrouterModel = $derived(data.openrouterModel);
+let openrouterKey = $state("");
+let genericEndpoint = $derived(data.genericEndpoint);
+let genericModel = $derived(data.genericModel);
+let genericKey = $state("");
+let allowNewDevices = $derived(data.allowNewDevices === "true");
+let mailServer = $derived(data.mailServer);
+let mailUsername = $derived(data.mailUsername);
+let mailPassword = $state("");
+let mailFrom = $derived(data.mailFrom);
+let apkHash = $derived(data.apkHash);
+let developmentEnvironmentSettings = $derived(data.developmentEnvironmentSettings);
+let developmentEnvironmentExtensions = $derived(data.developmentEnvironmentExtensions);
+let developmentEnvironmentGitconfig = $derived(data.developmentEnvironmentGitconfig);
+let developmentEnvironmentPaths = $derived(data.developmentEnvironmentPaths);
+let downloadLink: any = $state();
+let actuallyDownload = false;
 
-  async function requestDownloadLink() {
-    const res = await authenticatedFetch("/api/download_auth", { method: "POST" });
-    const downloadAuth = await res.json();
-    downloadLink.href = `${API_HOST}/api/atlas-agent?auth=${downloadAuth.jwt}&arch=x86_64&os=linux`;
-    actuallyDownload = true;
-    downloadLink.click();
-  }
-  async function restart() {
-    await authenticatedFetch("/api/restart", { method: "POST" });
-  }
+async function requestDownloadLink() {
+  const res = await authenticatedFetch("/api/download_auth", { method: "POST" });
+  const downloadAuth = await res.json();
+  downloadLink.href = `${API_HOST}/api/atlas-agent?auth=${downloadAuth.jwt}&arch=x86_64&os=linux`;
+  actuallyDownload = true;
+  downloadLink.click();
+}
+async function restart() {
+  await authenticatedFetch("/api/restart", { method: "POST" });
+}
 </script>
 
 <h1 class="text-2xl">User Settings</h1>
@@ -46,7 +45,6 @@
 <Setting name="development_environment_extensions" description="Development Environment Extensions" val={developmentEnvironmentExtensions} global="false" type="text" />
 <Setting name="development_environment_gitconfig" description="Development Environment Git Configuration" val={developmentEnvironmentGitconfig} global="false" type="textarea" />
 <Setting name="development_environment_paths" description="Development Environment Persisted Paths" val={developmentEnvironmentPaths} global="false" type="text" />
-<Setting name="mail_to" description="Mail To" val={mailTo} global="false" type="text" />
 
 {#if user.admin}
   <h1 class="text-2xl">System Settings</h1>
@@ -62,14 +60,14 @@
   <h1 class="text-xl">Allow New Devices</h1>
   <br />
   <form
-    onsubmit={async (e) => {
+  onsubmit={async (e) => {
       e.preventDefault();
       await updateSetting("allow_new_devices", String(allowNewDevices), true);
     }}
-  >
-    <input id="allowNewDevices" type="checkbox" class="checkbox" bind:checked={allowNewDevices} />
-    <button class="btn"><Check /></button>
-  </form>
+>
+  <input id="allowNewDevices" type="checkbox" class="checkbox" bind:checked={allowNewDevices} />
+  <button class="btn"><Check /></button>
+</form>
   <br />
 
   <Setting name="mail_server" description="Mail Server" val={mailServer} global="true" type="text" />
@@ -84,10 +82,10 @@
   <br />
 
   <a
-    class="btn"
-    href="/api/atlas-agent"
-    bind:this={downloadLink}
-    onclick={async (e) => {
+  class="btn"
+  href="/api/atlas-agent"
+  bind:this={downloadLink}
+  onclick={async (e) => {
       if (!actuallyDownload) {
         e.preventDefault();
         await requestDownloadLink();
@@ -95,8 +93,8 @@
         actuallyDownload = false;
       }
     }}
-    download
-    >Download Agent
+  download
+>Download Agent
   </a>
   <br />
 
@@ -106,11 +104,11 @@
   <br />
 
   <button
-    class="btn"
-    onclick={async () => {
+  class="btn"
+  onclick={async () => {
       await restart();
     }}
-  >
+>
     Restart System
   </button>
 {/if}
