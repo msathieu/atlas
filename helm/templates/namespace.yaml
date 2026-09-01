@@ -63,3 +63,9 @@ spec:
       podSelector:
         matchLabels:
           app: atlas-web
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.namespace }}
+      podSelector:
+        matchLabels:
+          app: atlas-master

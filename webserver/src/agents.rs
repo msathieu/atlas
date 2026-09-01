@@ -119,6 +119,7 @@ pub async fn create_agent(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
             command: None,
             password,
             forge_token: None,
+            forge_webhook_secret: None,
         };
         diesel::insert_into(agents::table).values(agent).execute(db).await?;
         Ok::<(), diesel::result::Error>(())

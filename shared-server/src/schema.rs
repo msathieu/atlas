@@ -7,6 +7,7 @@ diesel::table! {
         command -> Nullable<Uuid>,
         password -> Varchar,
         forge_token -> Nullable<Varchar>,
+        forge_webhook_secret -> Nullable<Varchar>,
     }
 }
 

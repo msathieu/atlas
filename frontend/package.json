@@ -9,7 +9,7 @@
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capawesome/capacitor-passkeys": "^0.1.1",
-    "@lucide/svelte": "^1.37.0",
+    "@lucide/svelte": "^1.38.0",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",

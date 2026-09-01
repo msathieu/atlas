@@ -202,4 +202,5 @@ pub struct Agent {
     pub command: Option<Uuid>,
     pub password: String,
     pub forge_token: Option<String>,
+    pub forge_webhook_secret: Option<String>,
 }

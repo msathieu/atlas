@@ -2,6 +2,7 @@
 
 use crate::containers::process_containers;
 use crate::device::process_devices;
+use crate::forge::process_forge_actions;
 use crate::llm::process_chats;
 use crate::timers::process_timers;
 use crate::tool::process_tool_calls;
@@ -31,6 +32,7 @@ use webauthn_rs::fake::{FakePasskeyDistribution, WebauthnFakeCredentialGenerator
 mod code;
 mod containers;
 mod device;
+mod forge;
 mod llm;
 mod timers;
 mod tool;
@@ -70,12 +72,14 @@ async fn main() {
     let tool_pool = pool.clone();
     let timers_pool = pool.clone();
     let container_pool = pool.clone();
+    let forge_pool = pool.clone();
     DB_POOL.set(pool).ok();
     tokio::spawn(async { tasks_loop_wrapper(device_pool, "MASTER:DEVICES", process_devices, Duration::from_secs(300)).await });
     tokio::spawn(async { tasks_loop_wrapper(llm_pool, "MASTER:LLM", process_chats, Duration::from_secs(300)).await });
     tokio::spawn(async { tasks_loop_wrapper(tool_pool, "MASTER:TOOLS", process_tool_calls, Duration::from_secs(300)).await });
     tokio::spawn(async { tasks_loop_wrapper(timers_pool, "MASTER:TIMERS", process_timers, Duration::from_secs(300)).await });
     tokio::spawn(async { tasks_loop_wrapper(container_pool, "MASTER:CONTAINERS", process_containers, Duration::from_secs(10)).await });
+    tokio::spawn(async { tasks_loop_wrapper(forge_pool, "MASTER:FORGE", process_forge_actions, Duration::from_secs(60)).await });
     loop {
         sleep(Duration::from_hours(24)).await;
     }

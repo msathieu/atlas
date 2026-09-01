@@ -141,5 +141,6 @@ CREATE TABLE agents(
     name varchar NOT NULL,
     command uuid REFERENCES commands ON DELETE SET NULL,
     password varchar NOT NULL,
-    forge_token varchar
+    forge_token varchar,
+    forge_webhook_secret varchar
 );
