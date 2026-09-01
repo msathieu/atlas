@@ -18,7 +18,6 @@ export const load: PageLoad = async ({ fetch }) => {
       genericModel: settings["llm_generic_model"],
       allowNewDevices: settings["allow_new_devices"],
       tlsCert: settings["tls_cert"],
-      mailServer: settings["mail_server"],
       mailUsername: settings["mail_username"],
       mailFrom: settings["mail_from"],
       installationScript: installationScript["script"],

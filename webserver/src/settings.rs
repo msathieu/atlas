@@ -26,7 +26,6 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
     let mut db = get_db().await?;
     let allowed_settings = [
         "allow_new_devices",
-        "mail_server",
         "mail_username",
         "mail_from",
         "llm_default_provider",
@@ -50,7 +49,6 @@ pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: O
     let mut db = get_db().await?;
     let allowed_settings = [
         "allow_new_devices",
-        "mail_server",
         "mail_username",
         "mail_password",
         "mail_from",

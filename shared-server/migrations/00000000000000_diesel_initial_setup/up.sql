@@ -140,5 +140,6 @@ CREATE TABLE agents(
     id uuid PRIMARY KEY REFERENCES containers ON DELETE CASCADE,
     name varchar NOT NULL,
     command uuid REFERENCES commands ON DELETE SET NULL,
-    password varchar NOT NULL
+    password varchar NOT NULL,
+    forge_token varchar
 );

@@ -312,6 +312,18 @@ async fn process_container(mut container: Container, pool: Pool<AsyncPgConnectio
                 value: Some(agent.password),
                 value_from: None,
             });
+            envs.push(EnvVar {
+                name: "FORGE_URL".to_string(),
+                value: Some(env::var("FORGE_URL")?),
+                value_from: None,
+            });
+            if let Some(token) = agent.forge_token {
+                envs.push(EnvVar {
+                    name: "FORGE_TOKEN".to_string(),
+                    value: Some(token),
+                    value_from: None,
+                });
+            }
         }
         let mut security_context = SecurityContext {
             run_as_user: Some(0),

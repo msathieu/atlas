@@ -14,7 +14,6 @@ let genericEndpoint = $derived(data.genericEndpoint);
 let genericModel = $derived(data.genericModel);
 let genericKey = $state("");
 let allowNewDevices = $derived(data.allowNewDevices === "true");
-let mailServer = $derived(data.mailServer);
 let mailUsername = $derived(data.mailUsername);
 let mailPassword = $state("");
 let mailFrom = $derived(data.mailFrom);
@@ -70,7 +69,6 @@ async function restart() {
 </form>
   <br />
 
-  <Setting name="mail_server" description="Mail Server" val={mailServer} global="true" type="text" />
   <Setting name="mail_username" description="Mail Username" val={mailUsername} global="true" type="text" />
   <Setting name="mail_password" description="Mail Password" val={mailPassword} global="true" type="text" />
   <Setting name="mail_from" description="Mail From" val={mailFrom} global="true" type="text" />

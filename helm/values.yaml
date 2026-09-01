@@ -10,3 +10,5 @@ envoyName: envoy
 apiserverHost: ""
 webserverHost: ""
 storageClass: ceph-block
+forgeURL: ""
+mailServer: ""

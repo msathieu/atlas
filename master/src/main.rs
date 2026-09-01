@@ -168,15 +168,6 @@ async fn create_settings(db: &mut AsyncPgConnection) -> Result<(), Box<dyn Error
             .execute(db)
             .await?;
     }
-    if !does_setting_exist(db, "mail_server").await? {
-        diesel::insert_into(settings::table)
-            .values(Setting {
-                name: "mail_server".to_owned(),
-                value: "".to_string(),
-            })
-            .execute(db)
-            .await?;
-    }
     if !does_setting_exist(db, "mail_username").await? {
         diesel::insert_into(settings::table)
             .values(Setting {

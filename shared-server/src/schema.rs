@@ -6,6 +6,7 @@ diesel::table! {
         name -> Varchar,
         command -> Nullable<Uuid>,
         password -> Varchar,
+        forge_token -> Nullable<Varchar>,
     }
 }
 

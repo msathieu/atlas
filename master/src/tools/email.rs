@@ -13,6 +13,7 @@ use shared_server::{
     models::{Setting, User},
     schema::{settings, users},
 };
+use std::env;
 use uuid::Uuid;
 
 pub struct EmailTool {
@@ -47,11 +48,7 @@ impl PortableTool for EmailTool {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         let pool = DB_POOL.get().ok_or(ToolExecutionError::other("Database connection failed"))?;
         let mut db = pool.get().await.map_err(|_| ToolExecutionError::other("Database connection failed"))?;
-        let mail_server: Setting = settings::table
-            .find("mail_server")
-            .get_result(&mut db)
-            .await
-            .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
+        let mail_server = env::var("MAIL_SERVER").map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
         let mail_username: Setting = settings::table
             .find("mail_username")
             .get_result(&mut db)
@@ -69,7 +66,7 @@ impl PortableTool for EmailTool {
             .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
         let user: User = users::table.find(self.user).get_result(&mut db).await.map_err(|_| ToolExecutionError::other("Couldn't get user"))?;
         let mail_to = user.email.ok_or(ToolExecutionError::other("User has no email address"))?;
-        if mail_server.value.is_empty() || mail_username.value.is_empty() || mail_password.value.is_empty() || mail_from.value.is_empty() || mail_to.is_empty() {
+        if mail_server.is_empty() || mail_username.value.is_empty() || mail_password.value.is_empty() || mail_from.value.is_empty() || mail_to.is_empty() {
             return Err(ToolExecutionError::other("Mail server isn't configured"));
         }
         let message = Message::builder()
@@ -86,7 +83,7 @@ impl PortableTool for EmailTool {
             .subject(args.subject)
             .body(args.body)
             .map_err(|_| ToolExecutionError::other("Invalid email"))?;
-        let transport: AsyncSmtpTransport<Tokio1Executor> = AsyncSmtpTransport::<Tokio1Executor>::relay(&mail_server.value)
+        let transport: AsyncSmtpTransport<Tokio1Executor> = AsyncSmtpTransport::<Tokio1Executor>::relay(&mail_server)
             .map_err(|_| ToolExecutionError::other("Invalid mail server"))?
             .credentials(Credentials::new(mail_username.value, mail_password.value))
             .build();

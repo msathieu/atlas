@@ -34,6 +34,10 @@ spec:
               value: {{ .Values.imageIDE }}
             - name: IMAGE_AGENT
               value: {{ .Values.imageAgent }}
+            - name: FORGE_URL
+              value: {{ .Values.forgeURL }}
+            - name: MAIL_SERVER
+              value: {{ .Values.mailServer }}
             - name: VALKEY_HOST
               value: atlas-valkey
             - name: DATABASE_HOST

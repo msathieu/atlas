@@ -201,4 +201,5 @@ pub struct Agent {
     pub name: String,
     pub command: Option<Uuid>,
     pub password: String,
+    pub forge_token: Option<String>,
 }
