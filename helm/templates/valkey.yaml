@@ -15,7 +15,7 @@ spec:
       hostUsers: false
       containers:
         - name: atlas-valkey
-          image: docker.io/valkey/valkey:9.1.1
+          image: docker.io/valkey/valkey:9.1.2
           command: ['/bin/sh', '-c', 'valkey-server --requirepass "$VALKEY_PASSWORD"']
           env:
             - name: VALKEY_PASSWORD

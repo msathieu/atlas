@@ -15,7 +15,7 @@ WORKDIR /build
 RUN cargo build --release -p apiserver -p proxy -p master -p webserver
 WORKDIR /build/frontend
 RUN ~/.deno/bin/deno install
-RUN ~/.deno/bin/deno task build
+RUN PUBLIC_API_HOST= PUBLIC_API_ENCRYPTION_PUBKEY= PUBLIC_API_SIGNING_PUBKEY= ~/.deno/bin/deno task build
 FROM fedora:44
 RUN dnf up -y
 RUN dnf install -y libpq tini

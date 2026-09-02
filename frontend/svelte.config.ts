@@ -1,4 +1,5 @@
 import adapter from "@sveltejs/adapter-static";
+import adapterNode from "@sveltejs/adapter-node";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import "dotenv/config";
 import process from "node:process";
@@ -6,7 +7,7 @@ import process from "node:process";
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapter({
+    adapter: process.env["DESKTOP"] ? adapterNode() : adapter({
       fallback: "404.html",
     }),
     csp: {

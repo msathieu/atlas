@@ -1,11 +1,11 @@
 import { formatRelative } from "date-fns";
-import { env } from "$env/dynamic/public";
+import { PUBLIC_API_ENCRYPTION_PUBKEY, PUBLIC_API_HOST, PUBLIC_API_SIGNING_PUBKEY } from "$env/static/public";
 import { verifyResponseSignature } from "./auth.ts";
 import Dexie from "dexie";
 
-export const API_HOST = env.PUBLIC_API_HOST ? `https://${env.PUBLIC_API_HOST}` : "";
-export const API_ENCRYPTION_PUBKEY = env.PUBLIC_API_ENCRYPTION_PUBKEY;
-export const API_SIGNING_PUBKEY = env.PUBLIC_API_SIGNING_PUBKEY;
+export const API_HOST = PUBLIC_API_HOST ? `https://${PUBLIC_API_HOST}` : "";
+export const API_ENCRYPTION_PUBKEY = PUBLIC_API_ENCRYPTION_PUBKEY;
+export const API_SIGNING_PUBKEY = PUBLIC_API_SIGNING_PUBKEY;
 
 let encryptionPubkey = API_ENCRYPTION_PUBKEY;
 let signingPubkey = API_SIGNING_PUBKEY;

@@ -26,7 +26,7 @@ jobs:
       - name: Install frontend dependencies
         run: cd frontend && nix develop -c deno install
       - name: Build frontend
-        run: cd frontend && nix develop -c deno task build
+        run: cd frontend && PUBLIC_API_HOST= PUBLIC_API_ENCRYPTION_PUBKEY= PUBLIC_API_SIGNING_PUBKEY= nix develop -c deno task build
       - name: Run svelte-check
         run: cd frontend && nix develop -c deno task check
       - name: Run deno lint
