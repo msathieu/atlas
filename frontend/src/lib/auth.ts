@@ -65,3 +65,10 @@ export async function authenticatedFetch(
   await verifyResponseSignature(response, requestSignature);
   return response;
 }
+export async function refreshJWT() {
+  const response = await authenticatedFetch(`/api/refresh_jwt`, { method: "POST" });
+  const data = await response.json();
+  if (localStorage.getItem("jwt")) {
+    localStorage.setItem("jwt", data["jwt"]);
+  }
+}

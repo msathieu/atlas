@@ -6,6 +6,7 @@ import { invalidateAll } from "$app/navigation";
 import { Toaster } from "svelte-sonner";
 import { connectWS, mounted, user, wsState } from "$lib/state.svelte.ts";
 import { getDatabase } from "$lib/util.ts";
+import { refreshJWT } from "$lib/auth.ts";
 import { onMount } from "svelte";
 import { App } from "@capacitor/app";
 let { children, data } = $props();
@@ -23,6 +24,11 @@ setInterval(async () => {
 setInterval(async () => {
   await connectWS();
 }, 5000);
+setInterval(async () => {
+  if (localStorage.getItem("jwt")) {
+    await refreshJWT();
+  }
+}, 600000);
 
 onMount(() => {
   App.addListener("backButton", ({ canGoBack }) => {

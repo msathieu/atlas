@@ -6,7 +6,7 @@
     "npm:@capacitor/cli@^8.5.1": "8.5.1",
     "npm:@capacitor/core@^8.5.1": "8.5.1",
     "npm:@capawesome/capacitor-passkeys@~0.1.1": "0.1.1_@capacitor+core@8.5.1",
-    "npm:@lucide/svelte@^1.38.0": "1.38.0_svelte@5.57.0",
+    "npm:@lucide/svelte@^1.39.0": "1.39.0_svelte@5.57.0",
     "npm:@sveltejs/adapter-node@^5.5.7": "5.5.7_@sveltejs+kit@2.70.3__@sveltejs+vite-plugin-svelte@7.3.0___svelte@5.57.0___vite@8.2.2____@types+node@26.4.0__svelte@5.57.0__typescript@6.0.3__vite@8.2.2___@types+node@26.4.0",
     "npm:@sveltejs/adapter-static@^3.0.10": "3.0.10_@sveltejs+kit@2.70.3__@sveltejs+vite-plugin-svelte@7.3.0___svelte@5.57.0___vite@8.2.2____@types+node@26.4.0__svelte@5.57.0__typescript@6.0.3__vite@8.2.2___@types+node@26.4.0_svelte@5.57.0",
     "npm:@sveltejs/kit@^2.70.3": "2.70.3_@sveltejs+vite-plugin-svelte@7.3.0__svelte@5.57.0__vite@8.2.2___@types+node@26.4.0_svelte@5.57.0_typescript@6.0.3_vite@8.2.2__@types+node@26.4.0",
@@ -187,8 +187,8 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "@lucide/svelte@1.38.0_svelte@5.57.0": {
-      "integrity": "sha512-x7pHfNAqArsjCbxgMxWoGEM25AXY1vl7P9ooGvY/DxbzNGK6vrfsFFoSw4yyv1ajfHY2jGBgi7lbSExya15ABA==",
+    "@lucide/svelte@1.39.0_svelte@5.57.0": {
+      "integrity": "sha512-jCgA/RqDv9uWHs4DiIUef4kpf5TfLl9y8OMGrh+W4aQTCOscT4X2BX14ta65J+5ooslrN1bXXiO9AaeAOHAcPA==",
       "dependencies": [
         "svelte"
       ]
@@ -1664,7 +1664,7 @@
         "npm:@capacitor/cli@^8.5.1",
         "npm:@capacitor/core@^8.5.1",
         "npm:@capawesome/capacitor-passkeys@~0.1.1",
-        "npm:@lucide/svelte@^1.38.0",
+        "npm:@lucide/svelte@^1.39.0",
         "npm:@sveltejs/adapter-node@^5.5.7",
         "npm:@sveltejs/adapter-static@^3.0.10",
         "npm:@sveltejs/kit@^2.70.3",
