@@ -36,7 +36,7 @@ pub struct GetAgentScriptResponse {
 }
 
 pub async fn get_agent_script(headers: HeaderMap, uri: OriginalUri, request: Query<GetAgentScriptRequest>, body: Bytes) -> Result<(HeaderMap, Json<GetAgentScriptResponse>), StatusCode> {
-    let user = authenticate(&headers).await?.0;
+    let (user, _pubkey, iat) = authenticate(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
     let mut db = get_db().await?;
     let agent = match personalize_binary(&mut db, &request.arch, &request.os).await {
@@ -49,7 +49,7 @@ pub async fn get_agent_script(headers: HeaderMap, uri: OriginalUri, request: Que
         }
     };
     let hash = Sha512::digest(&agent).to_vec();
-    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None)?;
+    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None, Some(iat))?;
     let web_host = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let script = format!(
         r#"curl -fO "https://{}/api/atlas-agent?auth={}&arch={}&os={}" &&\
@@ -80,9 +80,9 @@ pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, Statu
     Ok(binary)
 }
 pub async fn download_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<DownloadAuthResponse>), StatusCode> {
-    let user = authenticate(&headers).await?.0;
+    let (user, _pubkey, iat) = authenticate(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None)?;
+    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None, Some(iat))?;
     let response = DownloadAuthResponse { jwt };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }

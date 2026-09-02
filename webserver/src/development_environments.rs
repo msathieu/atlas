@@ -233,7 +233,7 @@ pub async fn open_development_environment(
     request: Query<OpenDevelopmentEnvironmentRequest>,
     body: Bytes,
 ) -> Result<(HeaderMap, Json<OpenDevelopmentEnvironmentResponse>), StatusCode> {
-    let user = authenticate(&headers).await?.0;
+    let (user, _pubkey, iat) = authenticate(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db().await?;
     let container: Container = containers::table
@@ -261,8 +261,8 @@ pub async fn open_development_environment(
     }
     let webserver = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let jwt = match request.port {
-        None => generate_jwt(&format!("proxy-dev-{}", id), &user, 12 * 60 * 60, None)?,
-        Some(_) => generate_jwt(&format!("proxy-devproxy-{}", id), &user, 12 * 60 * 60, None)?,
+        None => generate_jwt(&format!("proxy-dev-{}", id), &user, 12 * 60 * 60, None, Some(iat))?,
+        Some(_) => generate_jwt(&format!("proxy-devproxy-{}", id), &user, 12 * 60 * 60, None, Some(iat))?,
     };
     let url = match request.port {
         None => format!("https://{}.dev.{}/atlas_setup?jwt={}", id, webserver, jwt),

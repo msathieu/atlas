@@ -1,11 +1,11 @@
 use crate::{
     JWT_KEY, get_db,
-    util::{decrypt_body, sign_response, validate_timestamp},
+    util::{decrypt_body, sign_response, validate_signature, validate_timestamp},
 };
-use aws_lc_rs::signature::ParsedPublicKey;
 use axum::{
     Json,
     body::Bytes,
+    extract::OriginalUri,
     http::{HeaderMap, StatusCode},
 };
 use axum_extra::headers::{Authorization, HeaderMapExt, authorization::Bearer};
@@ -16,7 +16,7 @@ use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 use shared_server::{Claims, authenticate_jwt, models::User, parse_pubkey, schema::users, verify_password};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
@@ -35,17 +35,19 @@ pub const JWT_EXPIRY: usize = 8 * 60 * 60;
 #[cfg(not(debug_assertions))]
 pub const JWT_EXPIRY: usize = 2 * 60 * 60;
 
-pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>) -> Result<String, StatusCode> {
+pub fn generate_jwt(aud: &str, user: &User, exp: usize, pubkey: Option<String>, iat: Option<usize>) -> Result<String, StatusCode> {
     if let Some(pubkey) = &pubkey {
         parse_pubkey(pubkey.clone()).or(Err(StatusCode::BAD_REQUEST))?;
     }
     let header = Header::new(Algorithm::HS512);
     let now = SystemTime::now().duration_since(UNIX_EPOCH).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.as_secs() as usize;
+    let iat = iat.unwrap_or(now);
     let claims = Claims {
         aud: aud.to_string(),
         sub: user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?,
         nbf: now,
         exp: now + exp,
+        iat,
         counter: user.jwt_counter as usize,
         pubkey,
     };
@@ -63,7 +65,7 @@ pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), Stat
         .await
         .or(Err(StatusCode::UNAUTHORIZED))?;
     verify_password(user.password.clone(), request.password).await.or(Err(StatusCode::UNAUTHORIZED))?;
-    let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
+    let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey), None)?;
     diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .set(users::last_login.eq(Some(SystemTime::now())))
         .execute(&mut db)
@@ -72,11 +74,11 @@ pub async fn login(body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), Stat
     let response = LoginResponse { jwt };
     Ok((sign_response(format!("login-{}", BASE64_STANDARD.encode(Sha512::digest(body))), Some(&response))?, Json(response)))
 }
-pub async fn authenticate(headers: &HeaderMap) -> Result<(User, Option<ParsedPublicKey>), StatusCode> {
+pub async fn authenticate(headers: &HeaderMap) -> Result<(User, Option<String>, usize), StatusCode> {
     let bearer: Authorization<Bearer> = headers.typed_get().ok_or(StatusCode::UNAUTHORIZED)?;
     let mut db = get_db().await?;
-    let (user, pubkey) = authenticate_jwt(bearer.token(), "webserver", &mut db).await.or(Err(StatusCode::UNAUTHORIZED))?;
-    Ok((user, pubkey))
+    let (user, pubkey, iat) = authenticate_jwt(bearer.token(), "webserver", &mut db).await.or(Err(StatusCode::UNAUTHORIZED))?;
+    Ok((user, pubkey, iat))
 }
 pub async fn require_admin(headers: &HeaderMap) -> Result<(), StatusCode> {
     let user = authenticate(headers).await?.0;
@@ -84,4 +86,16 @@ pub async fn require_admin(headers: &HeaderMap) -> Result<(), StatusCode> {
         return Err(StatusCode::FORBIDDEN);
     }
     Ok(())
+}
+pub async fn refresh_jwt(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), StatusCode> {
+    let (user, pubkey, iat) = authenticate(&headers).await?;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
+    let now = SystemTime::now();
+    let parsed_iat = UNIX_EPOCH + Duration::from_secs(iat as u64);
+    if now < parsed_iat || now > parsed_iat + Duration::from_hours(48) {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, pubkey, Some(iat))?;
+    let response = LoginResponse { jwt };
+    Ok((sign_response(signature, Some(&response))?, Json(response)))
 }

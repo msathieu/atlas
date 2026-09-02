@@ -227,7 +227,7 @@ pub async fn finish_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Js
         .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey))?;
+    let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey), None)?;
     let response = FinishPasskeyAuthenticationResponse { jwt };
     Ok((
         sign_response(format!("passkey_finish-{}", BASE64_STANDARD.encode(Sha512::digest(body))), Some(&response))?,
@@ -266,6 +266,11 @@ pub async fn delete_passkey(headers: HeaderMap, Path(id): Path<String>, uri: Ori
         .execute(&mut db)
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
+    diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+        .set(users::jwt_counter.eq(user.jwt_counter + 1))
+        .execute(&mut db)
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server(&format!("WEB:REFRESH:{}", user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
         .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

@@ -11,7 +11,7 @@ use base64::{Engine, prelude::BASE64_STANDARD};
 use redis::{AsyncTypedCommands, ExistenceCheck, SetExpiry, SetOptions};
 use serde::Serialize;
 use sha2::{Digest, Sha512};
-use shared_server::get_valkey_client;
+use shared_server::{get_valkey_client, parse_pubkey};
 use std::{
     sync::OnceLock,
     time::{SystemTime, UNIX_EPOCH},
@@ -63,6 +63,7 @@ pub async fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, met
     let timestamp: u64 = timestamp.parse().or(Err(StatusCode::UNAUTHORIZED))?;
     let signature = BASE64_STANDARD.decode(signature).or(Err(StatusCode::UNAUTHORIZED))?;
     let pubkey = authenticate(headers).await?.1.ok_or(StatusCode::UNAUTHORIZED)?;
+    let pubkey = parse_pubkey(pubkey).or(Err(StatusCode::UNAUTHORIZED))?;
     let uri_hashed = BASE64_STANDARD.encode(Sha512::digest(uri.to_string()));
     let body_hashed = BASE64_STANDARD.encode(Sha512::digest(body));
     let hash = format!("{}-{}-{}-{}-{}", method, timestamp, nonce, uri_hashed, body_hashed);

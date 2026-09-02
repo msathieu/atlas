@@ -162,7 +162,7 @@ pub async fn set_agent_state(headers: HeaderMap, Path(id): Path<Uuid>, request: 
     sign_response::<String>(signature, None)
 }
 pub async fn open_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<OpenAgentResponse>), StatusCode> {
-    let user = authenticate(&headers).await?.0;
+    let (user, _pubkey, iat) = authenticate(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let mut db = get_db().await?;
     let container: Container = containers::table
@@ -189,7 +189,7 @@ pub async fn open_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalU
         ready = false;
     }
     let webserver = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let jwt = generate_jwt(&format!("proxy-agent-{}", id), &user, 12 * 60 * 60, None)?;
+    let jwt = generate_jwt(&format!("proxy-agent-{}", id), &user, 12 * 60 * 60, None, Some(iat))?;
     let url = format!("https://{}.agent.{}/atlas_setup?jwt={}", id, webserver, jwt);
     let response = OpenAgentResponse { url, ready };
     Ok((sign_response(signature, Some(&response))?, Json(response)))

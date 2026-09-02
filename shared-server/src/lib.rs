@@ -44,6 +44,7 @@ pub struct Claims {
     pub sub: Uuid,
     pub nbf: usize,
     pub exp: usize,
+    pub iat: usize,
     pub counter: usize,
     pub pubkey: Option<String>,
 }
@@ -169,7 +170,7 @@ pub fn parse_pubkey(pubkey: String) -> Result<ParsedPublicKey, Box<dyn Error>> {
     let key = UnparsedPublicKey::new(&ED25519, BASE64_STANDARD.decode(pubkey)?).parse()?;
     Ok(key)
 }
-pub async fn authenticate_jwt(jwt: &str, aud: &str, db: &mut AsyncPgConnection) -> Result<(User, Option<ParsedPublicKey>), Box<dyn Error>> {
+pub async fn authenticate_jwt(jwt: &str, aud: &str, db: &mut AsyncPgConnection) -> Result<(User, Option<String>, usize), Box<dyn Error>> {
     if JWT_KEY.get().is_none() {
         let jwt_secret: Setting = settings::table.find("jwt_secret").first(db).await?;
         let jwt_secret = BASE64_STANDARD.decode(jwt_secret.value)?;
@@ -179,17 +180,13 @@ pub async fn authenticate_jwt(jwt: &str, aud: &str, db: &mut AsyncPgConnection) 
     let mut validation = Validation::new(jsonwebtoken::Algorithm::HS512);
     validation.validate_nbf = true;
     validation.set_audience(&[aud]);
-    validation.set_required_spec_claims(&["aud", "sub", "nbf", "exp", "counter"]);
+    validation.set_required_spec_claims(&["aud", "sub", "nbf", "iat", "exp", "counter"]);
     let token = decode::<Claims>(jwt, &key, &validation)?;
     let user: User = users::table.find(token.claims.sub).first(db).await?;
     if !user.enabled || user.jwt_counter as usize != token.claims.counter {
         return Err("Wrong JWT counter or user isn't enabled".into());
     }
-    let mut pubkey = None;
-    if let Some(pubkey_claim) = token.claims.pubkey {
-        pubkey = Some(parse_pubkey(pubkey_claim)?);
-    }
-    Ok((user, pubkey))
+    Ok((user, token.claims.pubkey, token.claims.iat))
 }
 pub async fn get_user_setting(uid: Uuid, name: String, db: &mut AsyncPgConnection) -> Result<UserSetting, Box<dyn Error>> {
     let setting: UserSetting = user_settings::table
