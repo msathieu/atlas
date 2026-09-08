@@ -70,3 +70,5 @@ spec:
           port: 8000
       sessionPersistence:
         type: Cookie
+      timeouts:
+        request: 600s
