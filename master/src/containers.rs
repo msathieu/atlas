@@ -375,6 +375,7 @@ async fn process_container(mut container: Container, pool: Pool<AsyncPgConnectio
             containers: vec![k8s_container],
             image_pull_secrets: Some(vec![pull_secret]),
             host_users: Some(false),
+            restart_policy: Some("Never".to_string()),
             ..Default::default()
         });
         pod_api.create(&PostParams::default(), &pod).await?;
