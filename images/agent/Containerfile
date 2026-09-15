@@ -1,4 +1,4 @@
-FROM quay.io/fedora/fedora-toolbox:44
+FROM quay.io/fedora/fedora-toolbox:45
 RUN dnf up -y
 RUN dnf install -y chromium ffmpeg gcc-c++ nodejs nix nix-daemon python3.11 ripgrep
 RUN useradd agent

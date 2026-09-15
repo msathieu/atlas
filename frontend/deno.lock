@@ -6,7 +6,7 @@
     "npm:@capacitor/cli@^8.5.2": "8.5.2",
     "npm:@capacitor/core@^8.5.2": "8.5.2",
     "npm:@capawesome/capacitor-passkeys@~0.1.2": "0.1.2_@capacitor+core@8.5.2",
-    "npm:@lucide/svelte@^1.45.0": "1.45.0_svelte@5.57.0",
+    "npm:@lucide/svelte@^1.46.0": "1.46.0_svelte@5.57.0",
     "npm:@sveltejs/adapter-node@^5.5.7": "5.5.7_@sveltejs+kit@2.70.3_@types+node@26.5.1_vite@8.3.0",
     "npm:@sveltejs/adapter-static@^3.0.10": "3.0.10_@sveltejs+kit@2.70.3_@types+node@26.5.1_vite@8.3.0",
     "npm:@sveltejs/kit@^2.70.3": "2.70.3_@sveltejs+vite-plugin-svelte@7.3.0_svelte@5.57.0_typescript@6.0.3_vite@8.3.0_@types+node@26.5.1",
@@ -187,8 +187,8 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "@lucide/svelte@1.45.0_svelte@5.57.0": {
-      "integrity": "sha512-SBqLvcYGEDz82Lwz7meR4qM+SGeDKRU/RBo8BhAhARNUzIXTrykbFLabW9X1Fokp01Yw2kOFx/AsLUUIxj0NLA==",
+    "@lucide/svelte@1.46.0_svelte@5.57.0": {
+      "integrity": "sha512-Ru8jDjoCVLJ7J7pPRUdY+odSBV2BI6rj68JTmT+ENq/ZwYOPGPAiKVvKz+XLyAoK4HAwlRTzZHpsMvrHfsetqg==",
       "dependencies": [
         "svelte"
       ]
@@ -1667,7 +1667,7 @@
         "npm:@capacitor/cli@^8.5.2",
         "npm:@capacitor/core@^8.5.2",
         "npm:@capawesome/capacitor-passkeys@~0.1.2",
-        "npm:@lucide/svelte@^1.45.0",
+        "npm:@lucide/svelte@^1.46.0",
         "npm:@sveltejs/adapter-node@^5.5.7",
         "npm:@sveltejs/adapter-static@^3.0.10",
         "npm:@sveltejs/kit@^2.70.3",
