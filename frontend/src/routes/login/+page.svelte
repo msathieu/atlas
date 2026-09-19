@@ -27,7 +27,7 @@ async function login() {
   const bodyHash = await crypto.subtle.digest("SHA-512", encryptedBody);
   await verifyResponseSignature(response, `login-${bufferToBase64(bodyHash)}`);
   const json = await response.json();
-  finishAuth(username, json["jwt"], keyPair);
+  await finishAuth(username, json["jwt"], keyPair);
 }
 async function passkeyLogin() {
   const startBody = JSON.stringify({ username });
@@ -56,13 +56,13 @@ async function passkeyLogin() {
   const finishHash = await crypto.subtle.digest("SHA-512", encryptedBody);
   await verifyResponseSignature(finishRes, `passkey_finish-${bufferToBase64(finishHash)}`);
   const json = await finishRes.json();
-  finishAuth(username, json["jwt"], keyPair);
+  await finishAuth(username, json["jwt"], keyPair);
 }
 async function finishAuth(username: string, jwt: string, keyPair: CryptoKeyPair) {
-  localStorage.setItem("username", username);
-  localStorage.setItem("jwt", jwt);
   const db = getDatabase();
   await db.table("keys").put({ name: "jwt_signing", key: keyPair.privateKey });
+  localStorage.setItem("username", username);
+  localStorage.setItem("jwt", jwt);
   if (!redirect) {
     await goto("/");
     return;
