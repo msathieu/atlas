@@ -115,7 +115,7 @@ async fn main() {
         let result = open_connection(&_host, tls_connector.clone(), &mut db).await;
         if let Err(e) = result {
             eprintln!("Error in connection: {}", e);
-            sleep(Duration::from_secs(10)).await;
+            sleep(Duration::from_secs(5)).await;
         } else {
             sleep(Duration::from_secs(2)).await;
         }

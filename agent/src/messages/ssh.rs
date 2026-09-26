@@ -104,7 +104,7 @@ async fn ssh_agent_task(key: PublicKey, host: String, tls_connector: TlsConnecto
         if let Err(e) = ssh_agent(key.clone(), &host, &tls_connector, &mut db).await {
             eprintln!("Error in connection: {}", e);
         }
-        sleep(Duration::from_secs(10)).await;
+        sleep(Duration::from_secs(5)).await;
     }
 }
 pub async fn handle_ssh_agent(msg: StartSshAgentRequest, stream: &mut TlsStream<TcpStream>, host: String, tls_connector: TlsConnector) -> Result<(), Box<dyn Error>> {
