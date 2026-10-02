@@ -86,7 +86,7 @@ impl ExecuteCodeTool {
         drop(db);
         notify_server(&format!("API:DEVICE:{}", args.device)).await?;
         notify_server(&format!("WEB:REFRESH:{}", self.user)).await?;
-        wait_for_pubsub_msg(&mut receiver).await;
+        wait_for_pubsub_msg(&mut receiver).await?;
         let mut db = pool.get().await?;
         let cmd: Command = commands::table.find(cmd_id).get_result(&mut db).await?;
         diesel::delete(commands::table.find(cmd_id)).execute(&mut db).await?;

@@ -33,7 +33,7 @@ pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStr
     valkey_client.subscribe(format!("API:SSH_FORWARD:{}", signing_id)).await?;
     notify_server_with_msg(&format!("WEB:REFRESH:{}", uid), &format!("SSH_FORWARD:{}", signing_id)).await?;
     let valkey_response = match timeout(Duration::from_secs(60), async { wait_for_pubsub_msg(&mut receiver).await }).await {
-        Ok(data) => data,
+        Ok(data) => data?,
         Err(_) => return Err("Timeout waiting for user approval".into()),
     };
     let mut response = ForwardSshAgentResponse { signature: vec![], accepted: false };

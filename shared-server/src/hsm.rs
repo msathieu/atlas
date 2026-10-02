@@ -27,7 +27,7 @@ pub async fn request_hsm_signature(key: HSMKey, data: &[u8]) -> Result<Vec<u8>, 
     valkey_client.set_ex(valkey_key, data, 15).await.or(Err("Failed to set valkey key"))?;
     valkey_client.subscribe(format!("HSM_SIGNATURE:{}", signing_id)).await?;
     notify_server_with_msg("MASTER:HSM:SIGN", &signing_id.to_string()).await?;
-    let response = timeout(Duration::from_secs(15), async { wait_for_pubsub_msg(&mut receiver).await }).await?;
+    let response = timeout(Duration::from_secs(15), async { wait_for_pubsub_msg(&mut receiver).await }).await??;
     let response = BASE64_STANDARD.decode(response)?;
     Ok(response)
 }

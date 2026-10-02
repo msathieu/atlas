@@ -51,7 +51,7 @@ async fn stream_handler(mut socket: WebSocket, user: User) -> Result<(), Box<dyn
     let key = format!("WEB:REFRESH:{}", user.id.ok_or("Invalid user")?);
     valkey_client.subscribe(key).await?;
     loop {
-        if let Ok(data) = timeout(Duration::from_secs(30), async { wait_for_pubsub_msg(&mut receiver).await }).await {
+        if let Ok(data) = timeout(Duration::from_secs(30), async { wait_for_pubsub_msg(&mut receiver).await.unwrap_or("".into()) }).await {
             if data.starts_with("SSH_FORWARD:") {
                 socket.send(data.into()).await?;
             } else {

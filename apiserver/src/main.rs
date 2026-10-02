@@ -283,7 +283,7 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
                 notify_server(&format!("MASTER:CMD:{}", command.id.ok_or("Invalid command")?)).await?;
             }
         } else if timeout(Duration::from_secs(60), async {
-            wait_for_pubsub_msg(&mut receiver).await;
+            wait_for_pubsub_msg(&mut receiver).await.ok();
         })
         .await
         .is_err()

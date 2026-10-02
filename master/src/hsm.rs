@@ -15,7 +15,7 @@ pub async fn process_hsm_requests(pool: Pool<AsyncPgConnection>) -> Result<(), B
     let (mut valkey_client, mut receiver) = get_valkey_client().await?;
     valkey_client.subscribe("MASTER:HSM:SIGN").await?;
     loop {
-        let uuid = wait_for_pubsub_msg(&mut receiver).await;
+        let uuid = wait_for_pubsub_msg(&mut receiver).await?;
         let data: String = valkey_client.get_del(format!("HSM_SIGNING_REQUEST:{}", uuid)).await?.ok_or("Missing signing request")?;
         let data: HSMSigningValkey = serde_json::from_str(&data)?;
         let signature = match data.key {

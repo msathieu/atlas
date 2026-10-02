@@ -114,28 +114,31 @@ pub async fn notify_server_with_msg(channel: &str, msg: &str) -> Result<(), Box<
     PUBSUB_POOL.get().ok_or("Failed to get pubsub client")?.clone().publish::<&str, &str>(channel, msg).await?;
     Ok(())
 }
-pub async fn wait_for_pubsub_msg(receiver: &mut UnboundedReceiver<PushInfo>) -> String {
+pub async fn wait_for_pubsub_msg(receiver: &mut UnboundedReceiver<PushInfo>) -> Result<String, Box<dyn Error>> {
     loop {
         let received = receiver.recv().await;
         if received.is_none() {
-            return "".into();
+            return Err("Connection closed".into());
         }
-        if let Some(push_info) = received
-            && push_info.kind == PushKind::Message
-        {
-            if let Some(msg) = Msg::from_push_info(push_info)
-                && let Ok(payload) = msg.get_payload::<String>()
-            {
-                return payload;
+        if let Some(push_info) = received {
+            if push_info.kind == PushKind::Disconnection {
+                return Err("Connection closed".into());
             }
-            return "".into();
+            if push_info.kind == PushKind::Message {
+                if let Some(msg) = Msg::from_push_info(push_info)
+                    && let Ok(payload) = msg.get_payload::<String>()
+                {
+                    return Ok(payload);
+                }
+                return Ok("".into());
+            }
         }
     }
 }
 async fn listen_for_restarts_task(component: String) -> Result<(), RedisError> {
     let (mut manager, mut receiver) = get_valkey_client().await?;
     manager.subscribe(format!("{}:RESTART", component)).await?;
-    wait_for_pubsub_msg(&mut receiver).await;
+    wait_for_pubsub_msg(&mut receiver).await.ok();
     Ok(())
 }
 pub async fn listen_for_restarts(component: String) {
