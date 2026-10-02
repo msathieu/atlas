@@ -35,6 +35,7 @@ use tokio_postgres_rustls::MakeRustlsConnect;
 use uuid::Uuid;
 
 pub mod binary;
+pub mod hsm;
 pub mod models;
 pub mod schema;
 

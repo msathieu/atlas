@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+use crate::ssh::handle_ssh_agent;
 use ::aws_lc_rs::{
     constant_time::verify_slices_are_equal,
     signature::{ED25519, UnparsedPublicKey},
@@ -45,8 +46,6 @@ use tokio_rustls::{
     rustls::{self, crypto::aws_lc_rs::kx_group::X25519MLKEM768},
 };
 use uuid::Uuid;
-
-use crate::ssh::handle_ssh_agent;
 
 mod ssh;
 

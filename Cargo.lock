@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "agent"
-version = "2026.9.14"
+version = "2026.10.2"
 dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
@@ -182,7 +182,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "apiserver"
-version = "2026.9.14"
+version = "2026.10.2"
 dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
@@ -2557,9 +2557,9 @@ dependencies = [
 
 [[package]]
 name = "lazy_static"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
+checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 dependencies = [
  "spin",
 ]
@@ -2686,9 +2686,9 @@ dependencies = [
 
 [[package]]
 name = "luajit-src"
-version = "210.7.3+1ee778a"
+version = "210.7.4+c6ffc14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "869665372263eb337b14f480cfb864b89f12eade4eb42cb415f71517b4a67572"
+checksum = "1db548b001f0b7da416daf0ffae963912bae6cad1799fa9f4eaba09da6dba837"
 dependencies = [
  "cc",
  "which",
@@ -2696,7 +2696,7 @@ dependencies = [
 
 [[package]]
 name = "master"
-version = "2026.9.14"
+version = "2026.10.2"
 dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
@@ -3817,7 +3817,7 @@ dependencies = [
 
 [[package]]
 name = "proxy"
-version = "2026.9.14"
+version = "2026.10.2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3857,9 +3857,9 @@ dependencies = [
 
 [[package]]
 name = "quinn-proto"
-version = "0.11.18"
+version = "0.11.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9746dbde176634f4f2f1faf2404e30a31b2bc1e9cafb5329c95d8177a18c9fc"
+checksum = "0e750cca55fe4f0439a15d0bb529da9651e79993e8e72c61a899a36d462befbe"
 dependencies = [
  "aws-lc-rs",
  "bytes",
@@ -3880,9 +3880,9 @@ dependencies = [
 
 [[package]]
 name = "quinn-udp"
-version = "0.5.15"
+version = "0.5.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35a133f956daabe89a61a685c2649f13d82d5aa4bd5d12d1277e1072a21c0694"
+checksum = "af66907df18639dcf4db56ca65490cabc4b27a97dbadd96f2926cca73298f016"
 dependencies = [
  "cfg_aliases",
  "libc",
@@ -4780,7 +4780,7 @@ dependencies = [
 
 [[package]]
 name = "shared-api"
-version = "2026.9.14"
+version = "2026.10.2"
 dependencies = [
  "num_enum",
  "prost",
@@ -4792,7 +4792,7 @@ dependencies = [
 
 [[package]]
 name = "shared-server"
-version = "2026.9.14"
+version = "2026.10.2"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -4806,6 +4806,7 @@ dependencies = [
  "redis",
  "rustls",
  "serde",
+ "serde_json",
  "tokio",
  "tokio-postgres",
  "tokio-postgres-rustls",
@@ -5398,9 +5399,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-rustls"
-version = "0.26.5"
+version = "0.26.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0c85f2c3ef0b1cd58b36682f4b17aaa995f0e5db534d85692b4903abce21f67"
+checksum = "c9cc2678c2cdd569ef8215e2afd7954ada2ae20b4fdd2c5fe6139a3b02d105db"
 dependencies = [
  "rustls",
  "tokio",
@@ -6037,7 +6038,7 @@ dependencies = [
 
 [[package]]
 name = "webserver"
-version = "2026.9.14"
+version = "2026.10.2"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -6300,9 +6301,9 @@ dependencies = [
 
 [[package]]
 name = "xxhash-rust"
-version = "0.8.18"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aee1b19627c7c60102ab80d3a9cbe18de90bfe03bfa6c3715447681f0e8c8af6"
+checksum = "550a2b930b62486a393c52d5c3b84bff264b28aa437ed64694d31e93b1757af7"
 
 [[package]]
 name = "yasna"
@@ -6327,9 +6328,9 @@ dependencies = [
 
 [[package]]
 name = "yoke-derive"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33811428bee40dbceb6d545e95754741d17a6aef9a4849f0fd62e2ba4f412a78"
+checksum = "ec8ebde2db3681e8c9980cc27822030e68752690ddfa9473e739aeb4dbde6d71"
 dependencies = [
  "proc-macro2",
  "quote",

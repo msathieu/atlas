@@ -17,7 +17,7 @@ use shared_api::{ContainerOrigin, ContainerState};
 use shared_server::{
     get_valkey_client,
     models::{Command, Container, DevelopmentEnvironment},
-    notify_server,
+    notify_server, notify_server_with_msg,
     schema::{commands, containers, development_environments},
 };
 use ssh_key::{Algorithm::Ed25519, LineEnding, PrivateKey};
@@ -326,8 +326,6 @@ pub async fn approve_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid
         .await
         .or(Err(StatusCode::NOT_FOUND))?;
     let data = if request.approved { "APPROVED" } else { "DENIED" };
-    let valkey_key = format!("SSH_FORWARD_APPROVAL:{}", id);
-    valkey_client.set_ex(valkey_key, data, 15).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    notify_server(&format!("API:SSH_FORWARD:{}", id)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server_with_msg(&format!("API:SSH_FORWARD:{}", id), data).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }

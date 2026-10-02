@@ -13,6 +13,7 @@ def run_command(cmd: str | list[str], user: str | None = None, shell: bool = Tru
 os.makedirs("/state/project", exist_ok=True)
 os.makedirs("/state/ide", exist_ok=True)
 os.makedirs("/state/misc", exist_ok=True)
+os.makedirs("/nix/store", exist_ok=True)
 run_command("chown -Rh ide:ide /state/project /state/ide /state/misc")
 with open("/state/ide-settings.json", "w") as file:
     _ = file.write(os.getenv("DEVELOPMENT_ENVIRONMENT_SETTINGS", "{}"))

@@ -10,7 +10,10 @@ def run_command(cmd: str | list[str], user: str | None = None, shell: bool = Tru
 
 
 os.makedirs("/state/data", exist_ok=True)
+os.makedirs("/nix/store", exist_ok=True)
 run_command("chown -Rh agent:agent /state/data")
+_ = subprocess.run("killall hermes nix-daemon 2> /dev/null", check=False, shell=True)
+run_command("nix-daemon > /var/log/nix.log 2>&1 &")
 run_command("HERMES_HOME=/state/data /home/agent/.local/bin/hermes config set platforms.webhook.enabled true", "agent")
 run_command('su agent -c "HERMES_HOME=/state/data AGENT_BROWSER_ARGS=--no-sandbox /home/agent/.local/bin/hermes gateway run" > /var/log/hermes.log 2>&1 &')
 run_command(
