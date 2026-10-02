@@ -1,3 +1,8 @@
+import adapter from "@sveltejs/adapter-static";
+import adapterNode from "@sveltejs/adapter-node";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
+import "dotenv/config";
+import process from "node:process";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
@@ -16,7 +21,25 @@ export default defineConfig({
       })],
     },
   },
-  plugins: [tailwindcss(), sveltekit()],
+  plugins: [
+    tailwindcss(),
+    sveltekit({
+      preprocess: vitePreprocess(),
+      adapter: process.env["DESKTOP"] ? adapterNode() : adapter({ fallback: "404.html" }),
+      csp: {
+        directives: {
+          "default-src": ["self"],
+          "connect-src": [
+            "self",
+            process.env.PUBLIC_API_HOST ? `https://${process.env.PUBLIC_API_HOST}` : "",
+            process.env.PUBLIC_API_HOST ? `wss://${process.env.PUBLIC_API_HOST}` : "",
+          ],
+          "img-src": ["self", "data:"],
+          "style-src": ["self", "unsafe-inline"],
+        },
+      },
+    }),
+  ],
   server: {
     allowedHosts: true,
     proxy: {

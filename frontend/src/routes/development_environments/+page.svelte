@@ -1,8 +1,8 @@
 <script lang="ts">
-import { authenticatedFetch } from "$lib/auth";
-import { user } from "$lib/state.svelte";
-import { formatTime } from "$lib/util.ts";
-import { updateContainer } from "$lib/container.ts";
+import { authenticatedFetch } from "#lib/auth.js";
+import { user } from "#lib/state.svelte.js";
+import { formatTime } from "#lib/util.ts";
+import { updateContainer } from "#lib/container.ts";
 import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, SquarePen, Trash } from "@lucide/svelte";
 
 let { data } = $props();

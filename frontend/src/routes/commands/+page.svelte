@@ -1,7 +1,7 @@
 <script lang="ts">
-import { authenticatedFetch } from "$lib/auth";
-import { user } from "$lib/state.svelte.ts";
-import { formatTime, getHostnameForDevice } from "$lib/util.ts";
+import { authenticatedFetch } from "#lib/auth.js";
+import { user } from "#lib/state.svelte.ts";
+import { formatTime, getHostnameForDevice } from "#lib/util.ts";
 import { Check, Loader, Plus, Trash, X } from "@lucide/svelte";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js";

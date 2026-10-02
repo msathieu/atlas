@@ -1,4 +1,4 @@
-import { authenticatedFetch } from "$lib/auth.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
 import type { PageLoad } from "./$types.ts";
 import { parse, stringify } from "uuid";
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 import { Check, Plus, Trash, X } from "@lucide/svelte";
-import { authenticatedFetch } from "$lib/auth.ts";
-import { encryptToServer, formatTime } from "$lib/util.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
+import { encryptToServer, formatTime } from "#lib/util.ts";
 
 let { data } = $props();
 let selectedUser: any = $state();

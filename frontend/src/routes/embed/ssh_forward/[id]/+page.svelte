@@ -1,5 +1,5 @@
 <script lang="ts">
-import { authenticatedFetch } from "$lib/auth.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
 let { data } = $props();
 
 setTimeout(() => {

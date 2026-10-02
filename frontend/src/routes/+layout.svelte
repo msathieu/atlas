@@ -2,11 +2,11 @@
 import "../app.css";
 import { Bot, Code, LogOut, MessageSquare, Package, Server, Settings, User, Users } from "@lucide/svelte";
 import { page } from "$app/state";
-import { invalidateAll } from "$app/navigation";
+import { refreshAll } from "$app/navigation";
 import { Toaster } from "svelte-sonner";
-import { connectWS, mounted, user, wsState } from "$lib/state.svelte.ts";
-import { getDatabase } from "$lib/util.ts";
-import { refreshJWT } from "$lib/auth.ts";
+import { connectWS, mounted, user, wsState } from "#lib/state.svelte.ts";
+import { getDatabase } from "#lib/util.ts";
+import { refreshJWT } from "#lib/auth.ts";
 import { onMount } from "svelte";
 import { App } from "@capacitor/app";
 let { children, data } = $props();
@@ -19,7 +19,7 @@ async function logout() {
 }
 
 setInterval(async () => {
-  await invalidateAll();
+  await refreshAll();
 }, 600000);
 setInterval(async () => {
   await connectWS();

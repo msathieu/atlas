@@ -1,9 +1,9 @@
 <script lang="ts">
 import { Check, ShieldCheck, ShieldQuestionMark, Trash, Unplug } from "@lucide/svelte";
-import { authenticatedFetch } from "$lib/auth.ts";
-import { formatTime } from "$lib/util.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
+import { formatTime } from "#lib/util.ts";
 import { toast } from "svelte-sonner";
-import { user } from "$lib/state.svelte.ts";
+import { user } from "#lib/state.svelte.ts";
 
 let { data } = $props();
 let selectedDevice: any = $state();

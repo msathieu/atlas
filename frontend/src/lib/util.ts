@@ -1,5 +1,5 @@
 import { formatRelative } from "date-fns";
-import { PUBLIC_API_ENCRYPTION_PUBKEY, PUBLIC_API_HOST, PUBLIC_API_SIGNING_PUBKEY } from "$env/static/public";
+import { PUBLIC_API_ENCRYPTION_PUBKEY, PUBLIC_API_HOST, PUBLIC_API_SIGNING_PUBKEY } from "$app/env/public";
 import { verifyResponseSignature } from "./auth.ts";
 import Dexie from "dexie";
 

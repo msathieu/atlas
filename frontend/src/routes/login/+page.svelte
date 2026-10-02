@@ -1,7 +1,7 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
-import { verifyResponseSignature } from "$lib/auth.ts";
-import { API_HOST, bufferToBase64, encryptToServer, getDatabase } from "$lib/util.ts";
+import { verifyResponseSignature } from "#lib/auth.ts";
+import { API_HOST, bufferToBase64, encryptToServer, getDatabase } from "#lib/util.ts";
 import { toast } from "svelte-sonner";
 import { Passkeys } from "@capawesome/capacitor-passkeys";
 import { page } from "$app/state";

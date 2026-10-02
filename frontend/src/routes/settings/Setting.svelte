@@ -1,6 +1,6 @@
 <script lang="ts">
 import { Check } from "@lucide/svelte";
-import { updateSetting } from "$lib/settings.ts";
+import { updateSetting } from "#lib/settings.ts";
 
 let { name, description, val, type, global } = $props();
 </script>

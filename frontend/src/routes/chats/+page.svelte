@@ -1,7 +1,7 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
-import { authenticatedFetch } from "$lib/auth";
-import { formatTime } from "$lib/util.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
+import { formatTime } from "#lib/util.ts";
 import { Bot, MessageCircle, Plus, Trash } from "@lucide/svelte";
 let { data } = $props();
 

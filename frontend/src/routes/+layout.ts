@@ -1,8 +1,8 @@
 import { redirect } from "@sveltejs/kit";
 import type { LayoutLoad } from "./$types.ts";
-import { connectWS, user } from "$lib/state.svelte.ts";
-import { API_ENCRYPTION_PUBKEY, API_SIGNING_PUBKEY, fetchInfo } from "$lib/util.ts";
-import { authenticatedFetch } from "$lib/auth.ts";
+import { connectWS, user } from "#lib/state.svelte.ts";
+import { API_ENCRYPTION_PUBKEY, API_SIGNING_PUBKEY, fetchInfo } from "#lib/util.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
 
 export const prerender = true;
 export const ssr = false;

@@ -1,9 +1,9 @@
 <script lang="ts">
-import { authenticatedFetch } from "$lib/auth.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
 import { BadgeCheck, BadgeX, Bot, CircleUser, SendHorizontal, Trash } from "@lucide/svelte";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { formatTime } from "$lib/util";
+import { formatTime } from "#lib/util.ts";
 let { data } = $props();
 let content = $state("");
 

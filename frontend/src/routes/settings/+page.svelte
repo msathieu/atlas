@@ -1,10 +1,10 @@
 <script lang="ts">
-import { authenticatedFetch } from "$lib/auth.ts";
-import { updateSetting } from "$lib/settings.ts";
-import { API_HOST } from "$lib/util.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
+import { updateSetting } from "#lib/settings.ts";
+import { API_HOST } from "#lib/util.ts";
 import { Check } from "@lucide/svelte";
 import Setting from "./Setting.svelte";
-import { user } from "$lib/state.svelte.ts";
+import { user } from "#lib/state.svelte.ts";
 
 let { data } = $props();
 let defaultProvider = $derived(data.defaultProvider);

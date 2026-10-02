@@ -1,7 +1,7 @@
 <script lang="ts">
-import { authenticatedFetch } from "$lib/auth";
-import { updateContainer } from "$lib/container.ts";
-import { formatTime } from "$lib/util.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
+import { updateContainer } from "#lib/container.ts";
+import { formatTime } from "#lib/util.ts";
 import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, SquarePen, Trash } from "@lucide/svelte";
 
 let { data } = $props();

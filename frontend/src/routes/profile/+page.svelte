@@ -1,6 +1,6 @@
 <script lang="ts">
-import { authenticatedFetch } from "$lib/auth.ts";
-import { encryptToServer, formatTime } from "$lib/util.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
+import { encryptToServer, formatTime } from "#lib/util.ts";
 import { Check, Trash } from "@lucide/svelte";
 import { toast } from "svelte-sonner";
 import { Passkeys } from "@capawesome/capacitor-passkeys";

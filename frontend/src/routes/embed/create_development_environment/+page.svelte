@@ -1,6 +1,6 @@
 <script lang="ts">
-import { authenticatedFetch } from "$lib/auth.ts";
-import { user } from "$lib/state.svelte.ts";
+import { authenticatedFetch } from "#lib/auth.ts";
+import { user } from "#lib/state.svelte.ts";
 let { data } = $props();
 
 let name = $state("");
