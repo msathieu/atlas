@@ -8,7 +8,9 @@ use tokio::time::timeout;
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize)]
-pub enum HSMKey {}
+pub enum HSMKey {
+    SSH(Uuid),
+}
 
 #[derive(Deserialize, Serialize)]
 pub struct HSMSigningValkey {

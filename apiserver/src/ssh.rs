@@ -10,6 +10,7 @@ use shared_api::handle_heartbeat;
 use shared_api::read_message;
 use shared_api::write_message;
 use shared_server::get_valkey_client;
+use shared_server::hsm::{HSMKey, request_hsm_signature};
 use shared_server::models::Container;
 use shared_server::models::DevelopmentEnvironment;
 use shared_server::notify_server_with_msg;
@@ -17,8 +18,6 @@ use shared_server::schema::containers;
 use shared_server::schema::development_environments;
 use shared_server::wait_for_pubsub_msg;
 use shared_server::{models::Device, schema::devices};
-use signature::Signer;
-use ssh_key::PrivateKey;
 use std::error::Error;
 use std::time::Duration;
 use tokio::net::TcpStream;
@@ -26,7 +25,7 @@ use tokio::time::timeout;
 use tokio_rustls::TlsStream;
 use uuid::Uuid;
 
-pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStream<TcpStream>, key: &PrivateKey, environment_uuid: Uuid, uid: Uuid) -> Result<(), Box<dyn Error>> {
+pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStream<TcpStream>, environment_uuid: Uuid, uid: Uuid) -> Result<(), Box<dyn Error>> {
     let (mut valkey_client, mut receiver) = get_valkey_client().await?;
     let signing_id = Uuid::new_v4();
     let valkey_key = format!("SSH_FORWARD:{}", signing_id);
@@ -39,9 +38,8 @@ pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStr
     };
     let mut response = ForwardSshAgentResponse { signature: vec![], accepted: false };
     if valkey_response == "APPROVED" {
-        let signature = key.try_sign(&msg.data)?;
+        response.signature = request_hsm_signature(HSMKey::SSH(environment_uuid), &msg.data).await?;
         response.accepted = true;
-        response.signature = signature.as_bytes().to_vec();
     }
     write_message(MessageType::ForwardSSHAgentResponse, response, stream).await?;
     Ok(())
@@ -51,7 +49,6 @@ pub async fn handle_ssh_agent(mut stream: TlsStream<TcpStream>, pool: Pool<Async
     let device: Device = devices::table.find(device_uuid).first(&mut db).await?;
     let development_environment: DevelopmentEnvironment = development_environments::table.find(device.container_id.ok_or("Device is not a container")?).first(&mut db).await?;
     let container: Container = containers::table.find(development_environment.id).first(&mut db).await?;
-    let private_key = PrivateKey::from_openssh(development_environment.ssh_key)?;
     drop(db);
     loop {
         let mut db = pool.get().await?;
@@ -63,7 +60,7 @@ pub async fn handle_ssh_agent(mut stream: TlsStream<TcpStream>, pool: Pool<Async
         let (message_type, buf) = read_message(&mut stream, None).await?;
         match message_type {
             MessageType::HeartbeatRequest => handle_heartbeat(HeartbeatRequest::decode(&*buf)?, &mut stream).await,
-            MessageType::ForwardSSHAgentRequest => handle_ssh_forward(ForwardSshAgentRequest::decode(&*buf)?, &mut stream, &private_key, development_environment.id, container.uid).await,
+            MessageType::ForwardSSHAgentRequest => handle_ssh_forward(ForwardSshAgentRequest::decode(&*buf)?, &mut stream, development_environment.id, container.uid).await,
             _ => return Err("Invalid message type".into()),
         }?
     }

@@ -17,6 +17,7 @@ spec:
       labels:
         app: atlas-master
     spec:
+      nodeName: {{ .Values.masterNode }}
       serviceAccountName: atlas-master
       hostUsers: false
       containers:
@@ -57,5 +58,8 @@ spec:
                 secretKeyRef:
                   name: atlas-db-ca
                   key: ca.crt
+          resources:
+            limits:
+              devic.es/tpm: 1
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}

@@ -29,6 +29,8 @@ serde_json = "1.0.145"
 sha2 = "0.11.0"
 shared-api = {path = "../shared-api"}
 shared-server = {path = "../shared-server"}
+signature = "2.2.0"
+ssh-key = {version = "0.6.7", features = ["ed25519"]}
 time = "0.3.44"
 tokio = {version = "1.47.1", features = ["macros", "rt-multi-thread", "time"]}
 unicode-rs = "0.1.0"

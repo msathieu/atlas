@@ -12,3 +12,4 @@ webserverHost: ""
 storageClass: ceph-block
 forgeURL: ""
 mailServer: ""
+masterNode: ""
