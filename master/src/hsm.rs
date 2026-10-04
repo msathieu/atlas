@@ -1,3 +1,4 @@
+use crate::tpm;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use diesel_async::{AsyncPgConnection, pooled_connection::deadpool::Pool};
@@ -9,6 +10,7 @@ use signature::Signer;
 use ssh_key::Algorithm::Ed25519;
 use ssh_key::{LineEnding, PrivateKey};
 use std::error::Error;
+use tokio::task::spawn_blocking;
 
 pub async fn process_hsm_requests(_pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn Error>> {
     let (mut valkey_client, mut receiver) = get_valkey_client().await?;
@@ -24,6 +26,10 @@ pub async fn process_hsm_requests(_pool: Pool<AsyncPgConnection>) -> Result<(), 
                     let ssh_key_exported = ssh_key.to_openssh(LineEnding::LF)?;
                     SSHKey::Software(ssh_key_exported.to_string())
                 }
+                CryptoBackend::TPM => {
+                    let (private, public) = spawn_blocking(|| tpm::generate_ssh_key().map_err(|e| e.to_string())).await??;
+                    SSHKey::TPM(private, public)
+                }
             })?,
             HSMOperation::SignSSHRequest(key, data) => BASE64_STANDARD.encode({
                 let key: SSHKey = serde_json::from_str(&key)?;
@@ -32,6 +38,7 @@ pub async fn process_hsm_requests(_pool: Pool<AsyncPgConnection>) -> Result<(), 
                         let key = PrivateKey::from_openssh(key)?;
                         key.try_sign(&data)?.as_bytes().to_vec()
                     }
+                    SSHKey::TPM(key, _) => spawn_blocking(move || tpm::sign_ssh(&key, &data).map_err(|e| e.to_string())).await??,
                 }
             }),
         };

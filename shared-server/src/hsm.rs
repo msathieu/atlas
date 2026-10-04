@@ -2,7 +2,7 @@ use crate::{get_valkey_client, notify_server_with_msg, wait_for_pubsub_msg};
 use redis::AsyncTypedCommands;
 use serde::{Deserialize, Serialize};
 use shared_api::CryptoBackend;
-use ssh_key::PrivateKey;
+use ssh_key::{PrivateKey, PublicKey};
 use std::{error::Error, time::Duration};
 use tokio::time::timeout;
 use uuid::Uuid;
@@ -10,6 +10,7 @@ use uuid::Uuid;
 #[derive(Deserialize, Serialize)]
 pub enum SSHKey {
     Software(String),
+    TPM(String, String),
 }
 #[derive(Deserialize, Serialize)]
 pub enum HSMOperation {
@@ -25,9 +26,17 @@ pub fn get_ssh_pubkey(key: &str, comment: Option<&str>) -> Result<String, Box<dy
             if let Some(comment) = comment {
                 private_key.set_comment(comment);
             }
-            private_key.public_key().to_openssh()?
+            private_key.public_key().clone()
         }
-    })
+        SSHKey::TPM(_, public_key) => {
+            let mut public_key = PublicKey::from_openssh(&public_key)?;
+            if let Some(comment) = comment {
+                public_key.set_comment(comment);
+            }
+            public_key
+        }
+    }
+    .to_openssh()?)
 }
 pub async fn request_hsm_operation(operation: HSMOperation) -> Result<String, Box<dyn Error>> {
     let (mut valkey_client, mut receiver) = get_valkey_client().await?;

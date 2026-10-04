@@ -138,7 +138,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let mut id = Uuid::nil();
     let repo = if request.repo.is_empty() { None } else { Some(request.repo) };
     let branch = if request.branch.is_empty() { None } else { Some(request.branch) };
-    let ssh_key = request_hsm_operation(HSMOperation::GenerateSSHKey(CryptoBackend::Software))
+    let ssh_key = request_hsm_operation(HSMOperation::GenerateSSHKey(CryptoBackend::TPM))
         .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     db.transaction(async |db| {

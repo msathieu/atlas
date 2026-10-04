@@ -91,6 +91,7 @@ pub enum HandshakePurpose {
 #[repr(u32)]
 pub enum CryptoBackend {
     Software = 0,
+    TPM = 1,
 }
 
 pub fn print_startup(component: &str, version: &str) {

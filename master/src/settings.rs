@@ -23,7 +23,7 @@ pub async fn create_settings(db: &mut AsyncPgConnection) -> Result<(), Box<dyn E
         diesel::insert_into(settings::table)
             .values(Setting {
                 name: "database_migration".to_owned(),
-                value: "0".to_string(),
+                value: "1".to_string(),
             })
             .execute(db)
             .await?;

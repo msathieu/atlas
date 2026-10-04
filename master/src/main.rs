@@ -34,6 +34,7 @@ mod settings;
 mod timers;
 mod tool;
 mod tools;
+mod tpm;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../shared-server/migrations");
 static DB_POOL: OnceLock<Pool<AsyncPgConnection>> = OnceLock::new();
