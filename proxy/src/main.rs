@@ -141,10 +141,10 @@ impl ProxyHttp for Proxy {
         let mut uuid = None;
         let mut port: Option<u16> = None;
         let mut request_type = ProxyType::Unknown;
-        if let Some(subdomain) = host.strip_suffix(&format!(".dev.{}", webserver_host)) {
+        if let Some(subdomain) = host.strip_suffix(&format!(".dev.{webserver_host}")) {
             request_type = ProxyType::DevelopmentEnvironment;
             uuid = Some(Uuid::parse_str(subdomain).or(Err(Error::new_down(InvalidHTTPHeader)))?);
-        } else if let Some(stripped_host) = host.strip_suffix(&format!(".devproxy.{}", webserver_host)) {
+        } else if let Some(stripped_host) = host.strip_suffix(&format!(".devproxy.{webserver_host}")) {
             request_type = ProxyType::DevelopmentEnvironment;
             let (uuid_str, port_str) = stripped_host.rsplit_once('-').ok_or(Error::new_down(InvalidHTTPHeader))?;
             uuid = Some(Uuid::parse_str(uuid_str).or(Err(Error::new_down(InvalidHTTPHeader)))?);
@@ -153,7 +153,7 @@ impl ProxyHttp for Proxy {
                 return Err(Error::new_down(InvalidHTTPHeader));
             }
             port = Some(parsed_port);
-        } else if let Some(subdomain) = host.strip_suffix(&format!(".agent.{}", webserver_host)) {
+        } else if let Some(subdomain) = host.strip_suffix(&format!(".agent.{webserver_host}")) {
             request_type = ProxyType::Agent;
             uuid = Some(Uuid::parse_str(subdomain).or(Err(Error::new_down(InvalidHTTPHeader)))?);
         }
@@ -164,7 +164,7 @@ impl ProxyHttp for Proxy {
             let mut response = ResponseHeader::build(307, None).or(Err(Error::new(InternalError)))?;
             let jwt = uri.query().ok_or(Error::new_down(InvalidHTTPHeader))?.strip_prefix("jwt=").ok_or(Error::new_down(InvalidHTTPHeader))?;
             authenticate_proxy_jwt(request_type, port, jwt, uuid).await?;
-            let cookie = format!("atlas_jwt={}; HttpOnly; Secure; SameSite=Strict", jwt);
+            let cookie = format!("atlas_jwt={jwt}; HttpOnly; Secure; SameSite=Strict");
             response.append_header("Set-Cookie", cookie).or(Err(Error::new(InternalError)))?;
             response.append_header("Set-Cookie", "code-server-session=; Max-Age=-1").or(Err(Error::new(InternalError)))?;
             response.insert_header("Location", "/").or(Err(Error::new(InternalError)))?;

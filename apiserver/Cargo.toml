@@ -17,7 +17,6 @@ redis = "1.2.1"
 sha2 = "0.11.0"
 shared-api = {path = "../shared-api"}
 shared-server = {path = "../shared-server"}
-ssh-key = {version = "0.6.7", features = ["ed25519"]}
 tokio = {version = "1.47.1", features = ["fs", "macros", "net", "rt-multi-thread", "time"]}
 tokio-rustls = "0.26.4"
 uuid = {version = "1.18.1", features = ["v4"]}

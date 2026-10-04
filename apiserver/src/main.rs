@@ -24,13 +24,14 @@ use shared_api::{
 };
 use shared_server::{
     binary::personalize_binary,
-    get_db_pool, get_valkey_client, listen_for_restarts,
+    get_db_pool, get_valkey_client,
+    hsm::get_ssh_pubkey,
+    listen_for_restarts,
     models::{Command, Container, DevelopmentEnvironment, Device, Setting},
     notify_server,
     schema::{commands, containers, development_environments, devices, settings},
     wait_for_pubsub_msg,
 };
-use ssh_key::PrivateKey;
 use std::{
     error::Error,
     str::FromStr,
@@ -214,21 +215,14 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         let container: Container = containers::table.find(container_id).first(&mut db).await?;
         if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
             let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db).await?;
-            let private_key = PrivateKey::from_openssh(development_environment.ssh_key)?;
-            write_message(
-                MessageType::StartSSHAgentRequest,
-                StartSshAgentRequest {
-                    key: private_key.public_key().to_openssh()?,
-                },
-                &mut stream,
-            )
-            .await?;
+            let public_key = get_ssh_pubkey(&development_environment.ssh_key, None)?;
+            write_message(MessageType::StartSSHAgentRequest, StartSshAgentRequest { key: public_key }, &mut stream).await?;
             read_message(&mut stream, Some(MessageType::StartSSHAgentResponse)).await?;
         }
     }
 
     let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
-    pubsub_client.subscribe(format!("API:DEVICE:{}", uuid)).await?;
+    pubsub_client.subscribe(format!("API:DEVICE:{uuid}")).await?;
     loop {
         let device_exists = devices::table.find(uuid).first::<Device>(&mut db).await.optional()?.is_some();
         if !device_exists {

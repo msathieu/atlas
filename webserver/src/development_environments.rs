@@ -13,14 +13,14 @@ use diesel::prelude::*;
 use diesel_async::{AsyncConnection, RunQueryDsl};
 use redis::{AsyncTypedCommands, ExistenceCheck, SetExpiry, SetOptions};
 use serde::{Deserialize, Serialize};
-use shared_api::{ContainerOrigin, ContainerState};
+use shared_api::{ContainerOrigin, ContainerState, CryptoBackend};
 use shared_server::{
     get_valkey_client,
+    hsm::{HSMOperation, get_ssh_pubkey, request_hsm_operation},
     models::{Command, Container, DevelopmentEnvironment},
     notify_server, notify_server_with_msg,
     schema::{commands, containers, development_environments},
 };
-use ssh_key::{Algorithm::Ed25519, LineEnding, PrivateKey};
 use std::{env, time::SystemTime};
 use uuid::Uuid;
 
@@ -86,16 +86,8 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
     let environments: Result<Vec<APIDevelopmentEnvironment>, StatusCode> = environments
         .iter()
         .map(|(environment, container)| {
-            let state = match ContainerState::try_from(container.state as u32).or(Err(StatusCode::INTERNAL_SERVER_ERROR))? {
-                ContainerState::NonExistent => "Non-Existent",
-                ContainerState::Started => "Started",
-                ContainerState::Running => "Running",
-                ContainerState::Stopped => "Stopped",
-                ContainerState::Restarting => "Restarting",
-            }
-            .to_string();
-            let mut private_key = PrivateKey::from_openssh(&environment.ssh_key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-            private_key.set_comment(format!("{}@atlas-{}", user.username, environment.name));
+            let state = ContainerState::try_from(container.state as u32).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.to_string();
+            let ssh_key = get_ssh_pubkey(&environment.ssh_key, Some(&format!("{}@atlas-{}", user.username, environment.name))).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
             Ok(APIDevelopmentEnvironment {
                 id: environment.id,
                 name: environment.name.clone(),
@@ -105,7 +97,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
                 state,
                 pending: container.requested_state != container.state,
                 nested_containers: environment.nested_containers,
-                ssh_key: private_key.public_key().to_openssh().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?,
+                ssh_key,
                 memory_limit: container.memory_limit,
                 storage_size: container.storage_size,
             })
@@ -146,8 +138,9 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let mut id = Uuid::nil();
     let repo = if request.repo.is_empty() { None } else { Some(request.repo) };
     let branch = if request.branch.is_empty() { None } else { Some(request.branch) };
-    let ssh_key = PrivateKey::random(&mut rand::rng(), Ed25519).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let ssh_key_exported = ssh_key.to_openssh(LineEnding::LF).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let ssh_key = request_hsm_operation(HSMOperation::GenerateSSHKey(CryptoBackend::Software))
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     db.transaction(async |db| {
         container = diesel::insert_into(containers::table).values(container).get_result(db).await?;
         id = container.id.ok_or(diesel::result::Error::NotFound)?;
@@ -158,7 +151,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
             branch,
             command: None,
             nested_containers: request.nested_containers,
-            ssh_key: ssh_key_exported.to_string(),
+            ssh_key,
         };
         diesel::insert_into(development_environments::table).values(development_environment).execute(db).await?;
         Ok::<(), diesel::result::Error>(())

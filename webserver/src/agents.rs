@@ -66,14 +66,7 @@ pub async fn agents_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
     let agents: Result<Vec<APIAgent>, StatusCode> = agents
         .iter()
         .map(|(agent, container)| {
-            let state = match ContainerState::try_from(container.state as u32).or(Err(StatusCode::INTERNAL_SERVER_ERROR))? {
-                ContainerState::NonExistent => "Non-Existent",
-                ContainerState::Started => "Started",
-                ContainerState::Running => "Running",
-                ContainerState::Stopped => "Stopped",
-                ContainerState::Restarting => "Restarting",
-            }
-            .to_string();
+            let state = ContainerState::try_from(container.state as u32).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.to_string();
             Ok(APIAgent {
                 id: agent.id,
                 name: agent.name.clone(),

@@ -27,7 +27,7 @@ use tokio_rustls::TlsStream;
 use tokio_rustls::rustls::pki_types::ServerName;
 
 pub async fn start_connection(host: &str, tls_connector: &TlsConnector, db: &mut SqliteConnection, purpose: HandshakePurpose) -> Result<Option<TlsStream<TcpStream>>, Box<dyn Error>> {
-    let stream = TcpStream::connect(format!("{}:8612", host)).await?;
+    let stream = TcpStream::connect(format!("{host}:8612")).await?;
     let server_name = ServerName::DnsName("apiserver".try_into()?);
     let mut stream = tls_connector.connect(server_name, stream).await?.into();
     let keypair = settings::table.find("keypair").first::<Setting>(db)?.value;

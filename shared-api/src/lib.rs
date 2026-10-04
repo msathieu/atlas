@@ -2,7 +2,8 @@
 
 use num_enum::TryFromPrimitive;
 use prost::Message;
-use std::{env, error::Error};
+use serde::{Deserialize, Serialize};
+use std::{env, error::Error, fmt};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::TcpStream,
@@ -68,11 +69,28 @@ pub enum ContainerState {
     Running = 3,
     Restarting = 4,
 }
+impl fmt::Display for ContainerState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let string = match self {
+            ContainerState::NonExistent => "Non-Existent",
+            ContainerState::Started => "Started",
+            ContainerState::Running => "Running",
+            ContainerState::Stopped => "Stopped",
+            ContainerState::Restarting => "Restarting",
+        };
+        write!(f, "{string}")
+    }
+}
 #[derive(PartialEq, TryFromPrimitive)]
 #[repr(u32)]
 pub enum HandshakePurpose {
     General = 0,
     SSHAgent = 1,
+}
+#[derive(PartialEq, TryFromPrimitive, Deserialize, Serialize)]
+#[repr(u32)]
+pub enum CryptoBackend {
+    Software = 0,
 }
 
 pub fn print_startup(component: &str, version: &str) {

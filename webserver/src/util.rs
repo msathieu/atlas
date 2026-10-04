@@ -30,7 +30,7 @@ async fn validate_nonce(nonce: Uuid) -> Result<(), StatusCode> {
         .get()
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
         .clone()
-        .set_options(key, true, SetOptions::default().conditional_set(ExistenceCheck::NX).with_expiration(SetExpiry::EX(60)))
+        .set_options(key, true, SetOptions::default().conditional_set(ExistenceCheck::NX).with_expiration(SetExpiry::EX(600)))
         .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     if exists.is_none() {
@@ -75,7 +75,7 @@ pub async fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, met
 pub fn validate_timestamp(timestamp: u64) -> Result<(), StatusCode> {
     let now = SystemTime::now();
     let now = now.duration_since(UNIX_EPOCH).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.as_secs();
-    if now + 30 < timestamp || now - 30 > timestamp {
+    if now + 60 < timestamp || now - 60 > timestamp {
         return Err(StatusCode::UNAUTHORIZED);
     }
     Ok(())

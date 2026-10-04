@@ -29,6 +29,7 @@
           python3
           sdkmanager
           sqlite-interactive
+          tpm2-tss
           fenix.packages.x86_64-linux.stable.toolchain
         ];
         LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.openssl pkgs.libpq ];

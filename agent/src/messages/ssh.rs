@@ -8,7 +8,7 @@ use ssh_agent_lib::{
     error::AgentError,
     proto::{Identity, PublicCredential, SignRequest},
 };
-use ssh_key::{Algorithm, PublicKey, Signature};
+use ssh_key::{PublicKey, Signature};
 use std::{
     error::Error,
     fs::Permissions,
@@ -43,7 +43,7 @@ async fn sign_internal(agent: &mut SSHAgent, request: SignRequest) -> Result<Opt
     if !response.accepted {
         return Ok(None);
     }
-    let signature = Signature::new(Algorithm::Ed25519, response.signature)?;
+    let signature = Signature::new(agent.key.algorithm(), response.signature)?;
     Ok(Some(signature))
 }
 #[async_trait]

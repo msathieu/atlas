@@ -2,17 +2,17 @@
   "version": "5",
   "specifiers": {
     "npm:@capacitor/android@^8.5.2": "8.5.2_@capacitor+core@8.5.2",
-    "npm:@capacitor/app@^8.1.1": "8.1.1_@capacitor+core@8.5.2",
+    "npm:@capacitor/app@^8.1.2": "8.1.2_@capacitor+core@8.5.2",
     "npm:@capacitor/cli@^8.5.2": "8.5.2",
     "npm:@capacitor/core@^8.5.2": "8.5.2",
     "npm:@capawesome/capacitor-passkeys@~0.1.2": "0.1.2_@capacitor+core@8.5.2",
-    "npm:@lucide/svelte@^1.49.0": "1.49.0_svelte@5.57.1",
-    "npm:@sveltejs/adapter-node@6": "6.0.0_@sveltejs+kit@3.0.0_@sveltejs+vite-plugin-svelte@7.3.1_svelte@5.57.1_typescript@6.0.3_vite@8.3.2",
-    "npm:@sveltejs/adapter-static@4": "4.0.0_@sveltejs+kit@3.0.0_@sveltejs+vite-plugin-svelte@7.3.1_svelte@5.57.1_typescript@6.0.3_vite@8.3.2",
-    "npm:@sveltejs/kit@3": "3.0.0_@sveltejs+vite-plugin-svelte@7.3.1_svelte@5.57.1_typescript@6.0.3_vite@8.3.2",
-    "npm:@sveltejs/vite-plugin-svelte@^7.3.1": "7.3.1_svelte@5.57.1_vite@8.3.2_@types+node@26.6.3",
-    "npm:@tailwindcss/vite@^4.3.3": "4.3.3_vite@8.3.2_@types+node@26.6.3",
-    "npm:@types/node@^26.6.3": "26.6.3",
+    "npm:@lucide/svelte@^1.51.0": "1.51.0_svelte@5.57.1",
+    "npm:@sveltejs/adapter-node@6": "6.0.0_@sveltejs+kit@3.0.0_@types+node@26.6.4",
+    "npm:@sveltejs/adapter-static@4": "4.0.0_@sveltejs+kit@3.0.0_@types+node@26.6.4",
+    "npm:@sveltejs/kit@3": "3.0.0_@sveltejs+vite-plugin-svelte@7.3.1__svelte@5.57.1__vite@8.3.2___@types+node@26.6.4__@types+node@26.6.4_svelte@5.57.1_typescript@6.0.3_vite@8.3.2__@types+node@26.6.4_@types+node@26.6.4",
+    "npm:@sveltejs/vite-plugin-svelte@^7.3.1": "7.3.1_svelte@5.57.1_vite@8.3.2__@types+node@26.6.4_@types+node@26.6.4",
+    "npm:@tailwindcss/vite@^4.3.3": "4.3.3_vite@8.3.2__@types+node@26.6.4_@types+node@26.6.4",
+    "npm:@types/node@^26.6.4": "26.6.4",
     "npm:daisyui@^5.7.47": "5.7.47",
     "npm:date-fns@^4.4.0": "4.4.0",
     "npm:dexie@^4.4.6": "4.4.6",
@@ -27,7 +27,7 @@
     "npm:tailwindcss@^4.3.3": "4.3.3",
     "npm:typescript@^6.0.3": "6.0.3",
     "npm:uuid@^14.0.2": "14.0.2",
-    "npm:vite@^8.3.2": "8.3.2_@types+node@26.6.3"
+    "npm:vite@^8.3.2": "8.3.2_@types+node@26.6.4"
   },
   "npm": {
     "@capacitor/android@8.5.2_@capacitor+core@8.5.2": {
@@ -36,8 +36,8 @@
         "@capacitor/core"
       ]
     },
-    "@capacitor/app@8.1.1_@capacitor+core@8.5.2": {
-      "integrity": "sha512-xM2ZTX5jK60tFtmjsmJv+Cdj1Qsb6NcavkqmdEnCPQBeya9oKhamZJxYOnQNj1ZvcJM7sWfG6BEtSLx42pisbA==",
+    "@capacitor/app@8.1.2_@capacitor+core@8.5.2": {
+      "integrity": "sha512-uKBlsrXH0IdvUn69e/KKYbZ32A06pcrUdG8LWuZ/6y33YMXZXLEEdNSwl+jKS/SrsTWqnePs8EqSWaiQM3mUGA==",
       "dependencies": [
         "@capacitor/core"
       ]
@@ -187,8 +187,8 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
-    "@lucide/svelte@1.49.0_svelte@5.57.1": {
-      "integrity": "sha512-RFH6Vx7dj6hshcBa1qJ0nKAWwkh385jJbDwF1WVg7yflC89310BsA55SEmJnaSRfr03dAyZMMLUC1EMGBu0Z0Q==",
+    "@lucide/svelte@1.51.0_svelte@5.57.1": {
+      "integrity": "sha512-FNoBtfrnQS1LV7yRm8T8pF6OH72BzCyPOWrOmVcpqGGLFmQZndRB4h0qhzUKqPq2JNkSfF7f4tUaiCwdY4WFfg==",
       "dependencies": [
         "svelte"
       ]
@@ -411,19 +411,19 @@
         "acorn"
       ]
     },
-    "@sveltejs/adapter-node@6.0.0_@sveltejs+kit@3.0.0_@sveltejs+vite-plugin-svelte@7.3.1_svelte@5.57.1_typescript@6.0.3_vite@8.3.2": {
+    "@sveltejs/adapter-node@6.0.0_@sveltejs+kit@3.0.0_@types+node@26.6.4": {
       "integrity": "sha512-s7muM4JmJ75OZ8o0G4VRhrEKdi8twuEm3t2o/qQsdlm12hKaX7S/CuUBuw3n983wB/IFBSpzG2ugX0xdGzbKwg==",
       "dependencies": [
         "@sveltejs/kit"
       ]
     },
-    "@sveltejs/adapter-static@4.0.0_@sveltejs+kit@3.0.0_@sveltejs+vite-plugin-svelte@7.3.1_svelte@5.57.1_typescript@6.0.3_vite@8.3.2": {
+    "@sveltejs/adapter-static@4.0.0_@sveltejs+kit@3.0.0_@types+node@26.6.4": {
       "integrity": "sha512-aF1J23R1ebKqUxQ4/qLr/Lxu63NFmLAtg8UZl3HFLxaoA1D/nhTVGcD9lTqx65iUbjNR2iOL0TgOxSX82x6Paw==",
       "dependencies": [
         "@sveltejs/kit"
       ]
     },
-    "@sveltejs/kit@3.0.0_@sveltejs+vite-plugin-svelte@7.3.1_svelte@5.57.1_typescript@6.0.3_vite@8.3.2": {
+    "@sveltejs/kit@3.0.0_@sveltejs+vite-plugin-svelte@7.3.1__svelte@5.57.1__vite@8.3.2___@types+node@26.6.4__@types+node@26.6.4_svelte@5.57.1_typescript@6.0.3_vite@8.3.2__@types+node@26.6.4_@types+node@26.6.4": {
       "integrity": "sha512-dmP6gjz41DAT7erONGW8FdTWjmsmOJ/SaWVEsuEc1MXDcpH6YV+Pt98biZFPuinH4LldJPmScxDqiHwCDLRCrg==",
       "dependencies": [
         "@rolldown/pluginutils",
@@ -447,7 +447,7 @@
     "@sveltejs/load-config@0.2.3": {
       "integrity": "sha512-VT3qmUb8pRV2QrZjd8iAmtg8lf4W0TIjZbvXtz5MKei/q96teWZgGJyyidJzOjzZzvdq616eSRVeMYIQChUTAQ=="
     },
-    "@sveltejs/vite-plugin-svelte@7.3.1_svelte@5.57.1_vite@8.3.2_@types+node@26.6.3": {
+    "@sveltejs/vite-plugin-svelte@7.3.1_svelte@5.57.1_vite@8.3.2__@types+node@26.6.4_@types+node@26.6.4": {
       "integrity": "sha512-ZPsLN8B1e/En+Ak5s4V7srFDT532oS0qieLsQwu63NGKsS+iAjoO2Js1BochlHlglcU+Pt7WAO3C5Ee+4f6gVA==",
       "dependencies": [
         "deepmerge",
@@ -546,7 +546,7 @@
         "@tailwindcss/oxide-win32-x64-msvc"
       ]
     },
-    "@tailwindcss/vite@4.3.3_vite@8.3.2_@types+node@26.6.3": {
+    "@tailwindcss/vite@4.3.3_vite@8.3.2__@types+node@26.6.4_@types+node@26.6.4": {
       "integrity": "sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==",
       "dependencies": [
         "@tailwindcss/node",
@@ -564,8 +564,8 @@
         "@types/node"
       ]
     },
-    "@types/node@26.6.3": {
-      "integrity": "sha512-dsqMQQoeTLqu9wynDD00q573mNzso3IdQOAfHRJqLCcmCFPoGo9A1bDpUcv/9tnKpErQWv9uKeGfl37EIS02Yg==",
+    "@types/node@26.6.4": {
+      "integrity": "sha512-ldVPDCzj7fsaGZrLB0NuHuTvJcsNasysBAqMolr/cgxrLd1xbqxIr3XJiPnHHJUCxj5sNF1vnRj9aWnrVh5Jcg==",
       "dependencies": [
         "undici-types"
       ]
@@ -1454,7 +1454,7 @@
       "deprecated": true,
       "bin": true
     },
-    "vite@8.3.2_@types+node@26.6.3": {
+    "vite@8.3.2_@types+node@26.6.4": {
       "integrity": "sha512-SQr1x6W5vVSbROg7vsyXIaxK9b0G7zsT68acdWWRmnBUsgDieLCRG+Rep9WdZgcposvv/GSnr4GUUBqB3vXq6w==",
       "dependencies": [
         "@types/node",
@@ -1472,7 +1472,7 @@
       ],
       "bin": true
     },
-    "vitefu@1.1.3_vite@8.3.2_@types+node@26.6.3": {
+    "vitefu@1.1.3_vite@8.3.2__@types+node@26.6.4_@types+node@26.6.4": {
       "integrity": "sha512-ub4okH7Z5KLjb6hDyjqrGXqWtWvoYdU3IGm/NorpgHncKoLTCfRIbvlhBm7r0YstIaQRYlp4yEbFqDcKSzXSSg==",
       "dependencies": [
         "vite"
@@ -1534,17 +1534,17 @@
     "packageJson": {
       "dependencies": [
         "npm:@capacitor/android@^8.5.2",
-        "npm:@capacitor/app@^8.1.1",
+        "npm:@capacitor/app@^8.1.2",
         "npm:@capacitor/cli@^8.5.2",
         "npm:@capacitor/core@^8.5.2",
         "npm:@capawesome/capacitor-passkeys@~0.1.2",
-        "npm:@lucide/svelte@^1.49.0",
+        "npm:@lucide/svelte@^1.51.0",
         "npm:@sveltejs/adapter-node@6",
         "npm:@sveltejs/adapter-static@4",
         "npm:@sveltejs/kit@3",
         "npm:@sveltejs/vite-plugin-svelte@^7.3.1",
         "npm:@tailwindcss/vite@^4.3.3",
-        "npm:@types/node@^26.6.3",
+        "npm:@types/node@^26.6.4",
         "npm:daisyui@^5.7.47",
         "npm:date-fns@^4.4.0",
         "npm:dexie@^4.4.6",
