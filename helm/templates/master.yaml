@@ -19,7 +19,6 @@ spec:
     spec:
       nodeName: {{ .Values.masterNode }}
       serviceAccountName: atlas-master
-      hostUsers: false
       containers:
         - name: atlas-master
           image: {{ .Values.image }}
