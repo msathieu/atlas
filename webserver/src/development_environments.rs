@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use shared_api::{ContainerOrigin, ContainerState, CryptoBackend};
 use shared_server::{
     get_valkey_client,
-    hsm::{HSMOperation, get_ssh_pubkey, request_hsm_operation},
+    hsm::{HSMOperation, get_ssh_backend, get_ssh_pubkey, request_hsm_operation},
     models::{Command, Container, DevelopmentEnvironment},
     notify_server, notify_server_with_msg,
     schema::{commands, containers, development_environments},
@@ -37,6 +37,7 @@ pub struct APIDevelopmentEnvironment {
     ssh_key: String,
     memory_limit: i32,
     storage_size: i32,
+    ssh_key_backend: String,
 }
 #[derive(Deserialize)]
 pub struct CreateDevelopmentEnvironmentRequest {
@@ -44,6 +45,7 @@ pub struct CreateDevelopmentEnvironmentRequest {
     repo: String,
     branch: String,
     nested_containers: bool,
+    ssh_key_backend: String,
 }
 #[derive(Serialize)]
 pub struct CreateDevelopmentEnvironmentResponse {
@@ -88,6 +90,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
         .map(|(environment, container)| {
             let state = ContainerState::try_from(container.state as u32).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.to_string();
             let ssh_key = get_ssh_pubkey(&environment.ssh_key, Some(&format!("{}@atlas-{}", user.username, environment.name))).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+            let ssh_key_backend = get_ssh_backend(&environment.ssh_key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.to_string();
             Ok(APIDevelopmentEnvironment {
                 id: environment.id,
                 name: environment.name.clone(),
@@ -100,6 +103,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
                 ssh_key,
                 memory_limit: container.memory_limit,
                 storage_size: container.storage_size,
+                ssh_key_backend,
             })
         })
         .collect();
@@ -138,9 +142,12 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let mut id = Uuid::nil();
     let repo = if request.repo.is_empty() { None } else { Some(request.repo) };
     let branch = if request.branch.is_empty() { None } else { Some(request.branch) };
-    let ssh_key = request_hsm_operation(HSMOperation::GenerateSSHKey(CryptoBackend::TPM))
-        .await
-        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let backend = match request.ssh_key_backend.as_str() {
+        "software" => CryptoBackend::Software,
+        "tpm" => CryptoBackend::TPM,
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
+    let ssh_key = request_hsm_operation(HSMOperation::GenerateSSHKey(backend)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     db.transaction(async |db| {
         container = diesel::insert_into(containers::table).values(container).get_result(db).await?;
         id = container.id.ok_or(diesel::result::Error::NotFound)?;

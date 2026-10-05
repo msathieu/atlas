@@ -5,11 +5,16 @@ let { data } = $props();
 
 let name = $state("");
 let nestedContainers = $state(false);
+let hardwareCrypto = $state(true);
 
 async function createEnvironment() {
+  let cryptoBackend = "software";
+  if (hardwareCrypto) {
+    cryptoBackend = "tpm";
+  }
   const response = await authenticatedFetch(`/api/development_environments`, {
     method: "POST",
-    body: JSON.stringify({ name: name, repo: data.repo, branch: "", nested_containers: nestedContainers }),
+    body: JSON.stringify({ name: name, repo: data.repo, branch: "", nested_containers: nestedContainers, ssh_key_backend: cryptoBackend }),
   });
   const json = await response.json();
   globalThis.open(`/embed/open_container/${json.id}?type=development_environment`, "_blank", "noopener");
@@ -29,6 +34,10 @@ async function createEnvironment() {
           <input id="nested_containers" type="checkbox" class="checkbox" bind:checked={nestedContainers} />
         </p>
       {/if}
+      <p>
+        Store SSH Key in TPM:
+        <input id="hardware_crypto" type="checkbox" class="checkbox" bind:checked={hardwareCrypto} />
+      </p>
       <button
         class="btn btn-primary"
         onclick={async () => {

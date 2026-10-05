@@ -11,7 +11,7 @@ use tss_esapi::{
     utils::PublicKey as TPMPublicKey,
 };
 
-fn context() -> Result<TransientKeyContext, Box<dyn Error>> {
+pub fn tpm_context() -> Result<TransientKeyContext, Box<dyn Error>> {
     Ok(TransientKeyContext::builder().with_tcti(TctiNameConf::from_str("device:/dev/tpmrm0")?).build()?)
 }
 fn key_params() -> KeyParams {
@@ -33,15 +33,15 @@ fn ssh_public_key(public: &TPMPublicKey) -> Result<PublicKey, Box<dyn Error>> {
     point.extend_from_slice(&field_bytes_from_slice(y)?);
     Ok(PublicKey::new(EcdsaPublicKey::from_sec1_bytes(&point)?.into(), ""))
 }
-pub fn generate_ssh_key() -> Result<(String, String), Box<dyn Error>> {
-    let (material, _) = context()?.create_key(key_params(), 0)?;
+pub fn tpm_generate_ssh_key(context: &mut TransientKeyContext) -> Result<(String, String), Box<dyn Error>> {
+    let (material, _) = context.create_key(key_params(), 0)?;
     Ok((serde_json::to_string(&material)?, ssh_public_key(material.public())?.to_openssh()?))
 }
-pub fn sign_ssh(key: &str, data: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+pub fn tpm_sign_ssh(context: &mut TransientKeyContext, key: &str, data: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
     let material: KeyMaterial = serde_json::from_str(key)?;
     let public_key = ssh_public_key(material.public())?;
     let digest = Digest::try_from(Sha384::digest(data).to_vec())?;
-    let signature = context()?.sign(material, key_params(), None, digest)?;
+    let signature = context.sign(material, key_params(), None, digest)?;
     let signature = match signature {
         TPMSignature::EcDsa(signature) => p384::ecdsa::Signature::from_scalars(field_bytes_from_slice(signature.signature_r().value())?, field_bytes_from_slice(signature.signature_s().value())?)?,
         _ => return Err("Invalid signature".into()),

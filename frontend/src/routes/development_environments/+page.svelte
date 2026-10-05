@@ -13,11 +13,16 @@ let newName = $state("");
 let newRepo = $state("");
 let newBranch = $state("");
 let newNestedContainers = $state(false);
+let newHardwareCrypto = $state(true);
 
 async function createEnvironment() {
+  let cryptoBackend = "software";
+  if (newHardwareCrypto) {
+    cryptoBackend = "tpm";
+  }
   await authenticatedFetch(`/api/development_environments`, {
     method: "POST",
-    body: JSON.stringify({ name: newName, repo: newRepo, branch: newBranch, nested_containers: newNestedContainers }),
+    body: JSON.stringify({ name: newName, repo: newRepo, branch: newBranch, nested_containers: newNestedContainers, ssh_key_backend: cryptoBackend }),
   });
   newName = "";
   newRepo = "";
@@ -157,6 +162,10 @@ async function openDevelopmentEnvironment(id: string) {
             <td>{selectedEnvironment.ssh_key} </td>
           </tr>
           <tr>
+            <td>SSH Crypto Backend</td>
+            <td>{selectedEnvironment.ssh_key_backend} </td>
+          </tr>
+          <tr>
             <td>Memory Limit</td>
             <td
               >{selectedEnvironment.memory_limit}
@@ -225,6 +234,10 @@ async function openDevelopmentEnvironment(id: string) {
             <input id="nested_containers" type="checkbox" class="checkbox" bind:checked={newNestedContainers} />
           </p>
         {/if}
+        <p>
+          Store SSH Key in TPM:
+          <input id="hardware_crypto" type="checkbox" class="checkbox" bind:checked={newHardwareCrypto} />
+        </p>
         <button class="btn btn-primary">Create</button>
       </fieldset>
     </form>

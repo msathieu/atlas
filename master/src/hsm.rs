@@ -1,4 +1,4 @@
-use crate::tpm;
+use crate::tpm::{tpm_context, tpm_generate_ssh_key, tpm_sign_ssh};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use diesel_async::{AsyncPgConnection, pooled_connection::deadpool::Pool};
@@ -10,11 +10,12 @@ use signature::Signer;
 use ssh_key::Algorithm::Ed25519;
 use ssh_key::{LineEnding, PrivateKey};
 use std::error::Error;
-use tokio::task::spawn_blocking;
+use tokio::task::block_in_place;
 
 pub async fn process_hsm_requests(_pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn Error>> {
     let (mut valkey_client, mut receiver) = get_valkey_client().await?;
     valkey_client.subscribe("MASTER:HSM:REQUEST").await?;
+    let mut tpm_context = block_in_place(tpm_context).map_err(|e| e.to_string());
     loop {
         let uuid = wait_for_pubsub_msg(&mut receiver).await?;
         let data: String = valkey_client.get_del(format!("HSM_REQUEST:{uuid}")).await?.ok_or("Missing HSM request")?;
@@ -27,7 +28,8 @@ pub async fn process_hsm_requests(_pool: Pool<AsyncPgConnection>) -> Result<(), 
                     SSHKey::Software(ssh_key_exported.to_string())
                 }
                 CryptoBackend::TPM => {
-                    let (private, public) = spawn_blocking(|| tpm::generate_ssh_key().map_err(|e| e.to_string())).await??;
+                    let tpm_context = tpm_context.as_mut().map_err(|e| e.clone())?;
+                    let (private, public) = block_in_place(|| tpm_generate_ssh_key(tpm_context))?;
                     SSHKey::TPM(private, public)
                 }
             })?,
@@ -38,7 +40,10 @@ pub async fn process_hsm_requests(_pool: Pool<AsyncPgConnection>) -> Result<(), 
                         let key = PrivateKey::from_openssh(key)?;
                         key.try_sign(&data)?.as_bytes().to_vec()
                     }
-                    SSHKey::TPM(key, _) => spawn_blocking(move || tpm::sign_ssh(&key, &data).map_err(|e| e.to_string())).await??,
+                    SSHKey::TPM(key, _) => {
+                        let tpm_context = tpm_context.as_mut().map_err(|e| e.clone())?;
+                        block_in_place(|| tpm_sign_ssh(tpm_context, &key, &data))?
+                    }
                 }
             }),
         };

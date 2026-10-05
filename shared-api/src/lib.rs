@@ -93,6 +93,15 @@ pub enum CryptoBackend {
     Software = 0,
     TPM = 1,
 }
+impl fmt::Display for CryptoBackend {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let string = match self {
+            CryptoBackend::Software => "Software",
+            CryptoBackend::TPM => "TPM",
+        };
+        write!(f, "{string}")
+    }
+}
 
 pub fn print_startup(component: &str, version: &str) {
     println!("--------------------------------------------------");

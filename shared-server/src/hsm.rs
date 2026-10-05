@@ -38,6 +38,13 @@ pub fn get_ssh_pubkey(key: &str, comment: Option<&str>) -> Result<String, Box<dy
     }
     .to_openssh()?)
 }
+pub fn get_ssh_backend(key: &str) -> Result<CryptoBackend, Box<dyn Error>> {
+    let key: SSHKey = serde_json::from_str(key)?;
+    Ok(match key {
+        SSHKey::Software(_) => CryptoBackend::Software,
+        SSHKey::TPM(_, _) => CryptoBackend::TPM,
+    })
+}
 pub async fn request_hsm_operation(operation: HSMOperation) -> Result<String, Box<dyn Error>> {
     let (mut valkey_client, mut receiver) = get_valkey_client().await?;
     let signing_id = Uuid::new_v4();
