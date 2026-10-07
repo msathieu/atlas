@@ -16,7 +16,11 @@ use diesel_async::{RunQueryDsl, pooled_connection::ManagerConfig};
 use futures_util::FutureExt;
 use jsonwebtoken::{DecodingKey, Validation, decode};
 use rand::random_range;
-use redis::{AsyncTypedCommands, Msg, PushInfo, PushKind, RedisError, aio::ConnectionManagerConfig};
+use redis::{
+    AsyncTypedCommands, IntoConnectionInfo, Msg, PushInfo, PushKind, RedisError,
+    aio::ConnectionManagerConfig,
+    io::tcp::{TcpSettings, socket2::TcpKeepalive},
+};
 use rustls::{
     ClientConfig, RootCertStore,
     pki_types::{CertificateDer, pem::PemObject},
@@ -91,7 +95,10 @@ pub async fn get_valkey_client() -> Result<(redis::aio::ConnectionManager, Unbou
         env::var("VALKEY_PASSWORD").unwrap_or("".to_string()),
         env::var("VALKEY_HOST").unwrap_or("localhost".to_string())
     );
-    let client = redis::Client::open(url)?;
+    let keepalive = TcpKeepalive::new().with_time(Duration::from_secs(30)).with_interval(Duration::from_secs(10)).with_retries(3);
+    let tcp_settings = TcpSettings::default().set_keepalive(keepalive);
+    let connection_info = url.into_connection_info()?.set_tcp_settings(tcp_settings);
+    let client = redis::Client::open(connection_info)?;
     let mut config = ConnectionManagerConfig::new();
     config = config
         .set_automatic_resubscription()
@@ -120,18 +127,15 @@ pub async fn wait_for_pubsub_msg(receiver: &mut UnboundedReceiver<PushInfo>) -> 
         if received.is_none() {
             return Err("Connection closed".into());
         }
-        if let Some(push_info) = received {
-            if push_info.kind == PushKind::Disconnection {
-                return Err("Connection closed".into());
+        if let Some(push_info) = received
+            && push_info.kind == PushKind::Message
+        {
+            if let Some(msg) = Msg::from_push_info(push_info)
+                && let Ok(payload) = msg.get_payload::<String>()
+            {
+                return Ok(payload);
             }
-            if push_info.kind == PushKind::Message {
-                if let Some(msg) = Msg::from_push_info(push_info)
-                    && let Ok(payload) = msg.get_payload::<String>()
-                {
-                    return Ok(payload);
-                }
-                return Ok("".into());
-            }
+            return Ok("".into());
         }
     }
 }
