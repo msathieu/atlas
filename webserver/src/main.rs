@@ -56,7 +56,6 @@ mod user_setting;
 mod users;
 mod util;
 
-static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 static ENCRYPTION_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 static SIGNING_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 static DB_POOL: OnceLock<Pool<AsyncPgConnection>> = OnceLock::new();
@@ -74,9 +73,6 @@ async fn main() {
     DB_POOL.set(get_db_pool().await.unwrap()).ok();
     {
         let mut db = DB_POOL.get().unwrap().get().await.unwrap();
-        let jwt_secret = schema::settings::table.find("jwt_secret").first::<Setting>(&mut db).await.unwrap().value;
-        let jwt_secret = BASE64_STANDARD.decode(jwt_secret).unwrap();
-        JWT_KEY.set(jwt_secret).unwrap();
         let encryption_key = schema::settings::table.find("web_encryption_key").first::<Setting>(&mut db).await.unwrap().value;
         let encryption_key = BASE64_STANDARD.decode(encryption_key).unwrap();
         ENCRYPTION_KEY.set(encryption_key).unwrap();

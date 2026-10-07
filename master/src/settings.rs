@@ -11,7 +11,10 @@ use shared_server::hash_password;
 use shared_server::models::User;
 use shared_server::schema::users;
 use shared_server::{models::Setting, schema::settings};
-use std::error::Error;
+use std::{
+    error::Error,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use webauthn_rs::fake::{FakePasskeyDistribution, WebauthnFakeCredentialGenerator};
 
 async fn does_setting_exist(db: &mut AsyncPgConnection, name: &str) -> Result<bool, Box<dyn Error>> {
@@ -124,6 +127,24 @@ pub async fn create_settings(db: &mut AsyncPgConnection) -> Result<(), Box<dyn E
             .values(Setting {
                 name: "jwt_secret".to_owned(),
                 value: BASE64_STANDARD.encode(jwt_secret),
+            })
+            .execute(db)
+            .await?;
+    }
+    if !does_setting_exist(db, "jwt_secret_old").await? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "jwt_secret_old".to_owned(),
+                value: "".to_string(),
+            })
+            .execute(db)
+            .await?;
+    }
+    if !does_setting_exist(db, "jwt_secret_rotated_at").await? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "jwt_secret_rotated_at".to_owned(),
+                value: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().to_string(),
             })
             .execute(db)
             .await?;

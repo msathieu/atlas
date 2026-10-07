@@ -49,7 +49,7 @@ pub async fn get_agent_script(headers: HeaderMap, uri: OriginalUri, request: Que
         }
     };
     let hash = Sha512::digest(&agent).to_vec();
-    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None, Some(iat))?;
+    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None, Some(iat), &mut db).await?;
     let web_host = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let script = format!(
         r#"curl -fO "https://{}/api/atlas-agent?auth={}&arch={}&os={}" &&\
@@ -82,7 +82,8 @@ pub async fn download_agent(query: Query<DownloadAuth>) -> Result<Vec<u8>, Statu
 pub async fn download_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<DownloadAuthResponse>), StatusCode> {
     let (user, _pubkey, iat) = authenticate(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None, Some(iat))?;
+    let mut db = get_db().await?;
+    let jwt = generate_jwt("webserver-download", &user, 10 * 60, None, Some(iat), &mut db).await?;
     let response = DownloadAuthResponse { jwt };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }

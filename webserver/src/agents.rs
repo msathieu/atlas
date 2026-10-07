@@ -182,7 +182,7 @@ pub async fn open_agent(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalU
         ready = false;
     }
     let webserver = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let jwt = generate_jwt(&format!("proxy-agent-{}", id), &user, 12 * 60 * 60, None, Some(iat))?;
+    let jwt = generate_jwt(&format!("proxy-agent-{}", id), &user, 12 * 60 * 60, None, Some(iat), &mut db).await?;
     let url = format!("https://{}.agent.{}/atlas_setup?jwt={}", id, webserver, jwt);
     let response = OpenAgentResponse { url, ready };
     Ok((sign_response(signature, Some(&response))?, Json(response)))

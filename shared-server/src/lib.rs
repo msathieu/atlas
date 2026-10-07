@@ -55,7 +55,6 @@ pub struct Claims {
 }
 
 static PUBSUB_POOL: OnceLock<redis::aio::ConnectionManager> = OnceLock::new();
-static JWT_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 static HASHING_SEMAPHORE: Semaphore = Semaphore::const_new(5);
 
 pub async fn get_db_pool() -> Result<Pool<AsyncPgConnection>, Box<dyn Error>> {
@@ -182,18 +181,27 @@ pub fn parse_pubkey(pubkey: String) -> Result<ParsedPublicKey, Box<dyn Error>> {
     let key = UnparsedPublicKey::new(&ED25519, BASE64_STANDARD.decode(pubkey)?).parse()?;
     Ok(key)
 }
+pub async fn get_jwt_key(db: &mut AsyncPgConnection) -> Result<Vec<u8>, Box<dyn Error>> {
+    let jwt_secret: Setting = settings::table.find("jwt_secret").first(db).await?;
+    Ok(BASE64_STANDARD.decode(jwt_secret.value)?)
+}
 pub async fn authenticate_jwt(jwt: &str, aud: &str, db: &mut AsyncPgConnection) -> Result<(User, Option<String>, usize), Box<dyn Error>> {
-    if JWT_KEY.get().is_none() {
-        let jwt_secret: Setting = settings::table.find("jwt_secret").first(db).await?;
-        let jwt_secret = BASE64_STANDARD.decode(jwt_secret.value)?;
-        JWT_KEY.set(jwt_secret).ok();
-    }
-    let key = DecodingKey::from_secret(JWT_KEY.get().ok_or("Invalid JWT key")?);
+    let key = DecodingKey::from_secret(&get_jwt_key(db).await?);
     let mut validation = Validation::new(jsonwebtoken::Algorithm::HS512);
     validation.validate_nbf = true;
     validation.set_audience(&[aud]);
     validation.set_required_spec_claims(&["aud", "sub", "nbf", "iat", "exp", "counter"]);
-    let token = decode::<Claims>(jwt, &key, &validation)?;
+    let token = match decode::<Claims>(jwt, &key, &validation) {
+        Ok(token) => token,
+        Err(error) => {
+            let old_secret: Setting = settings::table.find("jwt_secret_old").first(db).await?;
+            if old_secret.value.is_empty() {
+                return Err(error.into());
+            }
+            let old_key = DecodingKey::from_secret(&BASE64_STANDARD.decode(old_secret.value)?);
+            decode::<Claims>(jwt, &old_key, &validation)?
+        }
+    };
     let user: User = users::table.find(token.claims.sub).first(db).await?;
     if !user.enabled || user.jwt_counter as usize != token.claims.counter {
         return Err("Wrong JWT counter or user isn't enabled".into());

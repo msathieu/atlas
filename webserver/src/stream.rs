@@ -27,7 +27,8 @@ pub struct StreamAuthResponse {
 pub async fn stream_auth(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<StreamAuthResponse>), StatusCode> {
     let (user, _pubkey, iat) = authenticate(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let jwt = generate_jwt("webserver-stream", &user, 60, None, Some(iat))?;
+    let mut db = get_db().await?;
+    let jwt = generate_jwt("webserver-stream", &user, 60, None, Some(iat), &mut db).await?;
     let response = StreamAuthResponse { jwt };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
 }

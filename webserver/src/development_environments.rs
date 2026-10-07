@@ -261,8 +261,8 @@ pub async fn open_development_environment(
     }
     let webserver = env::var("WEBSERVER_HOST").or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let jwt = match request.port {
-        None => generate_jwt(&format!("proxy-dev-{}", id), &user, 12 * 60 * 60, None, Some(iat))?,
-        Some(_) => generate_jwt(&format!("proxy-devproxy-{}", id), &user, 12 * 60 * 60, None, Some(iat))?,
+        None => generate_jwt(&format!("proxy-dev-{}", id), &user, 12 * 60 * 60, None, Some(iat), &mut db).await?,
+        Some(_) => generate_jwt(&format!("proxy-devproxy-{}", id), &user, 12 * 60 * 60, None, Some(iat), &mut db).await?,
     };
     let url = match request.port {
         None => format!("https://{}.dev.{}/atlas_setup?jwt={}", id, webserver, jwt),

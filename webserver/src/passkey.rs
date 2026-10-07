@@ -227,7 +227,7 @@ pub async fn finish_passkey_authentication(body: Bytes) -> Result<(HeaderMap, Js
         .await
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey), None)?;
+    let jwt = generate_jwt("webserver", &user, JWT_EXPIRY, Some(request.pubkey), None, &mut db).await?;
     let response = FinishPasskeyAuthenticationResponse { jwt };
     Ok((
         sign_response(format!("passkey_finish-{}", BASE64_STANDARD.encode(Sha512::digest(body))), Some(&response))?,
