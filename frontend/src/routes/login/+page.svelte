@@ -8,8 +8,22 @@ import { page } from "$app/state";
 
 let username = $state(localStorage.getItem("username") || "");
 let password = $state("");
+let loginPending = $state(false);
 let redirect = page.url.searchParams.get("redirect");
 
+async function runLogin(authenticate: () => Promise<void>) {
+  if (loginPending) {
+    return;
+  }
+  loginPending = true;
+  try {
+    await authenticate();
+  } catch {
+    toast.error("Login Failed");
+  } finally {
+    loginPending = false;
+  }
+}
 async function login() {
   const keyPair = await crypto.subtle.generateKey("Ed25519", false, ["sign", "verify"]);
   const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
@@ -81,23 +95,15 @@ async function finishAuth(username: string, jwt: string, keyPair: CryptoKeyPair)
     <form
       onsubmit={async (e) => {
         e.preventDefault();
-        await login();
+        await runLogin(login);
       }}
     >
-      <fieldset class="fieldset">
+      <fieldset class="fieldset" disabled={loginPending}>
         <input id="username" type="text" placeholder="Username" class="input" required autocomplete="username" bind:value={username} />
         <input id="password" type="password" placeholder="Password" class="input" autocomplete="current-password" bind:value={password} />
         <button class="btn btn-primary">Login</button>
         <div class="divider"></div>
-        <button
-          class="btn btn-primary"
-          onclick={async (e) => {
-            e.preventDefault();
-            await passkeyLogin();
-          }}
-        >
-          Login With Passkey
-        </button>
+        <button type="button" class="btn btn-primary" onclick={async () => await runLogin(passkeyLogin)}> Login With Passkey </button>
       </fieldset>
     </form>
   </div>
