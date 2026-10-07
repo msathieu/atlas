@@ -73,7 +73,18 @@ pub struct ApproveSSHForwardRequestRequest {
 pub struct SetDevelopmentEnvironmentStateRequest {
     state: String,
 }
+#[derive(Deserialize)]
+pub struct RotateSSHKeyRequest {
+    ssh_key_backend: String,
+}
 
+fn parse_ssh_backend(backend: &str) -> Result<CryptoBackend, StatusCode> {
+    match backend {
+        "software" => Ok(CryptoBackend::Software),
+        "tpm" => Ok(CryptoBackend::TPM),
+        _ => Err(StatusCode::BAD_REQUEST),
+    }
+}
 pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIDevelopmentEnvironment>>), StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
@@ -142,11 +153,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
     let mut id = Uuid::nil();
     let repo = if request.repo.is_empty() { None } else { Some(request.repo) };
     let branch = if request.branch.is_empty() { None } else { Some(request.branch) };
-    let backend = match request.ssh_key_backend.as_str() {
-        "software" => CryptoBackend::Software,
-        "tpm" => CryptoBackend::TPM,
-        _ => return Err(StatusCode::BAD_REQUEST),
-    };
+    let backend = parse_ssh_backend(&request.ssh_key_backend)?;
     let ssh_key = request_hsm_operation(HSMOperation::GenerateSSHKey(backend)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     db.transaction(async |db| {
         container = diesel::insert_into(containers::table).values(container).get_result(db).await?;
@@ -171,6 +178,32 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let response = CreateDevelopmentEnvironmentResponse { id };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
+}
+pub async fn rotate_ssh_key(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+    let user = authenticate(&headers).await?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
+    let request: RotateSSHKeyRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
+    let uid = user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut db = get_db().await?;
+    containers::table
+        .filter(
+            containers::id
+                .eq(id)
+                .and(containers::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
+                .and(containers::origin.eq(ContainerOrigin::DevelopmentEnvironment as i32)),
+        )
+        .first::<Container>(&mut db)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
+    let backend = parse_ssh_backend(&request.ssh_key_backend)?;
+    let ssh_key = request_hsm_operation(HSMOperation::GenerateSSHKey(backend)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    diesel::update(development_environments::table.filter(development_environments::id.eq(id)))
+        .set(development_environments::ssh_key.eq(ssh_key))
+        .execute(&mut db)
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server(&format!("WEB:REFRESH:{uid}")).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    sign_response::<String>(signature, None)
 }
 pub async fn set_development_environment_state(
     headers: HeaderMap,

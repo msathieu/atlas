@@ -5,13 +5,9 @@ let { data } = $props();
 
 let name = $state("");
 let nestedContainers = $state(false);
-let hardwareCrypto = $state(true);
+let cryptoBackend = $state("tpm");
 
 async function createEnvironment() {
-  let cryptoBackend = "software";
-  if (hardwareCrypto) {
-    cryptoBackend = "tpm";
-  }
   const response = await authenticatedFetch(`/api/development_environments`, {
     method: "POST",
     body: JSON.stringify({ name: name, repo: data.repo, branch: "", nested_containers: nestedContainers, ssh_key_backend: cryptoBackend }),
@@ -35,8 +31,11 @@ async function createEnvironment() {
         </p>
       {/if}
       <p>
-        Store SSH Key in TPM:
-        <input id="hardware_crypto" type="checkbox" class="checkbox" bind:checked={hardwareCrypto} />
+        SSH Crypto Backend:
+        <select id="ssh_key_backend" class="select" bind:value={cryptoBackend}>
+          <option value="software">Software</option>
+          <option value="tpm">TPM</option>
+        </select>
       </p>
       <button
         class="btn btn-primary"

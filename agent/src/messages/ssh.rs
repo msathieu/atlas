@@ -37,7 +37,15 @@ static SSH_HEALTH_NOTIFY: Notify = Notify::const_new();
 
 async fn sign_internal(agent: &mut SSHAgent, request: SignRequest) -> Result<Option<Signature>, Box<dyn Error>> {
     let mut stream = agent.stream.lock().await;
-    write_message(MessageType::ForwardSSHAgentRequest, ForwardSshAgentRequest { data: request.data }, &mut *stream).await?;
+    write_message(
+        MessageType::ForwardSSHAgentRequest,
+        ForwardSshAgentRequest {
+            data: request.data,
+            key: agent.key.to_openssh()?,
+        },
+        &mut *stream,
+    )
+    .await?;
     let (_, buf) = read_message(&mut *stream, Some(MessageType::ForwardSSHAgentResponse)).await?;
     let response = ForwardSshAgentResponse::decode(&*buf)?;
     if !response.accepted {
@@ -108,14 +116,16 @@ async fn ssh_agent_task(key: PublicKey, host: String, tls_connector: TlsConnecto
     }
 }
 pub async fn handle_ssh_agent(msg: StartSshAgentRequest, stream: &mut TlsStream<TcpStream>, host: String, tls_connector: TlsConnector) -> Result<(), Box<dyn Error>> {
-    if let Some(ssh_task) = SSH_TASK.lock().await.as_ref() {
+    let mut ssh_task_slot = SSH_TASK.lock().await;
+    if let Some(ssh_task) = ssh_task_slot.take() {
         ssh_task.abort();
+        let _ = ssh_task.await;
     }
     let public_key = PublicKey::from_openssh(&msg.key)?;
     let task = tokio::spawn(async {
         ssh_agent_task(public_key, host, tls_connector).await.unwrap();
     });
-    *SSH_TASK.lock().await = Some(task);
+    *ssh_task_slot = Some(task);
     write_message(MessageType::StartSSHAgentResponse, StartSshAgentResponse {}, stream).await?;
     Ok(())
 }

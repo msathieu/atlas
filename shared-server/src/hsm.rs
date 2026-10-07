@@ -45,6 +45,11 @@ pub fn get_ssh_backend(key: &str) -> Result<CryptoBackend, Box<dyn Error>> {
         SSHKey::TPM(_, _) => CryptoBackend::TPM,
     })
 }
+pub fn matches_ssh_pubkey(key: &str, public_key: &str) -> Result<bool, Box<dyn Error>> {
+    let expected = PublicKey::from_openssh(&get_ssh_pubkey(key, None)?)?;
+    let requested = PublicKey::from_openssh(public_key)?;
+    Ok(expected.key_data() == requested.key_data())
+}
 pub async fn request_hsm_operation(operation: HSMOperation) -> Result<String, Box<dyn Error>> {
     let (mut valkey_client, mut receiver) = get_valkey_client().await?;
     let signing_id = Uuid::new_v4();

@@ -3,7 +3,7 @@ import { authenticatedFetch } from "#lib/auth.js";
 import { user } from "#lib/state.svelte.js";
 import { formatTime } from "#lib/util.ts";
 import { updateContainer } from "#lib/container.ts";
-import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, SquarePen, Trash } from "@lucide/svelte";
+import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, RefreshCw, SquarePen, Trash } from "@lucide/svelte";
 
 let { data } = $props();
 let selectedEnvironment: any = $state();
@@ -13,16 +13,20 @@ let newName = $state("");
 let newRepo = $state("");
 let newBranch = $state("");
 let newNestedContainers = $state(false);
-let newHardwareCrypto = $state(true);
+let newCryptoBackend = $state("tpm");
+let rotationBackend = $state("tpm");
+
+async function rotateSSHKey() {
+  await authenticatedFetch(`/api/development_environments/${selectedEnvironment.id}/rotate_ssh_key`, {
+    method: "POST",
+    body: JSON.stringify({ ssh_key_backend: rotationBackend }),
+  });
+}
 
 async function createEnvironment() {
-  let cryptoBackend = "software";
-  if (newHardwareCrypto) {
-    cryptoBackend = "tpm";
-  }
   await authenticatedFetch(`/api/development_environments`, {
     method: "POST",
-    body: JSON.stringify({ name: newName, repo: newRepo, branch: newBranch, nested_containers: newNestedContainers, ssh_key_backend: cryptoBackend }),
+    body: JSON.stringify({ name: newName, repo: newRepo, branch: newBranch, nested_containers: newNestedContainers, ssh_key_backend: newCryptoBackend }),
   });
   newName = "";
   newRepo = "";
@@ -56,6 +60,7 @@ async function openDevelopmentEnvironment(id: string) {
         class="cursor-pointer hover:bg-base-200"
         onclick={() => {
           selectedEnvironment = environment;
+          rotationBackend = environment.ssh_key_backend === "TPM" ? "tpm" : "software";
           dialog.showModal();
         }}
       >
@@ -166,6 +171,18 @@ async function openDevelopmentEnvironment(id: string) {
             <td>{selectedEnvironment.ssh_key_backend} </td>
           </tr>
           <tr>
+            <td>Rotate SSH Key</td>
+            <td>
+              <select class="select" bind:value={rotationBackend}>
+                <option value="software">Software</option>
+                <option value="tpm">TPM</option>
+              </select>
+              <button class="btn" onclick={async () => await rotateSSHKey()}>
+                <RefreshCw />
+              </button>
+            </td>
+          </tr>
+          <tr>
             <td>Memory Limit</td>
             <td
               >{selectedEnvironment.memory_limit}
@@ -235,8 +252,11 @@ async function openDevelopmentEnvironment(id: string) {
           </p>
         {/if}
         <p>
-          Store SSH Key in TPM:
-          <input id="hardware_crypto" type="checkbox" class="checkbox" bind:checked={newHardwareCrypto} />
+          SSH Crypto Backend:
+          <select id="ssh_key_backend" class="select" bind:value={newCryptoBackend}>
+            <option value="software">Software</option>
+            <option value="tpm">TPM</option>
+          </select>
         </p>
         <button class="btn btn-primary">Create</button>
       </fieldset>

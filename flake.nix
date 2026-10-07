@@ -32,7 +32,7 @@
           tpm2-tss
           fenix.packages.x86_64-linux.stable.toolchain
         ];
-        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.openssl pkgs.libpq ];
+        LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.openssl pkgs.libpq pkgs.tpm2-tss ];
         shellHook = ''
           export ANDROID_HOME=$HOME/Android
         '';

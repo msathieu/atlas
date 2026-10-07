@@ -8,7 +8,8 @@ use crate::{
     commands::{commands_list, create_command, delete_command},
     containers::update_container,
     development_environments::{
-        approve_ssh_forward_request, create_development_environment, development_environments_list, get_ssh_forward_request, open_development_environment, set_development_environment_state,
+        approve_ssh_forward_request, create_development_environment, development_environments_list, get_ssh_forward_request, open_development_environment, rotate_ssh_key,
+        set_development_environment_state,
     },
     devices::{approve_device, delete_device, devices_list},
     info::{assetlinks, server_info},
@@ -124,6 +125,7 @@ async fn main() {
         .route("/api/development_environments", post(create_development_environment))
         .route("/api/development_environments/{id}/open", post(open_development_environment))
         .route("/api/development_environments/{id}/state", post(set_development_environment_state))
+        .route("/api/development_environments/{id}/rotate_ssh_key", post(rotate_ssh_key))
         .route("/api/development_environments/ssh_forward/{id}", post(get_ssh_forward_request))
         .route("/api/development_environments/ssh_forward/approve/{id}", post(approve_ssh_forward_request))
         .route("/api/agents", get(agents_list))

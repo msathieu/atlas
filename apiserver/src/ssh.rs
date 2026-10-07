@@ -13,6 +13,7 @@ use shared_api::read_message;
 use shared_api::write_message;
 use shared_server::get_valkey_client;
 use shared_server::hsm::HSMOperation;
+use shared_server::hsm::matches_ssh_pubkey;
 use shared_server::hsm::request_hsm_operation;
 use shared_server::models::Container;
 use shared_server::models::DevelopmentEnvironment;
@@ -28,7 +29,14 @@ use tokio::time::timeout;
 use tokio_rustls::TlsStream;
 use uuid::Uuid;
 
-pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStream<TcpStream>, environment_uuid: Uuid, uid: Uuid, ssh_key: String) -> Result<(), Box<dyn Error>> {
+pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStream<TcpStream>, environment_uuid: Uuid, uid: Uuid, pool: &Pool<AsyncPgConnection>) -> Result<(), Box<dyn Error>> {
+    let mut db = pool.get().await?;
+    let environment: DevelopmentEnvironment = development_environments::table.find(environment_uuid).first(&mut db).await?;
+    if !matches_ssh_pubkey(&environment.ssh_key, &msg.key)? {
+        write_message(MessageType::ForwardSSHAgentResponse, ForwardSshAgentResponse { signature: vec![], accepted: false }, stream).await?;
+        return Ok(());
+    }
+    drop(db);
     let (mut valkey_client, mut receiver) = get_valkey_client().await?;
     let signing_id = Uuid::new_v4();
     let valkey_key = format!("SSH_FORWARD:{signing_id}");
@@ -41,7 +49,7 @@ pub async fn handle_ssh_forward(msg: ForwardSshAgentRequest, stream: &mut TlsStr
     };
     let mut response = ForwardSshAgentResponse { signature: vec![], accepted: false };
     if valkey_response == "APPROVED" {
-        let signature = request_hsm_operation(HSMOperation::SignSSHRequest(ssh_key, msg.data)).await?;
+        let signature = request_hsm_operation(HSMOperation::SignSSHRequest(environment.ssh_key, msg.data)).await?;
         response.signature = BASE64_STANDARD.decode(signature)?;
         response.accepted = true;
     }
@@ -64,16 +72,7 @@ pub async fn handle_ssh_agent(mut stream: TlsStream<TcpStream>, pool: Pool<Async
         let (message_type, buf) = read_message(&mut stream, None).await?;
         match message_type {
             MessageType::HeartbeatRequest => handle_heartbeat(HeartbeatRequest::decode(&*buf)?, &mut stream).await,
-            MessageType::ForwardSSHAgentRequest => {
-                handle_ssh_forward(
-                    ForwardSshAgentRequest::decode(&*buf)?,
-                    &mut stream,
-                    development_environment.id,
-                    container.uid,
-                    development_environment.ssh_key.clone(),
-                )
-                .await
-            }
+            MessageType::ForwardSSHAgentRequest => handle_ssh_forward(ForwardSshAgentRequest::decode(&*buf)?, &mut stream, development_environment.id, container.uid, &pool).await,
             _ => return Err("Invalid message type".into()),
         }?
     }

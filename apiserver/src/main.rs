@@ -211,22 +211,25 @@ async fn handle_connection(stream: TcpStream, ip: String, tls_acceptor: TlsAccep
         }
     }
 
-    if let Some(container_id) = device.container_id {
-        let container: Container = containers::table.find(container_id).first(&mut db).await?;
-        if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
-            let development_environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db).await?;
-            let public_key = get_ssh_pubkey(&development_environment.ssh_key, None)?;
-            write_message(MessageType::StartSSHAgentRequest, StartSshAgentRequest { key: public_key }, &mut stream).await?;
-            read_message(&mut stream, Some(MessageType::StartSSHAgentResponse)).await?;
-        }
-    }
-
+    let mut ssh_public_key = None;
     let (mut pubsub_client, mut receiver) = get_valkey_client().await?;
     pubsub_client.subscribe(format!("API:DEVICE:{uuid}")).await?;
     loop {
         let device_exists = devices::table.find(uuid).first::<Device>(&mut db).await.optional()?.is_some();
         if !device_exists {
             return Err("Device no longer exists".into());
+        }
+        if let Some(container_id) = device.container_id {
+            let container: Container = containers::table.find(container_id).first(&mut db).await?;
+            if container.origin == ContainerOrigin::DevelopmentEnvironment as i32 {
+                let environment: DevelopmentEnvironment = development_environments::table.find(container_id).first(&mut db).await?;
+                let public_key = get_ssh_pubkey(&environment.ssh_key, None)?;
+                if ssh_public_key.as_ref() != Some(&public_key) {
+                    write_message(MessageType::StartSSHAgentRequest, StartSshAgentRequest { key: public_key.clone() }, &mut stream).await?;
+                    read_message(&mut stream, Some(MessageType::StartSSHAgentResponse)).await?;
+                    ssh_public_key = Some(public_key);
+                }
+            }
         }
         let command: Option<Command> = commands::table
             .filter(commands::device.eq(uuid).and(commands::completed.eq(false)).and(commands::transient.eq(false)))
