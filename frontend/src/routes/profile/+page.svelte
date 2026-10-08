@@ -7,12 +7,37 @@ import { Passkeys } from "@capawesome/capacitor-passkeys";
 
 let { data } = $props();
 let passwordDialog: any = $state();
+let confirmationDialog: any = $state();
+let confirmationPassword = $state("");
+let confirmationAction = $state<((password: string) => Promise<void>) | null>();
+let confirmationPending = $state(false);
 let oldPassword = $state("");
 let newPassword = $state("");
 let passwordConfirmation = $state("");
 let passwordEnabled = $derived(data.user.password_enabled);
 let email = $derived(data.user.email);
 
+function confirmPassword(action: (password: string) => Promise<void>) {
+  if (confirmationPending) {
+    return;
+  }
+  confirmationAction = action;
+  confirmationDialog.showModal();
+}
+async function submitConfirmation() {
+  if (confirmationPending || !confirmationAction) {
+    return;
+  }
+  confirmationPending = true;
+  try {
+    await confirmationAction(confirmationPassword);
+  } catch (error) {
+    toast.error("Request Failed");
+  } finally {
+    confirmationDialog.close();
+    confirmationPending = false;
+  }
+}
 async function changePassword() {
   if (newPassword != passwordConfirmation) {
     alert("New password fields don't match");
@@ -30,15 +55,15 @@ async function changePassword() {
   );
   if (response.ok) {
     passwordDialog.close();
-    toast.success("Changed password");
+    toast.success("Changed Password");
     localStorage.removeItem("jwt");
     location.reload();
   } else {
-    toast.error("Request denied");
+    toast.error("Request Denied");
   }
 }
-async function setPasswordEnabled() {
-  const body = JSON.stringify({ password: prompt("Enter your password:"), password_state: passwordEnabled });
+async function setPasswordEnabled(password: string, enabled: boolean) {
+  const body = JSON.stringify({ password, password_state: enabled });
   const encryptedBody = await encryptToServer(body);
   await authenticatedFetch(
     `/api/user/info`,
@@ -49,10 +74,10 @@ async function setPasswordEnabled() {
     undefined,
     "application/octet-stream",
   );
-  toast.success("Changed password state");
+  toast.success("Changed Password State");
 }
-async function updateEmail() {
-  const body = JSON.stringify({ password: prompt("Enter your password:"), email });
+async function updateEmail(password: string, newEmail: string) {
+  const body = JSON.stringify({ password, email: newEmail });
   const encryptedBody = await encryptToServer(body);
   await authenticatedFetch(
     `/api/user/info`,
@@ -63,10 +88,10 @@ async function updateEmail() {
     undefined,
     "application/octet-stream",
   );
-  toast.success("Changed email");
+  toast.success("Changed Email");
 }
-async function registerPasskey() {
-  const body = JSON.stringify({ password: prompt("Enter your password to register a new passkey:") });
+async function registerPasskey(password: string) {
+  const body = JSON.stringify({ password });
   const encryptedBody = await encryptToServer(body);
   const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST", body: encryptedBody }, undefined, "application/octet-stream");
   const startData = await startRes.json();
@@ -91,7 +116,15 @@ async function deletePasskey(id: string) {
 >
   Change Password
 </button>
-<dialog bind:this={passwordDialog} class="modal">
+<dialog
+  bind:this={passwordDialog}
+  class="modal"
+  onclose={() => {
+    oldPassword = "";
+    newPassword = "";
+    passwordConfirmation = "";
+  }}
+>
   <form class="modal-backdrop" method="dialog">
     <button>Close</button>
   </form>
@@ -112,19 +145,47 @@ async function deletePasskey(id: string) {
     </form>
   </div>
 </dialog>
+<dialog
+  bind:this={confirmationDialog}
+  class="modal"
+  onclose={() => {
+    confirmationAction = null;
+    confirmationPassword = "";
+  }}
+>
+  <form class="modal-backdrop" method="dialog">
+    <button>Close</button>
+  </form>
+  <div class="modal-box">
+    <h2 class="text-xl text-center">Confirm Password</h2>
+    <br />
+    <form
+      onsubmit={async (e) => {
+        e.preventDefault();
+        await submitConfirmation();
+      }}
+    >
+      <fieldset class="fieldset" disabled={confirmationPending}>
+        <input id="confirmationPassword" placeholder="Password" type="password" class="input w-full" required autocomplete="current-password" bind:value={confirmationPassword} />
+        <button type="submit" class="btn btn-primary">Confirm</button>
+      </fieldset>
+    </form>
+  </div>
+</dialog>
 <br />
 <button
   class="btn"
-  onclick={async () => {
-    await registerPasskey();
+  onclick={() => {
+    confirmPassword(registerPasskey);
   }}
 >
   Register Passkey
 </button>
 <form
-  onsubmit={async (e) => {
+  onsubmit={(e) => {
     e.preventDefault();
-    await setPasswordEnabled();
+    const intendedEnabled = passwordEnabled;
+    confirmPassword((password) => setPasswordEnabled(password, intendedEnabled));
   }}
 >
   Allow Password Login:
@@ -132,9 +193,10 @@ async function deletePasskey(id: string) {
   <button class="btn"><Check /></button>
 </form>
 <form
-  onsubmit={async (e) => {
+  onsubmit={(e) => {
     e.preventDefault();
-    await updateEmail();
+    const intendedEmail = email;
+    confirmPassword((password) => updateEmail(password, intendedEmail));
   }}
 >
   Email:

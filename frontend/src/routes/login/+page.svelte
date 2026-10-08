@@ -73,6 +73,7 @@ async function passkeyLogin() {
   await finishAuth(username, json["jwt"], keyPair);
 }
 async function finishAuth(username: string, jwt: string, keyPair: CryptoKeyPair) {
+  password = "";
   const db = getDatabase();
   await db.table("keys").put({ name: "jwt_signing", key: keyPair.privateKey });
   localStorage.setItem("username", username);
