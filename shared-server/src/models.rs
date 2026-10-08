@@ -130,7 +130,6 @@ pub struct ToolCall {
     pub response: Option<String>,
     pub user_consented: Option<bool>,
     pub initiated: bool,
-    pub provider_id: Option<String>,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]

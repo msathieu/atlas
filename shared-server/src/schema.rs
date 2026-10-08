@@ -156,7 +156,6 @@ diesel::table! {
         response -> Nullable<Varchar>,
         user_consented -> Nullable<Bool>,
         initiated -> Bool,
-        provider_id -> Nullable<Varchar>,
     }
 }
 

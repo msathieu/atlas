@@ -1,12 +1,15 @@
 use crate::tools::get_toolset;
 use diesel::{dsl::insert_into, prelude::*};
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl, pooled_connection::deadpool::Pool};
-use rig_agent::agent::Text;
 use rig_core::{
-    client::CompletionClient,
-    completion::CompletionModel,
-    message::{AssistantContent, ProviderCallId, ReasoningContent, ToolCallId, ToolFunction, ToolResult, ToolResultContent, UserContent},
-    providers::{openai, openrouter},
+    DynModel,
+    completion::CompletionRequest,
+    message::{AssistantContent, Issuer, Reasoning, ReasoningContent, Text, ToolFunction, ToolName, ToolResult, ToolResultContent, UserContent},
+    operation::Completion,
+    providers::{
+        openai::{self, wire::upstream_reasoning_issuer},
+        openrouter,
+    },
 };
 use shared_api::ChatType;
 use shared_server::{
@@ -35,16 +38,15 @@ pub async fn process_chats(pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn 
         } else {
             continue;
         }
-        let (mut openrouter_client, mut generic_client) = (None, None);
         let model;
-        match llm_provider.as_str() {
+        let completion_model = match llm_provider.as_str() {
             "openrouter" => {
                 let api_key = settings::table.find("llm_openrouter_key").first::<Setting>(&mut db).await?;
                 model = settings::table.find("llm_openrouter_model").first::<Setting>(&mut db).await?.value;
                 if api_key.value.is_empty() || model.is_empty() {
                     return Ok(());
                 }
-                openrouter_client = Some(openrouter::Client::new(&api_key.value)?);
+                openrouter::new(api_key.value).completion(model.clone()).erase()
             }
             "generic" => {
                 let endpoint = settings::table.find("llm_generic_endpoint").first::<Setting>(&mut db).await?;
@@ -53,17 +55,12 @@ pub async fn process_chats(pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn 
                 if endpoint.value.is_empty() || model.is_empty() {
                     return Ok(());
                 }
-                generic_client = Some(openai::Client::builder().base_url(endpoint.value).api_key(&api_key.value).build()?);
+                openai::OpenAIConfig::new(api_key.value).with_base_url(endpoint.value).client().responses(model.clone()).erase()
             }
             _ => return Err("Invalid LLM provider")?,
         };
         tasks.push(tokio::spawn(async move {
-            let result = match llm_provider.as_str() {
-                "openrouter" => process_chat::<openrouter::Client>(chat, pool.clone(), error_count, &llm_provider, openrouter_client.unwrap(), model).await,
-                "generic" => process_chat::<openai::Client>(chat, pool.clone(), error_count, &llm_provider, generic_client.unwrap(), model).await,
-                _ => Err("Invalid LLM provider".into()),
-            }
-            .map_err(|e| e.to_string());
+            let result = process_chat(chat, pool.clone(), error_count, &llm_provider, completion_model, &model).await.map_err(|e| e.to_string());
             if let Err(e) = result {
                 eprintln!("Error while processing chats: {}", e);
                 if let Ok(mut db) = pool.get().await {
@@ -79,11 +76,7 @@ pub async fn process_chats(pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn 
     }
     Ok(())
 }
-#[allow(clippy::get_first)]
-async fn process_chat<C: CompletionClient>(chat: Chat, pool: Pool<AsyncPgConnection>, error_count: i32, provider: &str, client: C, model: String) -> Result<(), Box<dyn Error>>
-where
-    C::CompletionModel: Clone,
-{
+async fn process_chat(chat: Chat, pool: Pool<AsyncPgConnection>, error_count: i32, provider: &str, completion_model: DynModel<Completion>, model: &str) -> Result<(), Box<dyn Error>> {
     let mut db = pool.get().await?;
     let chat_id = chat.id.ok_or("Invalid chat")?;
     let messages: Vec<Message> = messages::table.filter(messages::chat.eq(chat_id)).order_by(messages::sequence.asc()).get_results(&mut db).await?;
@@ -185,51 +178,45 @@ The servers you can access are: {}
             })];
             for call in &tool_calls {
                 let function = ToolFunction {
-                    name: call.tool.clone(),
+                    name: ToolName::new(call.tool.clone())?,
                     arguments: serde_json::from_str(&call.request)?,
                 };
-                let provider = if let Some(provider_id) = &call.provider_id { ProviderCallId::new(provider_id) } else { None };
                 parts.push(AssistantContent::ToolCall(rig_core::message::ToolCall {
-                    id: ToolCallId::new(call.call_id.clone()).ok_or("Invalid call ID")?,
+                    id: serde_json::from_str(&call.call_id)?,
                     function,
                     additional_params: None,
                     signature: None,
-                    provider,
                 }));
             }
             if let Some(reasoning) = msg.reasoning {
-                parts.push(AssistantContent::Reasoning(rig_core::message::Reasoning::new(&reasoning)));
+                let issuer = match msg.provider.as_str() {
+                    "generic" => Issuer::from("openai"),
+                    "openrouter" => Issuer::from(upstream_reasoning_issuer("openrouter", &msg.model)),
+                    _ => return Err("Invalid message provider".into()),
+                };
+                parts.push(AssistantContent::Reasoning(Reasoning::new(&reasoning).sealed(issuer)));
             }
             ai_messages.push(rig_core::message::Message::Assistant { id: None, content: parts });
             if !tool_calls.is_empty() {
                 let mut parts = Vec::new();
                 for call in &tool_calls {
                     let response = call.response.clone().ok_or("Invalid tool call")?;
-                    let provider = if let Some(provider_id) = &call.provider_id { ProviderCallId::new(provider_id) } else { None };
                     parts.push(UserContent::ToolResult(ToolResult {
-                        call: ToolCallId::new(call.call_id.clone()).ok_or("Invalid call ID")?,
-                        provider,
+                        call: serde_json::from_str(&call.call_id)?,
                         content: vec![ToolResultContent::Text(Text {
                             text: response,
                             additional_params: None,
                         })],
-                        name: call.tool.clone(),
+                        name: ToolName::new(call.tool.clone())?,
                     }));
                 }
                 ai_messages.push(rig_core::message::Message::User { content: parts });
             }
         }
     }
-    let (last_ai_message, other_ai_messages) = ai_messages.split_last().ok_or("Invalid chat")?;
     let toolset = get_toolset(chat.uid, chat.id.ok_or("Invalid chat")?, 0, "".to_string());
-    let completion = client
-        .completion_model(&model)
-        .completion_request(last_ai_message.clone())
-        .preamble(preamble)
-        .messages(other_ai_messages.to_vec())
-        .tools(toolset.get_tool_definitions())
-        .send()
-        .await?;
+    let request = CompletionRequest::from(ai_messages).preamble(preamble).tools(toolset.tool_definitions());
+    let completion = completion_model.call(request).await?;
     let mut text = None;
     let mut calls = Vec::new();
     let mut reasoning = None;
@@ -250,7 +237,7 @@ The servers you can access are: {}
                 if auto_approved_tools.contains(&call.function.name.as_str()) {
                     consent = Some(true);
                 }
-                if call.function.name == "execute_code" && call.function.arguments.get("code").is_none() {
+                if call.function.name.as_str() == "execute_code" && call.function.arguments.get("code").is_none() {
                     consent = Some(true);
                 }
                 let request = call.function.arguments.to_string();
@@ -261,23 +248,23 @@ The servers you can access are: {}
                 calls.push(ToolCall {
                     chat: chat_id,
                     sequence: last_sequence + 1,
-                    call_id: call.id.into_string(),
-                    tool: call.function.name,
+                    call_id: serde_json::to_string(&call.id)?,
+                    tool: call.function.name.into(),
                     request,
                     response: None,
                     user_consented: consent,
                     initiated: false,
-                    provider_id: call.provider.map(|provider| provider.call_id),
                 });
             }
             AssistantContent::Reasoning(reasoning_arg) => {
+                let reasoning_arg = reasoning_arg.open(reasoning_arg.issuer()).ok_or("Invalid reasoning issuer")?;
                 if reasoning_arg.content.is_empty() {
                     continue;
                 }
                 if reasoning_arg.content.len() != 1 {
                     return Err("Invalid LLM response".into());
                 }
-                let reasoning_content = reasoning_arg.content.get(0).ok_or("Invalid LLM response")?.to_owned();
+                let reasoning_content = reasoning_arg.content.as_slice().first().ok_or("Invalid LLM response")?.to_owned();
                 reasoning = match reasoning_content {
                     ReasoningContent::Text { text, signature: _ } => Some(text),
                     ReasoningContent::Encrypted(_) => None,
@@ -306,10 +293,10 @@ The servers you can access are: {}
         generation_id: completion.message_id,
         finished: true,
         reasoning,
-        input_tokens: completion.usage.input_tokens as i32,
-        output_tokens: completion.usage.output_tokens as i32,
+        input_tokens: completion.usage.input_tokens.unwrap_or(0) as i32,
+        output_tokens: completion.usage.output_tokens.unwrap_or(0) as i32,
         provider: provider.to_owned(),
-        model,
+        model: model.to_string(),
         compacted: false,
     };
     for call in &calls {
