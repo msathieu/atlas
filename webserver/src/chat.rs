@@ -36,6 +36,7 @@ pub struct APIToolCall {
     request: String,
     response: Option<String>,
     user_consented: Option<bool>,
+    error: bool,
 }
 #[derive(Serialize)]
 pub struct APIMessage {
@@ -185,6 +186,7 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri
                 request: call.request.clone(),
                 response: call.response.clone(),
                 user_consented: call.user_consented,
+                error: call.error,
             })
             .collect();
         api_messages.push(APIMessage {
@@ -258,6 +260,7 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<Uuid>, uri: Origina
         provider: "user".to_owned(),
         model: "".to_owned(),
         compacted: false,
+        origin: None,
     };
     diesel::update(chats::table.find(chat_id))
         .set((chats::end_timestamp.eq(SystemTime::now()), chats::error_count.eq(0), chats::consecutive_llm_messages.eq(0)))
@@ -293,6 +296,7 @@ pub async fn manage_tool_call_consent(headers: HeaderMap, Path((chat_id, seq, ca
             .set((
                 tool_calls::user_consented.eq(false),
                 tool_calls::response.eq(format!("User has rejected the tool call: {}", request.rejection_reason)),
+                tool_calls::error.eq(true),
             ))
             .execute(&mut db)
             .await

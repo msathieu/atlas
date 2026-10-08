@@ -116,6 +116,7 @@ pub struct Message {
     pub provider: String,
     pub model: String,
     pub compacted: bool,
+    pub origin: Option<String>,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]
@@ -130,6 +131,7 @@ pub struct ToolCall {
     pub response: Option<String>,
     pub user_consented: Option<bool>,
     pub initiated: bool,
+    pub error: bool,
 }
 
 #[derive(Debug, Queryable, Insertable, Selectable, AsChangeset)]

@@ -4,12 +4,9 @@ use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl, pooled_conne
 use rig_core::{
     DynModel,
     completion::CompletionRequest,
-    message::{AssistantContent, Issuer, Reasoning, ReasoningContent, Text, ToolFunction, ToolName, ToolResult, ToolResultContent, UserContent},
+    message::{AssistantContent, AssistantMessage, Origin, Reasoning, StopReason, Text, ToolFunction, ToolName, ToolResult, ToolResultContent, UserContent},
     operation::Completion,
-    providers::{
-        openai::{self, wire::upstream_reasoning_issuer},
-        openrouter,
-    },
+    providers::{openai, openrouter},
 };
 use shared_api::ChatType;
 use shared_server::{
@@ -110,6 +107,7 @@ async fn process_chat(chat: Chat, pool: Pool<AsyncPgConnection>, error_count: i3
             provider: "internal".to_owned(),
             model: "".to_owned(),
             compacted: false,
+            origin: None,
         };
         if error_count < 5 {
             reply.content = "Maximum number of consecutive LLM messages reached".into();
@@ -172,42 +170,29 @@ The servers you can access are: {}
                 .filter(tool_calls::chat.eq(chat_id).and(tool_calls::sequence.eq(msg.sequence)))
                 .get_results(&mut db)
                 .await?;
-            let mut parts = vec![AssistantContent::Text(Text {
-                text: msg.content.clone(),
-                additional_params: None,
-            })];
+            let mut parts = vec![AssistantContent::Text(Text::new(msg.content.clone()))];
             for call in &tool_calls {
-                let function = ToolFunction {
-                    name: ToolName::new(call.tool.clone())?,
-                    arguments: serde_json::from_str(&call.request)?,
-                };
-                parts.push(AssistantContent::ToolCall(rig_core::message::ToolCall {
-                    id: serde_json::from_str(&call.call_id)?,
-                    function,
-                    additional_params: None,
-                    signature: None,
-                }));
+                let function = ToolFunction::new(ToolName::new(call.tool.clone())?, serde_json::from_str(&call.request)?);
+                parts.push(AssistantContent::ToolCall(rig_core::message::ToolCall::new(serde_json::from_str(&call.call_id)?, function)));
             }
             if let Some(reasoning) = msg.reasoning {
-                let issuer = match msg.provider.as_str() {
-                    "generic" => Issuer::from("openai"),
-                    "openrouter" => Issuer::from(upstream_reasoning_issuer("openrouter", &msg.model)),
-                    _ => return Err("Invalid message provider".into()),
-                };
-                parts.push(AssistantContent::Reasoning(Reasoning::new(&reasoning).sealed(issuer)));
+                parts.push(AssistantContent::Reasoning(Reasoning::new(reasoning)));
             }
-            ai_messages.push(rig_core::message::Message::Assistant { id: None, content: parts });
+            let origin: Option<Origin> = match msg.origin {
+                Some(origin) => serde_json::from_str(&origin)?,
+                None => None,
+            };
+            let stop = if tool_calls.is_empty() { StopReason::Stop } else { StopReason::ToolUse };
+            ai_messages.push(rig_core::message::Message::Assistant(AssistantMessage::new(parts).with_origin(origin).with_stop(stop)));
             if !tool_calls.is_empty() {
                 let mut parts = Vec::new();
                 for call in &tool_calls {
                     let response = call.response.clone().ok_or("Invalid tool call")?;
                     parts.push(UserContent::ToolResult(ToolResult {
                         call: serde_json::from_str(&call.call_id)?,
-                        content: vec![ToolResultContent::Text(Text {
-                            text: response,
-                            additional_params: None,
-                        })],
+                        content: vec![ToolResultContent::Text(Text::new(response))],
                         name: ToolName::new(call.tool.clone())?,
+                        is_error: call.error,
                     }));
                 }
                 ai_messages.push(rig_core::message::Message::User { content: parts });
@@ -217,20 +202,21 @@ The servers you can access are: {}
     let toolset = get_toolset(chat.uid, chat.id.ok_or("Invalid chat")?, 0, "".to_string());
     let request = CompletionRequest::from(ai_messages).preamble(preamble).tools(toolset.tool_definitions());
     let completion = completion_model.call(request).await?;
-    let mut text = None;
+    match completion.stop() {
+        StopReason::Error(err) => return Err(err.into()),
+        StopReason::Aborted(err) => return Err(err.into()),
+        _ => {}
+    }
+    let generation_id = completion.response_id().map(|id| id.to_owned());
+    let mut content = completion.text();
+    let reasoning = if completion.reasoning().is_empty() { None } else { Some(completion.reasoning()) };
     let mut calls = Vec::new();
-    let mut reasoning = None;
     let auto_approved_tools = ["device_info", "email", "sleep", "think", "time", "compact", "summary"];
     for part in completion.choice {
         match part {
-            AssistantContent::Text(text_part) => {
-                if text.is_some() {
-                    return Err("Invalid LLM response".into());
-                }
-                text = Some(text_part);
-            }
+            AssistantContent::Text(_) | AssistantContent::Reasoning(_) => {}
             AssistantContent::ToolCall(call) => {
-                if !toolset.contains(call.function.name.as_str()) {
+                if !toolset.contains(call.function.name.as_str()) || call.function.invalid_arguments.is_some() {
                     return Err("Invalid tool call".into());
                 }
                 let mut consent = None;
@@ -240,7 +226,7 @@ The servers you can access are: {}
                 if call.function.name.as_str() == "execute_code" && call.function.arguments.get("code").is_none() {
                     consent = Some(true);
                 }
-                let request = call.function.arguments.to_string();
+                let request = serde_json::to_string(&call.function.arguments)?;
                 let analysis = analyze_text(&request);
                 if analysis.risk_level != RiskLevel::Low && analysis.risk_level != RiskLevel::Medium {
                     return Err("LLM response contains invalid characters".into());
@@ -254,33 +240,14 @@ The servers you can access are: {}
                     response: None,
                     user_consented: consent,
                     initiated: false,
+                    error: false,
                 });
             }
-            AssistantContent::Reasoning(reasoning_arg) => {
-                let reasoning_arg = reasoning_arg.open(reasoning_arg.issuer()).ok_or("Invalid reasoning issuer")?;
-                if reasoning_arg.content.is_empty() {
-                    continue;
-                }
-                if reasoning_arg.content.len() != 1 {
-                    return Err("Invalid LLM response".into());
-                }
-                let reasoning_content = reasoning_arg.content.as_slice().first().ok_or("Invalid LLM response")?.to_owned();
-                reasoning = match reasoning_content {
-                    ReasoningContent::Text { text, signature: _ } => Some(text),
-                    ReasoningContent::Encrypted(_) => None,
-                    ReasoningContent::Redacted { data: _ } => None,
-                    ReasoningContent::Summary(text) => Some(text),
-                };
-            }
-            AssistantContent::Image(_) => {
+            _ => {
                 return Err("Invalid LLM response".into());
             }
         }
     }
-    let mut content = match text {
-        Some(text) => text.text,
-        None => "".to_owned(),
-    };
     if content.is_empty() {
         content = "-".to_string(); // Some API providers reject empty messages
     }
@@ -290,7 +257,7 @@ The servers you can access are: {}
         content,
         sent_on: SystemTime::now(),
         user_message: false,
-        generation_id: completion.message_id,
+        generation_id,
         finished: true,
         reasoning,
         input_tokens: completion.usage.input_tokens.unwrap_or(0) as i32,
@@ -298,6 +265,7 @@ The servers you can access are: {}
         provider: provider.to_owned(),
         model: model.to_string(),
         compacted: false,
+        origin: Some(serde_json::to_string(&completion.origin)?),
     };
     for call in &calls {
         if call.tool != "compact" && call.tool != "summary" {

@@ -62,7 +62,7 @@ async fn main() {
             .await
             .unwrap();
         diesel::update(tool_calls::table.filter(tool_calls::initiated.eq(true).and(tool_calls::response.is_null())))
-            .set(tool_calls::response.eq(Some("Tool call was interrupted")))
+            .set((tool_calls::response.eq(Some("Tool call was interrupted")), tool_calls::error.eq(true)))
             .execute(&mut db)
             .await
             .unwrap();

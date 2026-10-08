@@ -43,16 +43,18 @@ async fn process_tool_call(call: ToolCall, pool: Pool<AsyncPgConnection>) -> Res
     drop(db);
     let toolset = get_toolset(chat.uid, call.chat, call.sequence, call.call_id.clone());
     let execution = (&toolset).execute(&call.tool, call.request, &mut ToolContext::new()).await;
+    let mut error = !execution.is_success();
     let text = if let Some(json) = execution.output().as_json() {
         json.to_string()
     } else if let Some(output) = execution.output().as_text() {
         output.to_string()
     } else {
+        error = true;
         "Error while executing tool".to_string()
     };
     let mut db = pool.get().await?;
     diesel::update(tool_calls::table.filter(tool_calls::chat.eq(call.chat).and(tool_calls::sequence.eq(call.sequence)).and(tool_calls::call_id.eq(call.call_id))))
-        .set(tool_calls::response.eq(Some(text)))
+        .set((tool_calls::response.eq(Some(text)), tool_calls::error.eq(error)))
         .execute(&mut db)
         .await?;
     notify_server("MASTER:LLM").await?;

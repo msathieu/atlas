@@ -117,6 +117,7 @@ diesel::table! {
         provider -> Varchar,
         model -> Varchar,
         compacted -> Bool,
+        origin -> Nullable<Varchar>,
     }
 }
 
@@ -156,6 +157,7 @@ diesel::table! {
         response -> Nullable<Varchar>,
         user_consented -> Nullable<Bool>,
         initiated -> Bool,
+        error -> Bool,
     }
 }
 

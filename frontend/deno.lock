@@ -1,11 +1,11 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@capacitor/android@^8.5.2": "8.5.2_@capacitor+core@8.5.2",
-    "npm:@capacitor/app@^8.1.2": "8.1.2_@capacitor+core@8.5.2",
-    "npm:@capacitor/cli@^8.5.2": "8.5.2",
-    "npm:@capacitor/core@^8.5.2": "8.5.2",
-    "npm:@capawesome/capacitor-passkeys@~0.1.2": "0.1.2_@capacitor+core@8.5.2",
+    "npm:@capacitor/android@^8.5.3": "8.5.3_@capacitor+core@8.5.3",
+    "npm:@capacitor/app@^8.1.2": "8.1.2_@capacitor+core@8.5.3",
+    "npm:@capacitor/cli@^8.5.3": "8.5.3",
+    "npm:@capacitor/core@^8.5.3": "8.5.3",
+    "npm:@capawesome/capacitor-passkeys@~0.1.2": "0.1.2_@capacitor+core@8.5.3",
     "npm:@lucide/svelte@^1.52.0": "1.52.0_svelte@5.57.2",
     "npm:@sveltejs/adapter-node@6": "6.0.0_@sveltejs+kit@3.0.1_svelte@5.57.2",
     "npm:@sveltejs/adapter-static@4": "4.0.0_@sveltejs+kit@3.0.1_svelte@5.57.2",
@@ -30,20 +30,20 @@
     "npm:vite@^8.3.3": "8.3.3_@types+node@26.6.4"
   },
   "npm": {
-    "@capacitor/android@8.5.2_@capacitor+core@8.5.2": {
-      "integrity": "sha512-rtiaz78egCcS+vs29wkWCL3C+RhazKMSygXcjutwWP8NmO6r5UBxOvGf3Wjz5+ahobyQ723tn9gCePwRwcNDZQ==",
+    "@capacitor/android@8.5.3_@capacitor+core@8.5.3": {
+      "integrity": "sha512-ilH4gSSz3DrketMkzDVAvY9JsWJ//rCQnECLTdcFRO7xXDogwAbUvQAnIAbiqefwV/D1xfjEL4Gw1MJXEcaA9g==",
       "dependencies": [
         "@capacitor/core"
       ]
     },
-    "@capacitor/app@8.1.2_@capacitor+core@8.5.2": {
+    "@capacitor/app@8.1.2_@capacitor+core@8.5.3": {
       "integrity": "sha512-uKBlsrXH0IdvUn69e/KKYbZ32A06pcrUdG8LWuZ/6y33YMXZXLEEdNSwl+jKS/SrsTWqnePs8EqSWaiQM3mUGA==",
       "dependencies": [
         "@capacitor/core"
       ]
     },
-    "@capacitor/cli@8.5.2": {
-      "integrity": "sha512-O2kpA5ZPJUAmliDCcmpMf8xnJwMezxlFPUrlyOAjbL3U9MFNY3l4ZpPI/UXwvyPmR8ETcVF9pFr+VdWq61rqTQ==",
+    "@capacitor/cli@8.5.3": {
+      "integrity": "sha512-/G6xwna+p4GS3lthSdWN3OThCH2F85O0Ukdy8rv3oAXvgEMeyFgPEIA3PMAS++IkHwUuBYBAKOQJnZfcrh1n0w==",
       "dependencies": [
         "@ionic/cli-framework-output",
         "@ionic/utils-subprocess",
@@ -51,7 +51,7 @@
         "commander",
         "debug",
         "env-paths",
-        "fs-extra@11.4.0",
+        "fs-extra@11.4.1",
         "kleur@4.1.5",
         "native-run",
         "open",
@@ -66,13 +66,13 @@
       ],
       "bin": true
     },
-    "@capacitor/core@8.5.2": {
-      "integrity": "sha512-agnQbGdhGw/KZFuLf7H9SY2o+oE7upkr/WPQsYaokXP6f9chaE8iVmbKkfN6SVl4w3pmz7oZ3Ur1hbkmy1hx+w==",
+    "@capacitor/core@8.5.3": {
+      "integrity": "sha512-oBE1oGuYE4ZzYYrulC75OuHdSsD6zLUy7d5o1tFwDLG4govGoubY15cxpiI5l0+q87Lm5p0bhbehMdzJg4aFag==",
       "dependencies": [
         "tslib"
       ]
     },
-    "@capawesome/capacitor-passkeys@0.1.2_@capacitor+core@8.5.2": {
+    "@capawesome/capacitor-passkeys@0.1.2_@capacitor+core@8.5.3": {
       "integrity": "sha512-egaDs8M1XjYKG0tmc2brmpnQTCdnlq9NxA6dOMtS4cJY9viYkGPSdt8heaswey5uv8bYo3cxKeQcCZknypG5Hw==",
       "dependencies": [
         "@capacitor/core"
@@ -634,8 +634,8 @@
         "big-integer"
       ]
     },
-    "brace-expansion@5.0.9": {
-      "integrity": "sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==",
+    "brace-expansion@5.0.12": {
+      "integrity": "sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==",
       "dependencies": [
         "balanced-match"
       ]
@@ -764,8 +764,8 @@
         "picomatch"
       ]
     },
-    "fs-extra@11.4.0": {
-      "integrity": "sha512-EQsFzMUJkCKGr1ePqlYADkIUmHW1s3ZXr5Yqy6wbGrfUCphpl2maM/kyOIRA2HpP3AaFQTZXD4ldjek+nccddA==",
+    "fs-extra@11.4.1": {
+      "integrity": "sha512-KYAb4c9BJQI6QqGKthV68OHe0badztdXJWKo0WtBA9IuCFPTKvE5ZdUBglP833aMjhaSPNO4A5j/EkzZtGlKjA==",
       "dependencies": [
         "graceful-fs",
         "jsonfile",
@@ -1001,8 +1001,8 @@
     "lodash@4.18.1": {
       "integrity": "sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q=="
     },
-    "lru-cache@11.5.2": {
-      "integrity": "sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g=="
+    "lru-cache@11.5.3": {
+      "integrity": "sha512-U4N8FgzmWxc8k1VH8Kr6lQg18U7Fjvby6wXHVRX/ZZ7IwWbRMgrRbP0Wrb5q5NVinryp4SQampHKdvtecItxUg=="
     },
     "magic-string@0.30.21": {
       "integrity": "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==",
@@ -1533,10 +1533,10 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@capacitor/android@^8.5.2",
+        "npm:@capacitor/android@^8.5.3",
         "npm:@capacitor/app@^8.1.2",
-        "npm:@capacitor/cli@^8.5.2",
-        "npm:@capacitor/core@^8.5.2",
+        "npm:@capacitor/cli@^8.5.3",
+        "npm:@capacitor/core@^8.5.3",
         "npm:@capawesome/capacitor-passkeys@~0.1.2",
         "npm:@lucide/svelte@^1.52.0",
         "npm:@sveltejs/adapter-node@6",

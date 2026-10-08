@@ -129,6 +129,10 @@ function isCallPendingConsent(toolCalls: any[]): boolean {
                       </td>
                     </tr>
                   {/if}
+                  <tr>
+                    <td>Error</td>
+                    <td>{call.error}</td>
+                  </tr>
                 </tbody>
               </table>
             {/each}
