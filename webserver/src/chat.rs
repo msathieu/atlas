@@ -18,7 +18,10 @@ use shared_server::{
     notify_server,
     schema::{chats, messages, tool_calls},
 };
-use std::time::{Duration, SystemTime};
+use std::{
+    error::Error,
+    time::{Duration, SystemTime},
+};
 use uuid::Uuid;
 
 #[derive(Serialize)]
@@ -53,6 +56,10 @@ pub struct APIMessage {
     model: String,
     compacted: bool,
 }
+#[derive(Deserialize)]
+struct ReasoningText {
+    text: String,
+}
 #[derive(Serialize)]
 pub struct APIChatDetailed {
     id: Uuid,
@@ -80,6 +87,14 @@ pub struct CreateChatRequest {
     chat_type: String,
 }
 
+fn reasoning_text(reasoning: &str) -> Result<String, Box<dyn Error>> {
+    let reasoning: Vec<ReasoningText> = serde_json::from_str(reasoning)?;
+    let mut reasoning_str = String::new();
+    for i in reasoning {
+        reasoning_str.push_str(&i.text);
+    }
+    Ok(reasoning_str)
+}
 pub async fn chats_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIChat>>), StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "GET").await?;
@@ -195,7 +210,10 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri
             sent_on: convert_timestamp(message.sent_on)?,
             user_message: message.user_message,
             finished: message.finished,
-            reasoning: message.reasoning.clone(),
+            reasoning: match &message.reasoning {
+                Some(reasoning) => Some(reasoning_text(reasoning).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?),
+                None => None,
+            },
             tool_calls,
             input_tokens: message.input_tokens as u64,
             output_tokens: message.output_tokens as u64,

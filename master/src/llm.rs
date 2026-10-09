@@ -170,13 +170,17 @@ The servers you can access are: {}
                 .filter(tool_calls::chat.eq(chat_id).and(tool_calls::sequence.eq(msg.sequence)))
                 .get_results(&mut db)
                 .await?;
-            let mut parts = vec![AssistantContent::Text(Text::new(msg.content.clone()))];
+            let mut parts = vec![];
+            if let Some(reasoning) = msg.reasoning {
+                let reasoning_vec: Vec<Reasoning> = serde_json::from_str(&reasoning)?;
+                for i in reasoning_vec {
+                    parts.push(AssistantContent::Reasoning(i));
+                }
+            }
+            parts.push(AssistantContent::Text(Text::new(msg.content.clone())));
             for call in &tool_calls {
                 let function = ToolFunction::new(ToolName::new(call.tool.clone())?, serde_json::from_str(&call.request)?);
                 parts.push(AssistantContent::ToolCall(rig_core::message::ToolCall::new(serde_json::from_str(&call.call_id)?, function)));
-            }
-            if let Some(reasoning) = msg.reasoning {
-                parts.push(AssistantContent::Reasoning(Reasoning::new(reasoning)));
             }
             let origin: Option<Origin> = match msg.origin {
                 Some(origin) => serde_json::from_str(&origin)?,
@@ -209,12 +213,15 @@ The servers you can access are: {}
     }
     let generation_id = completion.response_id().map(|id| id.to_owned());
     let mut content = completion.text();
-    let reasoning = if completion.reasoning().is_empty() { None } else { Some(completion.reasoning()) };
+    let mut reasoning_vec = vec![];
     let mut calls = Vec::new();
     let auto_approved_tools = ["device_info", "email", "sleep", "think", "time", "compact", "summary"];
     for part in completion.choice {
         match part {
-            AssistantContent::Text(_) | AssistantContent::Reasoning(_) => {}
+            AssistantContent::Text(_) => {}
+            AssistantContent::Reasoning(reasoning) => {
+                reasoning_vec.push(reasoning);
+            }
             AssistantContent::ToolCall(call) => {
                 if !toolset.contains(call.function.name.as_str()) || call.function.invalid_arguments.is_some() {
                     return Err("Invalid tool call".into());
@@ -251,6 +258,7 @@ The servers you can access are: {}
     if content.is_empty() {
         content = "-".to_string(); // Some API providers reject empty messages
     }
+    let reasoning = if reasoning_vec.is_empty() { None } else { Some(serde_json::to_string(&reasoning_vec)?) };
     let mut reply = Message {
         chat: chat_id,
         sequence: last_sequence + 1,
