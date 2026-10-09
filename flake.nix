@@ -14,13 +14,13 @@
           apksigner
           cargo-deny
           cmake
-          deno
           diesel-cli
           git
           jq
           kubectl
           kubernetes-helm
           lua5_5
+          nodejs_26
           openjdk
           openssl
           pkg-config

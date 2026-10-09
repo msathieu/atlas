@@ -1,9 +1,9 @@
 <script lang="ts">
-import { authenticatedFetch } from "#lib/auth.ts";
-import { encryptToServer, formatTime } from "#lib/util.ts";
+import { Passkeys } from "@capawesome/capacitor-passkeys";
 import { Check, Trash } from "@lucide/svelte";
 import { toast } from "svelte-sonner";
-import { Passkeys } from "@capawesome/capacitor-passkeys";
+import { authenticatedFetch } from "#lib/auth.ts";
+import { encryptToServer, formatTime } from "#lib/util.ts";
 
 let { data } = $props();
 let passwordDialog: any = $state();
@@ -18,222 +18,231 @@ let passwordEnabled = $derived(data.user.password_enabled);
 let email = $derived(data.user.email);
 
 function confirmPassword(action: (password: string) => Promise<void>) {
-  if (confirmationPending) {
-    return;
-  }
-  confirmationAction = action;
-  confirmationDialog.showModal();
+	if (confirmationPending) {
+		return;
+	}
+	confirmationAction = action;
+	confirmationDialog.showModal();
 }
 async function submitConfirmation() {
-  if (confirmationPending || !confirmationAction) {
-    return;
-  }
-  confirmationPending = true;
-  try {
-    await confirmationAction(confirmationPassword);
-  } catch (error) {
-    toast.error("Request Failed");
-  } finally {
-    confirmationDialog.close();
-    confirmationPending = false;
-  }
+	if (confirmationPending || !confirmationAction) {
+		return;
+	}
+	confirmationPending = true;
+	try {
+		await confirmationAction(confirmationPassword);
+	} catch (_) {
+		toast.error("Request Failed");
+	} finally {
+		confirmationDialog.close();
+		confirmationPending = false;
+	}
 }
 async function changePassword() {
-  if (newPassword != passwordConfirmation) {
-    alert("New password fields don't match");
-    return;
-  }
-  const body = JSON.stringify({ old_password: oldPassword, new_password: newPassword });
-  const response = await authenticatedFetch(
-    `/api/user/update_password`,
-    {
-      method: "POST",
-      body: await encryptToServer(body),
-    },
-    undefined,
-    "application/octet-stream",
-  );
-  if (response.ok) {
-    passwordDialog.close();
-    toast.success("Changed Password");
-    localStorage.removeItem("jwt");
-    location.reload();
-  } else {
-    toast.error("Request Denied");
-  }
+	if (newPassword !== passwordConfirmation) {
+		alert("New password fields don't match");
+		return;
+	}
+	const body = JSON.stringify({
+		old_password: oldPassword,
+		new_password: newPassword,
+	});
+	const response = await authenticatedFetch(
+		`/api/user/update_password`,
+		{
+			method: "POST",
+			body: await encryptToServer(body),
+		},
+		undefined,
+		"application/octet-stream",
+	);
+	if (response.ok) {
+		passwordDialog.close();
+		toast.success("Changed Password");
+		localStorage.removeItem("jwt");
+		location.reload();
+	} else {
+		toast.error("Request Denied");
+	}
 }
 async function setPasswordEnabled(password: string, enabled: boolean) {
-  const body = JSON.stringify({ password, password_state: enabled });
-  const encryptedBody = await encryptToServer(body);
-  await authenticatedFetch(
-    `/api/user/info`,
-    {
-      method: "PATCH",
-      body: encryptedBody,
-    },
-    undefined,
-    "application/octet-stream",
-  );
-  toast.success("Changed Password State");
+	const body = JSON.stringify({ password, password_state: enabled });
+	const encryptedBody = await encryptToServer(body);
+	await authenticatedFetch(
+		`/api/user/info`,
+		{
+			method: "PATCH",
+			body: encryptedBody,
+		},
+		undefined,
+		"application/octet-stream",
+	);
+	toast.success("Changed Password State");
 }
 async function updateEmail(password: string, newEmail: string) {
-  const body = JSON.stringify({ password, email: newEmail });
-  const encryptedBody = await encryptToServer(body);
-  await authenticatedFetch(
-    `/api/user/info`,
-    {
-      method: "PATCH",
-      body: encryptedBody,
-    },
-    undefined,
-    "application/octet-stream",
-  );
-  toast.success("Changed Email");
+	const body = JSON.stringify({ password, email: newEmail });
+	const encryptedBody = await encryptToServer(body);
+	await authenticatedFetch(
+		`/api/user/info`,
+		{
+			method: "PATCH",
+			body: encryptedBody,
+		},
+		undefined,
+		"application/octet-stream",
+	);
+	toast.success("Changed Email");
 }
 async function registerPasskey(password: string) {
-  const body = JSON.stringify({ password });
-  const encryptedBody = await encryptToServer(body);
-  const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST", body: encryptedBody }, undefined, "application/octet-stream");
-  const startData = await startRes.json();
-  const credential = await Passkeys.createPasskey(startData["publicKey"]);
-  await authenticatedFetch(`/api/passkeys/finish_registration`, {
-    method: "POST",
-    body: JSON.stringify({ credential, name: prompt("Enter a name for your passkey:") }),
-  });
+	const body = JSON.stringify({ password });
+	const encryptedBody = await encryptToServer(body);
+	const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST", body: encryptedBody }, undefined, "application/octet-stream");
+	const startData = await startRes.json();
+	const credential = await Passkeys.createPasskey(startData.publicKey);
+	await authenticatedFetch(`/api/passkeys/finish_registration`, {
+		method: "POST",
+		body: JSON.stringify({
+			credential,
+			name: prompt("Enter a name for your passkey:"),
+		}),
+	});
 }
 async function deletePasskey(id: string) {
-  await authenticatedFetch(`/api/passkeys/${id}`, {
-    method: "DELETE",
-  });
+	await authenticatedFetch(`/api/passkeys/${id}`, {
+		method: "DELETE",
+	});
 }
 </script>
 
 <button
-  class="btn"
-  onclick={() => {
-    passwordDialog.showModal();
-  }}
+	type="button"
+	class="btn"
+	onclick={() => {
+		passwordDialog.showModal();
+	}}
 >
-  Change Password
+	Change Password
 </button>
 <dialog
-  bind:this={passwordDialog}
-  class="modal"
-  onclose={() => {
-    oldPassword = "";
-    newPassword = "";
-    passwordConfirmation = "";
-  }}
+	bind:this={passwordDialog}
+	class="modal"
+	onclose={() => {
+		oldPassword = "";
+		newPassword = "";
+		passwordConfirmation = "";
+	}}
 >
-  <form class="modal-backdrop" method="dialog">
-    <button>Close</button>
-  </form>
-  <div class="modal-box max-w-200">
-    <h1>Change Password</h1>
-    <form
-      onsubmit={async (e) => {
-        e.preventDefault();
-        await changePassword();
-      }}
-    >
-      <fieldset class="fieldset">
-        <input id="oldPassword" type="password" placeholder="Old password" class="input" required autocomplete="current-password" bind:value={oldPassword} />
-        <input id="newPassword" type="password" placeholder="New password" class="input" required autocomplete="new-password" bind:value={newPassword} />
-        <input id="passwordConfirmation" type="password" placeholder="Confirm password" class="input" required autocomplete="new-password" bind:value={passwordConfirmation} />
-        <button class="btn btn-primary">Update</button>
-      </fieldset>
-    </form>
-  </div>
+	<form class="modal-backdrop" method="dialog">
+		<button type="submit">Close</button>
+	</form>
+	<div class="modal-box max-w-200">
+		<h1>Change Password</h1>
+		<form
+			onsubmit={async (e) => {
+				e.preventDefault();
+				await changePassword();
+			}}
+		>
+			<fieldset class="fieldset">
+				<input id="oldPassword" type="password" placeholder="Old password" class="input" required autocomplete="current-password" bind:value={oldPassword}>
+				<input id="newPassword" type="password" placeholder="New password" class="input" required autocomplete="new-password" bind:value={newPassword}>
+				<input id="passwordConfirmation" type="password" placeholder="Confirm password" class="input" required autocomplete="new-password" bind:value={passwordConfirmation}>
+				<button type="submit" class="btn btn-primary">Update</button>
+			</fieldset>
+		</form>
+	</div>
 </dialog>
 <dialog
-  bind:this={confirmationDialog}
-  class="modal"
-  onclose={() => {
-    confirmationAction = null;
-    confirmationPassword = "";
-  }}
+	bind:this={confirmationDialog}
+	class="modal"
+	onclose={() => {
+		confirmationAction = null;
+		confirmationPassword = "";
+	}}
 >
-  <form class="modal-backdrop" method="dialog">
-    <button>Close</button>
-  </form>
-  <div class="modal-box">
-    <h2 class="text-xl text-center">Confirm Password</h2>
-    <br />
-    <form
-      onsubmit={async (e) => {
-        e.preventDefault();
-        await submitConfirmation();
-      }}
-    >
-      <fieldset class="fieldset" disabled={confirmationPending}>
-        <input id="confirmationPassword" placeholder="Password" type="password" class="input w-full" required autocomplete="current-password" bind:value={confirmationPassword} />
-        <button type="submit" class="btn btn-primary">Confirm</button>
-      </fieldset>
-    </form>
-  </div>
+	<form class="modal-backdrop" method="dialog">
+		<button type="submit">Close</button>
+	</form>
+	<div class="modal-box">
+		<h2 class="text-xl text-center">Confirm Password</h2>
+		<br>
+		<form
+			onsubmit={async (e) => {
+				e.preventDefault();
+				await submitConfirmation();
+			}}
+		>
+			<fieldset class="fieldset" disabled={confirmationPending}>
+				<input id="confirmationPassword" placeholder="Password" type="password" class="input w-full" required autocomplete="current-password" bind:value={confirmationPassword}>
+				<button type="submit" class="btn btn-primary">Confirm</button>
+			</fieldset>
+		</form>
+	</div>
 </dialog>
-<br />
+<br>
 <button
-  class="btn"
-  onclick={() => {
-    confirmPassword(registerPasskey);
-  }}
+	type="button"
+	class="btn"
+	onclick={() => {
+		confirmPassword(registerPasskey);
+	}}
 >
-  Register Passkey
+	Register Passkey
 </button>
 <form
-  onsubmit={(e) => {
-    e.preventDefault();
-    const intendedEnabled = passwordEnabled;
-    confirmPassword((password) => setPasswordEnabled(password, intendedEnabled));
-  }}
+	onsubmit={(e) => {
+		e.preventDefault();
+		const intendedEnabled = passwordEnabled;
+		confirmPassword((password) => setPasswordEnabled(password, intendedEnabled));
+	}}
 >
-  Allow Password Login:
-  <input id="passwordEnabled" type="checkbox" class="checkbox" bind:checked={passwordEnabled} />
-  <button class="btn"><Check /></button>
+	Allow Password Login:
+	<input id="passwordEnabled" type="checkbox" class="checkbox" bind:checked={passwordEnabled}>
+	<button type="submit" class="btn"><Check /></button>
 </form>
 <form
-  onsubmit={(e) => {
-    e.preventDefault();
-    const intendedEmail = email;
-    confirmPassword((password) => updateEmail(password, intendedEmail));
-  }}
+	onsubmit={(e) => {
+		e.preventDefault();
+		const intendedEmail = email;
+		confirmPassword((password) => updateEmail(password, intendedEmail));
+	}}
 >
-  Email:
-  <input id="email" type="email" class="input" required bind:value={email} />
-  <button class="btn"><Check /></button>
+	Email:
+	<input id="email" type="email" class="input" required bind:value={email}>
+	<button type="submit" class="btn"><Check /></button>
 </form>
 <div class="divider"></div>
 <table class="border border-base-content/10 table">
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Created At</th>
-      <th>Last Used</th>
-      <th>Delete</th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each data.passkeys as passkey}
-      <tr class="hover:bg-base-200">
-        <td>{passkey.name}</td>
-        <td>{formatTime(passkey.created_at)}</td>
-        {#if passkey.last_used}
-          <td>{formatTime(passkey.last_used)}</td>
-        {:else}
-          <td>Never</td>
-        {/if}
-        <td>
-          <button
-            class="btn"
-            onclick={async () => {
-              await deletePasskey(passkey.id);
-            }}
-          >
-            <Trash />
-          </button>
-        </td>
-      </tr>
-    {/each}
-  </tbody>
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Created At</th>
+			<th>Last Used</th>
+			<th>Delete</th>
+		</tr>
+	</thead>
+	<tbody>
+		{#each data.passkeys as passkey}
+			<tr class="hover:bg-base-200">
+				<td>{passkey.name}</td>
+				<td>{formatTime(passkey.created_at)}</td>
+				{#if passkey.last_used}
+					<td>{formatTime(passkey.last_used)}</td>
+				{:else}
+					<td>Never</td>
+				{/if}
+				<td>
+					<button
+						type="button"
+						class="btn"
+						onclick={async () => {
+							await deletePasskey(passkey.id);
+						}}
+					>
+						<Trash />
+					</button>
+				</td>
+			</tr>
+		{/each}
+	</tbody>
 </table>

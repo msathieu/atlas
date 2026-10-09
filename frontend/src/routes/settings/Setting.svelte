@@ -6,18 +6,18 @@ let { name, description, val, type, global } = $props();
 </script>
 
 <h1 class="text-xl">{description}</h1>
-<br />
+<br>
 <form
-  onsubmit={async (e) => {
-    e.preventDefault();
-    await updateSetting(name, val, global === "true");
-  }}
+	onsubmit={async (e) => {
+		e.preventDefault();
+		await updateSetting(name, val, global === "true");
+	}}
 >
-  {#if type === "textarea"}
-    <textarea id={name} placeholder={description} class="textarea w-3xl h-100" bind:value={val}></textarea>
-  {:else}
-    <input id={name} type="text" placeholder={description} class="input" bind:value={val} />
-  {/if}
-  <button class="btn"><Check /></button>
+	{#if type === "textarea"}
+		<textarea id={name} placeholder={description} class="textarea w-3xl h-100" bind:value={val}></textarea>
+	{:else}
+		<input id={name} type="text" placeholder={description} class="input" bind:value={val}>
+	{/if}
+	<button type="submit" class="btn"><Check /></button>
 </form>
-<br />
+<br>

@@ -24,12 +24,10 @@ jobs:
       - name: Run cargo fmt
         run: nix develop -c -- cargo fmt --check
       - name: Install frontend dependencies
-        run: cd frontend && nix develop -c deno install
+        run: cd frontend && nix develop -c npm ci
       - name: Build frontend
-        run: cd frontend && PUBLIC_API_HOST= PUBLIC_API_ENCRYPTION_PUBKEY= PUBLIC_API_SIGNING_PUBKEY= nix develop -c deno task build
+        run: cd frontend && nix develop -c npm run build
       - name: Run svelte-check
-        run: cd frontend && nix develop -c deno task check
-      - name: Run deno lint
-        run: cd frontend && nix develop -c -- deno lint
-      - name: Run deno fmt
-        run: cd frontend && nix develop -c -- deno fmt --check
+        run: cd frontend && nix develop -c npm run check
+      - name: Run Biome lint
+        run: cd frontend && nix develop -c npm run lint

@@ -1,6 +1,6 @@
 FROM quay.io/fedora/fedora-toolbox:45
 RUN dnf up -y
-RUN dnf install -y chromium ffmpeg gcc-c++ nodejs nix nix-daemon python3.11 ripgrep
+RUN dnf install -y chromium clang gcc-c++ nix nix-daemon
 RUN useradd agent
 USER agent
 RUN curl -fL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser --skip-computer-use
