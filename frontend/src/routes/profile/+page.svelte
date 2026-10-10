@@ -144,9 +144,18 @@ async function deletePasskey(id: string) {
 			}}
 		>
 			<fieldset class="fieldset">
-				<input id="oldPassword" type="password" placeholder="Old password" class="input" required autocomplete="current-password" bind:value={oldPassword}>
-				<input id="newPassword" type="password" placeholder="New password" class="input" required autocomplete="new-password" bind:value={newPassword}>
-				<input id="passwordConfirmation" type="password" placeholder="Confirm password" class="input" required autocomplete="new-password" bind:value={passwordConfirmation}>
+				<div>
+					<label for="oldPassword">Old Password</label>
+					<input id="oldPassword" type="password" placeholder="Old password" class="input" required autocomplete="current-password" bind:value={oldPassword}>
+				</div>
+				<div>
+					<label for="newPassword">New Password</label>
+					<input id="newPassword" type="password" placeholder="New password" class="input" required autocomplete="new-password" bind:value={newPassword}>
+				</div>
+				<div>
+					<label for="passwordConfirmation">Confirm Password</label>
+					<input id="passwordConfirmation" type="password" placeholder="Confirm Password" class="input" required autocomplete="new-password" bind:value={passwordConfirmation}>
+				</div>
 				<button type="submit" class="btn btn-primary">Update</button>
 			</fieldset>
 		</form>
@@ -196,7 +205,7 @@ async function deletePasskey(id: string) {
 		confirmPassword((password) => setPasswordEnabled(password, intendedEnabled));
 	}}
 >
-	Allow Password Login:
+	<label for="passwordEnabled">Allow Password Login:</label>
 	<input id="passwordEnabled" type="checkbox" class="checkbox" bind:checked={passwordEnabled}>
 	<button type="submit" class="btn"><Check /></button>
 </form>
@@ -207,7 +216,7 @@ async function deletePasskey(id: string) {
 		confirmPassword((password) => updateEmail(password, intendedEmail));
 	}}
 >
-	Email:
+	<label for="email">Email:</label>
 	<input id="email" type="email" class="input" required bind:value={email}>
 	<button type="submit" class="btn"><Check /></button>
 </form>

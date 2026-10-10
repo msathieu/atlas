@@ -11,7 +11,7 @@ use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use shared_server::models::User;
 use shared_server::schema::users;
-use shared_server::{hash_password, notify_server};
+use shared_server::{hash_password, notify_server, verify_password};
 use uuid::Uuid;
 
 #[derive(Serialize)]
@@ -29,6 +29,16 @@ pub struct CreateUserRequest {
     username: String,
     password: String,
     admin: bool,
+    auth_password: String,
+}
+#[derive(Deserialize)]
+pub struct DeleteUserRequest {
+    password: String,
+}
+#[derive(Deserialize)]
+pub struct UpdateUserRequest {
+    admin: bool,
+    password: String,
 }
 #[derive(Serialize)]
 pub struct CreateUserResponse {
@@ -58,17 +68,34 @@ pub async fn users_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Re
     Ok((sign_response(signature, Some(&users))?, Json(users)))
 }
 pub async fn delete_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
-    require_admin(&headers).await?;
+    let user = require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
+    let request: DeleteUserRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    verify_password(user.password, request.password).await.or(Err(StatusCode::FORBIDDEN))?;
     let mut db = get_db().await?;
-    diesel::delete(users::table.find(id)).execute(&mut db).await.or(Err(StatusCode::NOT_FOUND))?;
+    diesel::delete(users::table.find(id)).execute(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    sign_response::<String>(signature, None)
+}
+pub async fn update_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+    let user = require_admin(&headers).await?;
+    let signature = validate_signature(&headers, uri.0, &body, "PATCH").await?;
+    let request: UpdateUserRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    verify_password(user.password, request.password).await.or(Err(StatusCode::FORBIDDEN))?;
+    let mut db = get_db().await?;
+    diesel::update(users::table.find(id))
+        .set(users::admin.eq(request.admin))
+        .execute(&mut db)
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     sign_response::<String>(signature, None)
 }
 pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateUserResponse>), StatusCode> {
-    require_admin(&headers).await?;
+    let user = require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateUserRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    verify_password(user.password, request.auth_password).await.or(Err(StatusCode::FORBIDDEN))?;
     if request.username.is_empty() || !request.username.chars().all(|c| c.is_ascii_alphanumeric()) || request.password.is_empty() || request.password.len() < MIN_PASSWORD_LENGTH {
         return Err(StatusCode::BAD_REQUEST);
     }

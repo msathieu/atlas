@@ -30,20 +30,23 @@ async function createEnvironment() {
 		<fieldset class="fieldset text-xl">
 			<p>Create Development Environment?</p>
 			<p>Repo: {data.repo}</p>
-			<input id="environment_name" type="text" placeholder="Name" class="input" required bind:value={name}>
+			<div>
+				<label for="environment_name">Name</label>
+				<input id="environment_name" type="text" placeholder="Name" class="input" required bind:value={name}>
+			</div>
 			{#if user.admin}
-				<p>
-					Nested Containers:
+				<div>
+					<label for="nested_containers">Nested Containers</label>
 					<input id="nested_containers" type="checkbox" class="checkbox" bind:checked={nestedContainers}>
-				</p>
+				</div>
 			{/if}
-			<p>
-				SSH Crypto Backend:
+			<div>
+				<label for="ssh_key_backend">SSH Crypto Backend</label>
 				<select id="ssh_key_backend" class="select" bind:value={cryptoBackend}>
 					<option value="software">Software</option>
 					<option value="tpm">TPM</option>
 				</select>
-			</p>
+			</div>
 			<button
 				type="button"
 				class="btn btn-primary"

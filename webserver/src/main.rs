@@ -18,7 +18,7 @@ use crate::{
     stream::{stream, stream_auth},
     user::{change_password, get_user_info, update_user_info},
     user_setting::{get_user_settings, update_user_setting},
-    users::{create_user, delete_user, users_list},
+    users::{create_user, delete_user, update_user, users_list},
 };
 use axum::{
     Router,
@@ -113,6 +113,7 @@ async fn main() {
         .route("/api/user/settings/{name}", put(update_user_setting))
         .route("/api/users", get(users_list))
         .route("/api/users/{id}", delete(delete_user))
+        .route("/api/users/{id}", patch(update_user))
         .route("/api/users", post(create_user))
         .route("/api/passkeys/start_registration", post(start_passkey_registration))
         .route("/api/passkeys/finish_registration", post(finish_passkey_registration))

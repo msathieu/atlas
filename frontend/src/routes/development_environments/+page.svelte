@@ -42,10 +42,6 @@ async function createEnvironment() {
 			ssh_key_backend: newCryptoBackend,
 		}),
 	});
-	newName = "";
-	newRepo = "";
-	newBranch = "";
-	newNestedContainers = false;
 }
 async function setEnvironmentState(id: string, state: string) {
 	await authenticatedFetch(`/api/development_environments/${id}/state?state=${state}`, {
@@ -138,7 +134,13 @@ async function openDevelopmentEnvironment(id: string) {
 		<Plus />
 	</button>
 </div>
-<dialog bind:this={dialog} class="modal">
+<dialog
+	bind:this={dialog}
+	class="modal"
+	onclose={() => {
+		rotationBackend = "tpm";
+	}}
+>
 	<form class="modal-backdrop" method="dialog">
 		<button type="submit">Close</button>
 	</form>
@@ -188,9 +190,9 @@ async function openDevelopmentEnvironment(id: string) {
 						<td>{selectedEnvironment.ssh_key_backend} </td>
 					</tr>
 					<tr>
-						<td>Rotate SSH Key</td>
+						<td><label for="rotation_backend">Rotate SSH Key</label></td>
 						<td>
-							<select class="select" bind:value={rotationBackend}>
+							<select id="rotation_backend" class="select" bind:value={rotationBackend}>
 								<option value="software">Software</option>
 								<option value="tpm">TPM</option>
 							</select>
@@ -208,7 +210,6 @@ async function openDevelopmentEnvironment(id: string) {
 								class="btn"
 								onclick={async () => {
 									await updateContainer(selectedEnvironment.id, parseInt(prompt("Enter requested memory size in GiB") || "", 10), 0);
-									dialog.close();
 								}}
 							>
 								<SquarePen />
@@ -224,7 +225,6 @@ async function openDevelopmentEnvironment(id: string) {
 								class="btn"
 								onclick={async () => {
 									await updateContainer(selectedEnvironment.id, 0, parseInt(prompt("Enter requested storage size in GiB") || "", 10));
-									dialog.close();
 								}}
 							>
 								<SquarePen />
@@ -248,7 +248,17 @@ async function openDevelopmentEnvironment(id: string) {
 		</div>
 	{/if}
 </dialog>
-<dialog bind:this={creationDialog} class="modal">
+<dialog
+	bind:this={creationDialog}
+	class="modal"
+	onclose={() => {
+		newName = "";
+		newRepo = "";
+		newBranch = "";
+		newNestedContainers = false;
+		newCryptoBackend = "tpm";
+	}}
+>
 	<form class="modal-backdrop" method="dialog">
 		<button type="submit">Close</button>
 	</form>
@@ -262,22 +272,31 @@ async function openDevelopmentEnvironment(id: string) {
 			}}
 		>
 			<fieldset class="fieldset">
-				<input id="environment_name" type="text" placeholder="Name" class="input" required bind:value={newName}>
-				<input id="repo" type="text" placeholder="Repository" class="input" bind:value={newRepo}>
-				<input id="branch" type="text" placeholder="Branch" class="input" bind:value={newBranch}>
+				<div>
+					<label for="environment_name">Name</label>
+					<input id="environment_name" type="text" placeholder="Name" class="input" required bind:value={newName}>
+				</div>
+				<div>
+					<label for="repo">Repository</label>
+					<input id="repo" type="text" placeholder="Repository" class="input" bind:value={newRepo}>
+				</div>
+				<div>
+					<label for="branch">Branch</label>
+					<input id="branch" type="text" placeholder="Branch" class="input" bind:value={newBranch}>
+				</div>
 				{#if user.admin}
-					<p>
-						Nested Containers:
+					<div>
+						<label for="nested_containers">Nested Containers</label>
 						<input id="nested_containers" type="checkbox" class="checkbox" bind:checked={newNestedContainers}>
-					</p>
+					</div>
 				{/if}
-				<p>
-					SSH Crypto Backend:
+				<div>
+					<label for="ssh_key_backend">SSH Crypto Backend</label>
 					<select id="ssh_key_backend" class="select" bind:value={newCryptoBackend}>
 						<option value="software">Software</option>
 						<option value="tpm">TPM</option>
 					</select>
-				</p>
+				</div>
 				<button type="submit" class="btn btn-primary">Create</button>
 			</fieldset>
 		</form>

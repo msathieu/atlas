@@ -80,12 +80,12 @@ pub async fn authenticate(headers: &HeaderMap) -> Result<(User, Option<String>, 
     let (user, pubkey, iat) = authenticate_jwt(bearer.token(), "webserver", &mut db).await.or(Err(StatusCode::UNAUTHORIZED))?;
     Ok((user, pubkey, iat))
 }
-pub async fn require_admin(headers: &HeaderMap) -> Result<(), StatusCode> {
+pub async fn require_admin(headers: &HeaderMap) -> Result<User, StatusCode> {
     let user = authenticate(headers).await?.0;
     if !user.admin {
         return Err(StatusCode::FORBIDDEN);
     }
-    Ok(())
+    Ok(user)
 }
 pub async fn refresh_jwt(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<LoginResponse>), StatusCode> {
     let (user, pubkey, iat) = authenticate(&headers).await?;

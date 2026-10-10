@@ -86,8 +86,7 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
     Ok((sign_response(signature, Some(&commands))?, Json(commands)))
 }
 pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateCommandResponse>), StatusCode> {
-    let user = authenticate(&headers).await?.0;
-    require_admin(&headers).await?;
+    let user = require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateCommandRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db().await?;

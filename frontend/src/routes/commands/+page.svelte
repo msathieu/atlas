@@ -27,8 +27,6 @@ async function createCommand() {
 		method: "POST",
 		body: JSON.stringify({ device: newDevice, code: newCode }),
 	});
-	newDevice = "";
-	newCode = "";
 }
 async function deleteCommand(id: string) {
 	await authenticatedFetch(`/api/commands/${id}`, {
@@ -175,7 +173,14 @@ function matchHighlightLanguage(language: string): string {
 		</div>
 	{/if}
 </dialog>
-<dialog bind:this={creationDialog} class="modal">
+<dialog
+	bind:this={creationDialog}
+	class="modal"
+	onclose={() => {
+		newDevice = "";
+		newCode = "";
+	}}
+>
 	<form class="modal-backdrop" method="dialog">
 		<button type="submit">Close</button>
 	</form>
@@ -189,15 +194,21 @@ function matchHighlightLanguage(language: string): string {
 			}}
 		>
 			<fieldset class="fieldset">
-				<select id="device" class="select w-full" required bind:value={newDevice}>
-					<option disabled selected value="">Choose a Device</option>
-					{#each data.devices as device}
-						{#if device.approved}
-							<option value={device.id}>{device.id} - {device.hostname}</option>
-						{/if}
-					{/each}
-				</select>
-				<textarea id="code" placeholder="Lua Code" class="textarea w-full" required bind:value={newCode}></textarea>
+				<div>
+					<label for="device">Device</label>
+					<select id="device" class="select w-full" required bind:value={newDevice}>
+						<option disabled selected value="">Choose a Device</option>
+						{#each data.devices as device}
+							{#if device.approved}
+								<option value={device.id}>{device.id} - {device.hostname}</option>
+							{/if}
+						{/each}
+					</select>
+				</div>
+				<div>
+					<label for="code">Lua Code</label>
+					<textarea id="code" placeholder="Lua Code" class="textarea w-full" required bind:value={newCode}></textarea>
+				</div>
 				<button type="submit" class="btn btn-primary">Create</button>
 			</fieldset>
 		</form>

@@ -1,13 +1,18 @@
 <script lang="ts">
 import { Check, Plus, Trash, X } from "@lucide/svelte";
+import { toast } from "svelte-sonner";
 import { authenticatedFetch } from "#lib/auth.ts";
 import { encryptToServer, formatTime } from "#lib/util.ts";
 
 let { data } = $props();
-let selectedUserId = $state();
+let selectedUserId = $state<string>();
 let selectedUser: any = $derived(data.users.find((user: any) => user.id === selectedUserId));
 let dialog: any = $state();
 let creationDialog: any = $state();
+let confirmationDialog: any = $state();
+let confirmationPassword = $state("");
+let confirmationAction = $state<((password: string) => Promise<void>) | null>(null);
+let confirmationPending = $state(false);
 let newUsername = $state("");
 let newPassword = $state("");
 let newPasswordConfirmation = $state("");
@@ -20,16 +25,43 @@ $effect(() => {
 	}
 });
 
-async function createUser() {
+function confirmPassword(action: (password: string) => Promise<void>) {
+	if (confirmationPending) {
+		return;
+	}
+	confirmationAction = action;
+	confirmationDialog.showModal();
+}
+async function submitConfirmation() {
+	if (confirmationPending || !confirmationAction) {
+		return;
+	}
+	confirmationPending = true;
+	try {
+		await confirmationAction(confirmationPassword);
+	} catch (_) {
+		toast.error("Request Failed");
+	} finally {
+		confirmationDialog.close();
+		confirmationPending = false;
+	}
+}
+function requestCreateUser() {
 	if (newPassword !== newPasswordConfirmation) {
 		alert("Password fields don't match");
 		return;
 	}
-	const body = JSON.stringify({
+	const newUser = {
 		username: newUsername,
 		password: newPassword,
 		admin: newAdmin,
+	};
+	confirmPassword(async (password) => {
+		await createUser(newUser, password);
 	});
+}
+async function createUser(newUser: { username: string; password: string; admin: boolean }, password: string) {
+	const body = JSON.stringify({ ...newUser, auth_password: password });
 	await authenticatedFetch(
 		`/api/users`,
 		{
@@ -39,15 +71,14 @@ async function createUser() {
 		undefined,
 		"application/octet-stream",
 	);
-	newUsername = "";
-	newPassword = "";
-	newPasswordConfirmation = "";
-	newAdmin = false;
+	creationDialog.close();
 }
-async function deleteUser(id: string) {
-	await authenticatedFetch(`/api/users/${id}`, {
-		method: "DELETE",
-	});
+async function deleteUser(id: string, password: string) {
+	await authenticatedFetch(`/api/users/${id}`, { method: "DELETE", body: await encryptToServer(JSON.stringify({ password })) }, undefined, "application/octet-stream");
+	dialog.close();
+}
+async function setAdmin(id: string, admin: boolean, password: string) {
+	await authenticatedFetch(`/api/users/${id}`, { method: "PATCH", body: await encryptToServer(JSON.stringify({ admin, password })) }, undefined, "application/octet-stream");
 }
 </script>
 
@@ -139,7 +170,19 @@ async function deleteUser(id: string) {
 					</tr>
 					<tr>
 						<td>Admin</td>
-						<td>{selectedUser.admin}</td>
+						<td>
+							{selectedUser.admin}
+							<button
+								type="button"
+								class="btn btn-sm"
+								onclick={() => {
+									const { id, admin } = selectedUser;
+									confirmPassword((password) => setAdmin(id, !admin, password));
+								}}
+							>
+								Toggle Admin
+							</button>
+						</td>
 					</tr>
 					<tr>
 						<td>Enabled</td>
@@ -162,21 +205,31 @@ async function deleteUser(id: string) {
 				</tbody>
 			</table>
 			<div class="divider"></div>
-			<form method="dialog">
+			<div>
 				<button
-					type="submit"
+					type="button"
 					class="btn"
-					onclick={async () => {
-						await deleteUser(selectedUser.id);
+					onclick={() => {
+						const { id } = selectedUser;
+						confirmPassword((password) => deleteUser(id, password));
 					}}
 				>
 					<Trash />
 				</button>
-			</form>
+			</div>
 		</div>
 	{/if}
 </dialog>
-<dialog bind:this={creationDialog} class="modal">
+<dialog
+	bind:this={creationDialog}
+	class="modal"
+	onclose={() => {
+		newUsername = "";
+		newPassword = "";
+		newPasswordConfirmation = "";
+		newAdmin = false;
+	}}
+>
 	<form class="modal-backdrop" method="dialog">
 		<button type="submit">Close</button>
 	</form>
@@ -184,20 +237,55 @@ async function deleteUser(id: string) {
 		<h2 class="text-xl text-center">Create User</h2>
 		<br>
 		<form
-			method="dialog"
-			onsubmit={async () => {
-				await createUser();
+			onsubmit={(e) => {
+				e.preventDefault();
+				requestCreateUser();
 			}}
 		>
 			<fieldset class="fieldset">
-				<input id="username" type="text" placeholder="Username" class="input" required autocomplete="username" bind:value={newUsername}>
-				<input id="password" type="password" placeholder="Password" class="input" required autocomplete="new-password" bind:value={newPassword}>
-				<input id="passwordConfirmation" type="password" placeholder="Confirm password" class="input" required autocomplete="new-password" bind:value={newPasswordConfirmation}>
-				<p>
-					Admin:
+				<div>
+					<label for="username">Username</label>
+					<input id="username" type="text" placeholder="Username" class="input" required autocomplete="username" bind:value={newUsername}>
+				</div>
+				<div>
+					<label for="password">Password</label>
+					<input id="password" type="password" placeholder="Password" class="input" required autocomplete="new-password" bind:value={newPassword}>
+				</div>
+				<div>
+					<label for="passwordConfirmation">Confirm Password</label>
+					<input id="passwordConfirmation" type="password" placeholder="Confirm Password" class="input" required autocomplete="new-password" bind:value={newPasswordConfirmation}>
+				</div>
+				<div>
+					<label for="admin">Admin</label>
 					<input id="admin" type="checkbox" class="checkbox" bind:checked={newAdmin}>
-				</p>
+				</div>
 				<button type="submit" class="btn btn-primary">Create</button>
+			</fieldset>
+		</form>
+	</div>
+</dialog>
+<dialog
+	bind:this={confirmationDialog}
+	class="modal"
+	onclose={() => {
+		confirmationAction = null;
+		confirmationPassword = "";
+	}}
+>
+	<form class="modal-backdrop" method="dialog">
+		<button type="submit">Close</button>
+	</form>
+	<div class="modal-box">
+		<h2 class="text-xl text-center">Confirm Password</h2>
+		<form
+			onsubmit={async (e) => {
+				e.preventDefault();
+				await submitConfirmation();
+			}}
+		>
+			<fieldset class="fieldset" disabled={confirmationPending}>
+				<input id="confirmationPassword" type="password" placeholder="Password" class="input w-full" required autocomplete="current-password" bind:value={confirmationPassword}>
+				<button type="submit" class="btn btn-primary">Confirm</button>
 			</fieldset>
 		</form>
 	</div>

@@ -103,8 +103,14 @@ async function finishAuth(username: string, jwt: string, keyPair: CryptoKeyPair)
 			}}
 		>
 			<fieldset class="fieldset" disabled={loginPending}>
-				<input id="username" type="text" placeholder="Username" class="input" required autocomplete="username" bind:value={username}>
-				<input id="password" type="password" placeholder="Password" class="input" autocomplete="current-password" bind:value={password}>
+				<div>
+					<label for="username">Username</label>
+					<input id="username" type="text" placeholder="Username" class="input" required autocomplete="username" bind:value={username}>
+				</div>
+				<div>
+					<label for="password">Password</label>
+					<input id="password" type="password" placeholder="Password" class="input" autocomplete="current-password" bind:value={password}>
+				</div>
 				<button type="submit" class="btn btn-primary">Login</button>
 				<div class="divider"></div>
 				<button type="button" class="btn btn-primary" onclick={async () => await runLogin(passkeyLogin)}>Login With Passkey</button>

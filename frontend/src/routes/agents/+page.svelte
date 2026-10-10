@@ -40,7 +40,6 @@ async function createAgent() {
 		method: "POST",
 		body: JSON.stringify({ name: newName }),
 	});
-	newName = "";
 }
 async function setAgentState(id: string, state: string) {
 	await authenticatedFetch(`/api/agents/${id}/state?state=${state}`, {
@@ -199,7 +198,7 @@ async function openAgent(id: string) {
 				}}
 			>
 				<fieldset class="fieldset">
-					Forge Token
+					<label for="forge_token">Forge Token</label>
 					<input id="forge_token" type="text" placeholder="Forge Token" class="input w-full" bind:value={forgeToken}>
 					<div class="flex gap-2">
 						<button type="submit" class="btn btn-primary" disabled={!forgeToken}>Save Token</button>
@@ -215,7 +214,7 @@ async function openAgent(id: string) {
 				}}
 			>
 				<fieldset class="fieldset">
-					Forge Webhook Secret
+					<label for="forge_webhook_secret">Forge Webhook Secret</label>
 					<input id="forge_webhook_secret" type="text" placeholder="Forge Webhook Secret" class="input w-full" bind:value={forgeWebhookSecret}>
 					<div class="flex gap-2">
 						<button type="submit" class="btn btn-primary" disabled={!forgeWebhookSecret}>Save Webhook Secret</button>
@@ -240,7 +239,13 @@ async function openAgent(id: string) {
 		</div>
 	{/if}
 </dialog>
-<dialog bind:this={creationDialog} class="modal">
+<dialog
+	bind:this={creationDialog}
+	class="modal"
+	onclose={() => {
+		newName = "";
+	}}
+>
 	<form class="modal-backdrop" method="dialog">
 		<button type="submit">Close</button>
 	</form>
@@ -254,7 +259,10 @@ async function openAgent(id: string) {
 			}}
 		>
 			<fieldset class="fieldset">
-				<input id="agent_name" type="text" placeholder="Name" class="input" required bind:value={newName}>
+				<div>
+					<label for="agent_name">Name</label>
+					<input id="agent_name" type="text" placeholder="Name" class="input" required bind:value={newName}>
+				</div>
 				<button type="submit" class="btn btn-primary">Create</button>
 			</fieldset>
 		</form>
