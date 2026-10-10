@@ -65,8 +65,7 @@ impl PortableTool for EmailTool {
             .await
             .map_err(|_| ToolExecutionError::other("Couldn't get email settings"))?;
         let user: User = users::table.find(self.user).get_result(&mut db).await.map_err(|_| ToolExecutionError::other("Couldn't get user"))?;
-        let mail_to = user.email.ok_or(ToolExecutionError::other("User has no email address"))?;
-        if mail_server.is_empty() || mail_username.value.is_empty() || mail_password.value.is_empty() || mail_from.value.is_empty() || mail_to.is_empty() {
+        if mail_server.is_empty() || mail_username.value.is_empty() || mail_password.value.is_empty() || mail_from.value.is_empty() {
             return Err(ToolExecutionError::other("Mail server isn't configured"));
         }
         let message = Message::builder()
@@ -76,7 +75,7 @@ impl PortableTool for EmailTool {
             })
             .to(Mailbox {
                 name: None,
-                email: mail_to.parse().map_err(|_| ToolExecutionError::other("Invalid to address"))?,
+                email: user.email.parse().map_err(|_| ToolExecutionError::other("Invalid to address"))?,
             })
             .header(ContentType::TEXT_PLAIN)
             .message_id(None)

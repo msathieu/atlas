@@ -249,7 +249,7 @@ pub async fn create_settings(db: &mut AsyncPgConnection) -> Result<(), Box<dyn E
                     enabled: true,
                     password_enabled: true,
                     last_login: None,
-                    email: None,
+                    email: "admin@localhost".to_string(),
                 })
                 .execute(db)
                 .await?;

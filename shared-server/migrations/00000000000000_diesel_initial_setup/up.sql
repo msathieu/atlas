@@ -11,7 +11,7 @@ CREATE TABLE users(
     enabled boolean NOT NULL,
     password_enabled boolean NOT NULL,
     last_login timestamp,
-    email varchar
+    email varchar NOT NULL
 );
 CREATE TABLE chats(
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

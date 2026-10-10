@@ -22,11 +22,12 @@ pub struct APIUser {
     enabled: bool,
     password_enabled: bool,
     last_login: Option<u64>,
-    email: Option<String>,
+    email: String,
 }
 #[derive(Deserialize)]
 pub struct CreateUserRequest {
     username: String,
+    email: String,
     password: String,
     admin: bool,
     auth_password: String,
@@ -96,7 +97,12 @@ pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateUserRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     verify_password(user.password, request.auth_password).await.or(Err(StatusCode::FORBIDDEN))?;
-    if request.username.is_empty() || !request.username.chars().all(|c| c.is_ascii_alphanumeric()) || request.password.is_empty() || request.password.len() < MIN_PASSWORD_LENGTH {
+    if request.username.is_empty()
+        || !request.username.chars().all(|c| c.is_ascii_alphanumeric())
+        || request.email.trim().is_empty()
+        || request.password.is_empty()
+        || request.password.len() < MIN_PASSWORD_LENGTH
+    {
         return Err(StatusCode::BAD_REQUEST);
     }
     let mut db = get_db().await?;
@@ -110,7 +116,7 @@ pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
         enabled: true,
         password_enabled: true,
         last_login: None,
-        email: None,
+        email: request.email,
     };
     user = diesel::insert_into(users::table).values(user).get_result(&mut db).await.or(Err(StatusCode::BAD_REQUEST))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

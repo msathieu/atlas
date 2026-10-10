@@ -179,7 +179,7 @@ diesel::table! {
         enabled -> Bool,
         password_enabled -> Bool,
         last_login -> Nullable<Timestamp>,
-        email -> Nullable<Varchar>,
+        email -> Varchar,
     }
 }
 

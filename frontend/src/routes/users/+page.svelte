@@ -14,6 +14,7 @@ let confirmationPassword = $state("");
 let confirmationAction = $state<((password: string) => Promise<void>) | null>(null);
 let confirmationPending = $state(false);
 let newUsername = $state("");
+let newEmail = $state("");
 let newPassword = $state("");
 let newPasswordConfirmation = $state("");
 let newAdmin = $state(false);
@@ -53,6 +54,7 @@ function requestCreateUser() {
 	}
 	const newUser = {
 		username: newUsername,
+		email: newEmail,
 		password: newPassword,
 		admin: newAdmin,
 	};
@@ -60,7 +62,7 @@ function requestCreateUser() {
 		await createUser(newUser, password);
 	});
 }
-async function createUser(newUser: { username: string; password: string; admin: boolean }, password: string) {
+async function createUser(newUser: { username: string; email: string; password: string; admin: boolean }, password: string) {
 	const body = JSON.stringify({ ...newUser, auth_password: password });
 	await authenticatedFetch(
 		`/api/users`,
@@ -225,6 +227,7 @@ async function setAdmin(id: string, admin: boolean, password: string) {
 	class="modal"
 	onclose={() => {
 		newUsername = "";
+		newEmail = "";
 		newPassword = "";
 		newPasswordConfirmation = "";
 		newAdmin = false;
@@ -246,6 +249,10 @@ async function setAdmin(id: string, admin: boolean, password: string) {
 				<div>
 					<label for="username">Username</label>
 					<input id="username" type="text" placeholder="Username" class="input" required autocomplete="username" bind:value={newUsername}>
+				</div>
+				<div>
+					<label for="email">Email</label>
+					<input id="email" type="email" placeholder="Email" class="input" required autocomplete="email" bind:value={newEmail}>
 				</div>
 				<div>
 					<label for="password">Password</label>

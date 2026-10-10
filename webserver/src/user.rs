@@ -27,7 +27,7 @@ pub struct GetUserInfoResponse {
     username: String,
     admin: bool,
     password_enabled: bool,
-    email: Option<String>,
+    email: String,
 }
 #[derive(Deserialize)]
 pub struct UpdateUserInfoRequest {
@@ -71,17 +71,20 @@ pub async fn update_user_info(headers: HeaderMap, uri: OriginalUri, body: Bytes)
     let request: UpdateUserInfoRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
     verify_password(user.password, request.password).await.or(Err(StatusCode::FORBIDDEN))?;
     let mut db = get_db().await?;
-    if let Some(password_state) = request.password_state {
+    if let Some(email) = request.email {
+        if email.trim().is_empty() {
+            return Err(StatusCode::BAD_REQUEST);
+        }
         diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-            .set(users::password_enabled.eq(password_state))
+            .set(users::email.eq(email))
             .execute(&mut db)
             .await
             .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
         notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     }
-    if let Some(email) = request.email {
+    if let Some(password_state) = request.password_state {
         diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
-            .set(users::email.eq(email))
+            .set(users::password_enabled.eq(password_state))
             .execute(&mut db)
             .await
             .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
