@@ -2,14 +2,39 @@
 import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, SquarePen, Trash } from "@lucide/svelte";
 import { authenticatedFetch } from "#lib/auth.ts";
 import { updateContainer } from "#lib/container.ts";
-import { formatTime } from "#lib/util.ts";
+import { encryptToServer, formatTime } from "#lib/util.ts";
 
 let { data } = $props();
-let selectedAgent: any = $state();
+let selectedAgentId = $state();
+let selectedAgent: any = $derived(data.agents.find((agent: any) => agent.id === selectedAgentId));
 let dialog: any = $state();
 let creationDialog: any = $state();
 let newName = $state("");
+let forgeToken = $state("");
+let forgeWebhookSecret = $state("");
 
+$effect(() => {
+	if (selectedAgentId && !selectedAgent) {
+		dialog?.close();
+		selectedAgentId = undefined;
+	}
+});
+
+function resetForgeInputs() {
+	forgeToken = "";
+	forgeWebhookSecret = "";
+}
+async function updateAgentForge(name: string, value: string) {
+	await authenticatedFetch(
+		`/api/agents/${selectedAgent.id}/forge`,
+		{
+			method: "PATCH",
+			body: await encryptToServer(JSON.stringify({ [name]: value })),
+		},
+		undefined,
+		"application/octet-stream",
+	);
+}
 async function createAgent() {
 	await authenticatedFetch(`/api/agents`, {
 		method: "POST",
@@ -41,7 +66,7 @@ async function openAgent(id: string) {
 			<tr
 				class="cursor-pointer hover:bg-base-200"
 				onclick={() => {
-					selectedAgent = agent;
+					selectedAgentId = agent.id;
 					dialog.showModal();
 				}}
 			>
@@ -103,7 +128,7 @@ async function openAgent(id: string) {
 		<Plus />
 	</button>
 </div>
-<dialog bind:this={dialog} class="modal">
+<dialog bind:this={dialog} class="modal" onclose={resetForgeInputs}>
 	<form class="modal-backdrop" method="dialog">
 		<button type="submit">Close</button>
 	</form>
@@ -141,7 +166,6 @@ async function openAgent(id: string) {
 								class="btn"
 								onclick={async () => {
 									await updateContainer(selectedAgent.id, parseInt(prompt("Enter requested memory size in GiB") || "", 10), 0);
-									dialog.close();
 								}}
 							>
 								<SquarePen />
@@ -157,7 +181,6 @@ async function openAgent(id: string) {
 								class="btn"
 								onclick={async () => {
 									await updateContainer(selectedAgent.id, 0, parseInt(prompt("Enter requested storage size in GiB") || "", 10));
-									dialog.close();
 								}}
 							>
 								<SquarePen />
@@ -166,6 +189,42 @@ async function openAgent(id: string) {
 					</tr>
 				</tbody>
 			</table>
+			<div class="divider"></div>
+			<h3 class="text-lg">Forge Credentials</h3>
+			<form
+				onsubmit={async (e) => {
+					e.preventDefault();
+					await updateAgentForge("forge_token", forgeToken);
+					forgeToken = "";
+				}}
+			>
+				<fieldset class="fieldset">
+					Forge Token
+					<input id="forge_token" type="text" placeholder="Forge Token" class="input w-full" bind:value={forgeToken}>
+					<div class="flex gap-2">
+						<button type="submit" class="btn btn-primary" disabled={!forgeToken}>Save Token</button>
+						<button type="button" class="btn" disabled={!selectedAgent.forge_token_configured} onclick={async () => await updateAgentForge("forge_token", "")}>Clear Token</button>
+					</div>
+				</fieldset>
+			</form>
+			<form
+				onsubmit={async (e) => {
+					e.preventDefault();
+					await updateAgentForge("forge_webhook_secret", forgeWebhookSecret);
+					forgeWebhookSecret = "";
+				}}
+			>
+				<fieldset class="fieldset">
+					Forge Webhook Secret
+					<input id="forge_webhook_secret" type="text" placeholder="Forge Webhook Secret" class="input w-full" bind:value={forgeWebhookSecret}>
+					<div class="flex gap-2">
+						<button type="submit" class="btn btn-primary" disabled={!forgeWebhookSecret}>Save Webhook Secret</button>
+						<button type="button" class="btn" disabled={!selectedAgent.forge_webhook_secret_configured} onclick={async () => await updateAgentForge("forge_webhook_secret", "")}>
+							Clear Webhook Secret
+						</button>
+					</div>
+				</fieldset>
+			</form>
 			<div class="divider"></div>
 			<form method="dialog">
 				<button

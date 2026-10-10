@@ -1,7 +1,7 @@
 use crate::{
     auth::{authenticate, generate_jwt},
     get_db,
-    util::{convert_timestamp, sign_response, validate_signature},
+    util::{convert_timestamp, decrypt_body, sign_response, validate_signature},
 };
 use axum::{
     Json,
@@ -33,6 +33,8 @@ pub struct APIAgent {
     pending: bool,
     memory_limit: i32,
     storage_size: i32,
+    forge_token_configured: bool,
+    forge_webhook_secret_configured: bool,
 }
 #[derive(Deserialize)]
 pub struct CreateAgentRequest {
@@ -50,6 +52,11 @@ pub struct OpenAgentResponse {
 #[derive(Deserialize)]
 pub struct SetAgentStateRequest {
     state: String,
+}
+#[derive(Deserialize)]
+pub struct UpdateAgentForgeRequest {
+    forge_token: Option<String>,
+    forge_webhook_secret: Option<String>,
 }
 
 pub async fn agents_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<Vec<APIAgent>>), StatusCode> {
@@ -75,6 +82,8 @@ pub async fn agents_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
                 pending: container.requested_state != container.state,
                 memory_limit: container.memory_limit,
                 storage_size: container.storage_size,
+                forge_token_configured: agent.forge_token.is_some(),
+                forge_webhook_secret_configured: agent.forge_webhook_secret.is_some(),
             })
         })
         .collect();
@@ -125,6 +134,58 @@ pub async fn create_agent(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
         .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let response = CreateAgentResponse { id };
     Ok((sign_response(signature, Some(&response))?, Json(response)))
+}
+pub async fn update_agent_forge(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
+    let user = authenticate(&headers).await?.0;
+    let signature = validate_signature(&headers, uri.0, &body, "PATCH").await?;
+    let request: UpdateAgentForgeRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    if request.forge_token.is_none() && request.forge_webhook_secret.is_none() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let uid = user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut db = get_db().await?;
+    let _container: Container = containers::table
+        .filter(
+            containers::uid
+                .eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)
+                .and(containers::origin.eq(ContainerOrigin::Agent as i32))
+                .and(containers::id.eq(id)),
+        )
+        .first(&mut db)
+        .await
+        .or(Err(StatusCode::NOT_FOUND))?;
+    if let Some(forge_token) = request.forge_token {
+        if forge_token.is_empty() {
+            diesel::update(agents::table.filter(agents::id.eq(id)))
+                .set(agents::forge_token.eq(None::<String>))
+                .execute(&mut db)
+                .await
+                .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        } else {
+            diesel::update(agents::table.filter(agents::id.eq(id)))
+                .set(agents::forge_token.eq(forge_token))
+                .execute(&mut db)
+                .await
+                .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        }
+    }
+    if let Some(forge_webhook_secret) = request.forge_webhook_secret {
+        if forge_webhook_secret.is_empty() {
+            diesel::update(agents::table.filter(agents::id.eq(id)))
+                .set(agents::forge_webhook_secret.eq(None::<String>))
+                .execute(&mut db)
+                .await
+                .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        } else {
+            diesel::update(agents::table.filter(agents::id.eq(id)))
+                .set(agents::forge_webhook_secret.eq(forge_webhook_secret))
+                .execute(&mut db)
+                .await
+                .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+        }
+    }
+    notify_server(&format!("WEB:REFRESH:{}", uid)).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    sign_response::<String>(signature, None)
 }
 pub async fn set_agent_state(headers: HeaderMap, Path(id): Path<Uuid>, request: Query<SetAgentStateRequest>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers).await?.0;

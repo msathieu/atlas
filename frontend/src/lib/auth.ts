@@ -51,7 +51,7 @@ export async function authenticatedFetch(
 	const nonce = crypto.randomUUID();
 	init.headers.append("X-Request-Nonce", nonce);
 	init.headers.append("X-Request-Timestamp", String(timestamp));
-	const requestSignature = await signRequest(method + "-" + String(timestamp) + "-" + nonce + "-" + bufferToBase64(urlHash) + "-" + bufferToBase64(bodyHash));
+	const requestSignature = await signRequest(`${method}-${String(timestamp)}-${nonce}-${bufferToBase64(urlHash)}-${bufferToBase64(bodyHash)}`);
 	init.headers.append("X-Request-Signature", requestSignature);
 	const response = await fn(url, init);
 	if (response.status === 401) {

@@ -2,7 +2,7 @@
 
 use crate::{
     agent::{download_agent, download_auth, get_agent_script},
-    agents::{agents_list, create_agent, deliver_webhook, open_agent, set_agent_state},
+    agents::{agents_list, create_agent, deliver_webhook, open_agent, set_agent_state, update_agent_forge},
     auth::{login, refresh_jwt},
     chat::{chats_list, create_chat, delete_chat, delete_message, get_chat, manage_tool_call_consent, send_message},
     commands::{commands_list, create_command, delete_command},
@@ -130,6 +130,7 @@ async fn main() {
         .route("/api/development_environments/ssh_forward/approve/{id}", post(approve_ssh_forward_request))
         .route("/api/agents", get(agents_list))
         .route("/api/agents", post(create_agent))
+        .route("/api/agents/{id}/forge", patch(update_agent_forge))
         .route("/api/agents/{id}/open", post(open_agent))
         .route("/api/agents/{id}/state", post(set_agent_state))
         .route("/api/agents/{id}/webhook/{name}", post(deliver_webhook))

@@ -3,7 +3,7 @@ resolver = "3"
 members = ["agent", "apiserver", "proxy", "master", "shared-api", "shared-server", "webserver"]
 
 [workspace.package]
-version = "2026.10.8"
+version = "2026.10.10"
 
 [profile.dev]
 debug = false

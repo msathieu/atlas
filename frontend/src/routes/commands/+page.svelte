@@ -8,11 +8,19 @@ import { formatTime, getHostnameForDevice } from "#lib/util.ts";
 import "highlight.js/styles/github-dark.css";
 
 let { data } = $props();
-let selectedCommand: any = $state();
+let selectedCommandId = $state();
+let selectedCommand: any = $derived(data.commands.find((command: any) => command.id === selectedCommandId));
 let dialog: any = $state();
 let creationDialog: any = $state();
 let newDevice = $state("");
 let newCode = $state("");
+
+$effect(() => {
+	if (selectedCommandId && !selectedCommand) {
+		dialog?.close();
+		selectedCommandId = undefined;
+	}
+});
 
 async function createCommand() {
 	await authenticatedFetch(`/api/commands`, {
@@ -53,7 +61,7 @@ function matchHighlightLanguage(language: string): string {
 			<tr
 				class="cursor-pointer hover:bg-base-200"
 				onclick={() => {
-					selectedCommand = command;
+					selectedCommandId = command.id;
 					dialog.showModal();
 				}}
 			>

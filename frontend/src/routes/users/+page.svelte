@@ -4,13 +4,21 @@ import { authenticatedFetch } from "#lib/auth.ts";
 import { encryptToServer, formatTime } from "#lib/util.ts";
 
 let { data } = $props();
-let selectedUser: any = $state();
+let selectedUserId = $state();
+let selectedUser: any = $derived(data.users.find((user: any) => user.id === selectedUserId));
 let dialog: any = $state();
 let creationDialog: any = $state();
 let newUsername = $state("");
 let newPassword = $state("");
 let newPasswordConfirmation = $state("");
 let newAdmin = $state(false);
+
+$effect(() => {
+	if (selectedUserId && !selectedUser) {
+		dialog?.close();
+		selectedUserId = undefined;
+	}
+});
 
 async function createUser() {
 	if (newPassword !== newPasswordConfirmation) {
@@ -59,7 +67,7 @@ async function deleteUser(id: string) {
 			<tr
 				class="cursor-pointer hover:bg-base-200"
 				onclick={() => {
-					selectedUser = user;
+					selectedUserId = user.id;
 					dialog.showModal();
 				}}
 			>

@@ -6,7 +6,8 @@ import { user } from "#lib/state.svelte.js";
 import { formatTime } from "#lib/util.ts";
 
 let { data } = $props();
-let selectedEnvironment: any = $state();
+let selectedEnvironmentId = $state();
+let selectedEnvironment: any = $derived(data.development_environments.find((environment: any) => environment.id === selectedEnvironmentId));
 let dialog: any = $state();
 let creationDialog: any = $state();
 let newName = $state("");
@@ -15,6 +16,13 @@ let newBranch = $state("");
 let newNestedContainers = $state(false);
 let newCryptoBackend = $state("tpm");
 let rotationBackend = $state("tpm");
+
+$effect(() => {
+	if (selectedEnvironmentId && !selectedEnvironment) {
+		dialog?.close();
+		selectedEnvironmentId = undefined;
+	}
+});
 
 async function rotateSSHKey() {
 	await authenticatedFetch(`/api/development_environments/${selectedEnvironment.id}/rotate_ssh_key`, {
@@ -65,7 +73,7 @@ async function openDevelopmentEnvironment(id: string) {
 			<tr
 				class="cursor-pointer hover:bg-base-200"
 				onclick={() => {
-					selectedEnvironment = environment;
+					selectedEnvironmentId = environment.id;
 					rotationBackend = environment.ssh_key_backend === "TPM" ? "tpm" : "software";
 					dialog.showModal();
 				}}

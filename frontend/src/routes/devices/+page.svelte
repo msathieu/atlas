@@ -6,8 +6,16 @@ import { user } from "#lib/state.svelte.ts";
 import { formatTime } from "#lib/util.ts";
 
 let { data } = $props();
-let selectedDevice: any = $state();
+let selectedDeviceId = $state();
+let selectedDevice: any = $derived(data.devices.find((device: any) => device.id === selectedDeviceId));
 let dialog: any = $state();
+
+$effect(() => {
+	if (selectedDeviceId && !selectedDevice) {
+		dialog?.close();
+		selectedDeviceId = undefined;
+	}
+});
 
 async function approveDevice(id: string, expected_pubkey: string) {
 	const pubkey = prompt("Enter public key");
@@ -44,7 +52,7 @@ async function deleteDevice(id: string) {
 			<tr
 				class="cursor-pointer hover:bg-base-200"
 				onclick={() => {
-					selectedDevice = device;
+					selectedDeviceId = device.id;
 					dialog.showModal();
 				}}
 			>
