@@ -51,7 +51,14 @@ async function restart() {
 	<h1 class="text-2xl">System Settings</h1>
 	<br>
 
-	<Setting name="llm_default_provider" description="Default LLM Provider" val={defaultProvider} global="true" type="text" />
+	<Setting
+		name="llm_default_provider"
+		description="Default LLM Provider"
+		val={defaultProvider}
+		global="true"
+		type="select"
+		options={["generic", "openrouter"]}
+	/>
 	<Setting name="llm_openrouter_model" description="Openrouter Model" val={openrouterModel} global="true" type="text" />
 	<Setting name="llm_openrouter_key" description="Openrouter API Key" val={openrouterKey} global="true" type="text" />
 	<Setting name="llm_generic_endpoint" description="Generic LLM Endpoint" val={genericEndpoint} global="true" type="text" />

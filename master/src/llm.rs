@@ -21,9 +21,6 @@ pub async fn process_chats(pool: Pool<AsyncPgConnection>) -> Result<(), Box<dyn 
     let mut db = pool.get().await?;
     let chats_vec: Vec<Chat> = chats::table.get_results(&mut db).await?;
     let llm_provider = settings::table.find("llm_default_provider").first::<Setting>(&mut db).await?.value;
-    if llm_provider.is_empty() {
-        return Ok(());
-    }
     let mut tasks = Vec::new();
     for chat in chats_vec {
         let pool = pool.clone();
