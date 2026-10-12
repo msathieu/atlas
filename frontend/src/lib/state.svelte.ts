@@ -7,7 +7,7 @@ export const wsState: { ws: WebSocket | null; connected: boolean } = $state({
 	ws: null,
 	connected: false,
 });
-export const user = $state({ username: "unknown", admin: false });
+export const user = $state({ username: "unknown", admin: false, password_enabled: false });
 export const mounted = $state({ mounted: false });
 
 export async function connectWS(fn?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {

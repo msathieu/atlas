@@ -1,3 +1,4 @@
+use crate::step_up::{StepUpVerification, verify_step_up};
 use crate::util::{decrypt_body, sign_response, validate_signature};
 use crate::{auth::authenticate, get_db};
 use axum::Json;
@@ -8,7 +9,7 @@ use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use shared_server::schema::users;
-use shared_server::{hash_password, notify_server, verify_password};
+use shared_server::{hash_password, notify_server};
 use uuid::Uuid;
 
 #[cfg(debug_assertions)]
@@ -18,7 +19,7 @@ pub const MIN_PASSWORD_LENGTH: usize = 16;
 
 #[derive(Deserialize)]
 pub struct ChangePasswordRequest {
-    old_password: String,
+    verification: StepUpVerification,
     new_password: String,
 }
 #[derive(Serialize)]
@@ -33,7 +34,7 @@ pub struct GetUserInfoResponse {
 pub struct UpdateUserInfoRequest {
     email: Option<String>,
     password_state: Option<bool>,
-    password: String,
+    verification: StepUpVerification,
 }
 
 pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
@@ -43,7 +44,7 @@ pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) 
     if request.new_password.is_empty() || request.new_password.len() < MIN_PASSWORD_LENGTH {
         return Err(StatusCode::BAD_REQUEST);
     }
-    verify_password(user.password, request.old_password).await.or(Err(StatusCode::FORBIDDEN))?;
+    verify_step_up(&headers, &user, request.verification).await?;
     let mut db = get_db().await?;
     let hash = hash_password(request.new_password).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     diesel::update(users::table.find(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?))
@@ -69,7 +70,7 @@ pub async fn update_user_info(headers: HeaderMap, uri: OriginalUri, body: Bytes)
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "PATCH").await?;
     let request: UpdateUserInfoRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
-    verify_password(user.password, request.password).await.or(Err(StatusCode::FORBIDDEN))?;
+    verify_step_up(&headers, &user, request.verification).await?;
     let mut db = get_db().await?;
     if let Some(email) = request.email {
         if email.trim().is_empty() {

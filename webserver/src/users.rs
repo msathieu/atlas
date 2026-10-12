@@ -1,5 +1,6 @@
 use crate::auth::require_admin;
 use crate::get_db;
+use crate::step_up::{StepUpVerification, verify_step_up};
 use crate::user::MIN_PASSWORD_LENGTH;
 use crate::util::{convert_timestamp, decrypt_body, sign_response, validate_signature};
 use axum::Json;
@@ -11,7 +12,7 @@ use diesel_async::RunQueryDsl;
 use serde::{Deserialize, Serialize};
 use shared_server::models::User;
 use shared_server::schema::users;
-use shared_server::{hash_password, notify_server, verify_password};
+use shared_server::{hash_password, notify_server};
 use uuid::Uuid;
 
 #[derive(Serialize)]
@@ -30,16 +31,16 @@ pub struct CreateUserRequest {
     email: String,
     password: String,
     admin: bool,
-    auth_password: String,
+    verification: StepUpVerification,
 }
 #[derive(Deserialize)]
 pub struct DeleteUserRequest {
-    password: String,
+    verification: StepUpVerification,
 }
 #[derive(Deserialize)]
 pub struct UpdateUserRequest {
     admin: bool,
-    password: String,
+    verification: StepUpVerification,
 }
 #[derive(Serialize)]
 pub struct CreateUserResponse {
@@ -72,7 +73,7 @@ pub async fn delete_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: Original
     let user = require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
     let request: DeleteUserRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
-    verify_password(user.password, request.password).await.or(Err(StatusCode::FORBIDDEN))?;
+    verify_step_up(&headers, &user, request.verification).await?;
     let mut db = get_db().await?;
     diesel::delete(users::table.find(id)).execute(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     notify_server("WEB:REFRESH").await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
@@ -82,7 +83,7 @@ pub async fn update_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: Original
     let user = require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "PATCH").await?;
     let request: UpdateUserRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
-    verify_password(user.password, request.password).await.or(Err(StatusCode::FORBIDDEN))?;
+    verify_step_up(&headers, &user, request.verification).await?;
     let mut db = get_db().await?;
     diesel::update(users::table.find(id))
         .set(users::admin.eq(request.admin))
@@ -96,7 +97,7 @@ pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
     let user = require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
     let request: CreateUserRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
-    verify_password(user.password, request.auth_password).await.or(Err(StatusCode::FORBIDDEN))?;
+    verify_step_up(&headers, &user, request.verification).await?;
     if request.username.is_empty()
         || !request.username.chars().all(|c| c.is_ascii_alphanumeric())
         || request.email.trim().is_empty()

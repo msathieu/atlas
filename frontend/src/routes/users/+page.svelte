@@ -1,18 +1,15 @@
 <script lang="ts">
 import { Check, Plus, Trash, X } from "@lucide/svelte";
-import { toast } from "svelte-sonner";
-import { authenticatedFetch } from "#lib/auth.ts";
-import { encryptToServer, formatTime } from "#lib/util.ts";
+import StepUpDialog from "#lib/StepUpDialog.svelte";
+import { type StepUpVerification, stepUpFetch } from "#lib/step_up.ts";
+import { formatTime } from "#lib/util.ts";
 
 let { data } = $props();
 let selectedUserId = $state<string>();
-let selectedUser: any = $derived(data.users.find((user: any) => user.id === selectedUserId));
+let selectedUser = $derived(data.users.find((user: any) => user.id === selectedUserId));
 let dialog: any = $state();
 let creationDialog: any = $state();
-let confirmationDialog: any = $state();
-let confirmationPassword = $state("");
-let confirmationAction = $state<((password: string) => Promise<void>) | null>(null);
-let confirmationPending = $state(false);
+let confirmation: any = $state();
 let newUsername = $state("");
 let newEmail = $state("");
 let newPassword = $state("");
@@ -26,27 +23,6 @@ $effect(() => {
 	}
 });
 
-function confirmPassword(action: (password: string) => Promise<void>) {
-	if (confirmationPending) {
-		return;
-	}
-	confirmationAction = action;
-	confirmationDialog.showModal();
-}
-async function submitConfirmation() {
-	if (confirmationPending || !confirmationAction) {
-		return;
-	}
-	confirmationPending = true;
-	try {
-		await confirmationAction(confirmationPassword);
-	} catch (_) {
-		toast.error("Request Failed");
-	} finally {
-		confirmationDialog.close();
-		confirmationPending = false;
-	}
-}
 function requestCreateUser() {
 	if (newPassword !== newPasswordConfirmation) {
 		alert("Password fields don't match");
@@ -58,29 +34,17 @@ function requestCreateUser() {
 		password: newPassword,
 		admin: newAdmin,
 	};
-	confirmPassword(async (password) => {
-		await createUser(newUser, password);
+	confirmation.confirm(async (verification: StepUpVerification) => {
+		await stepUpFetch("/api/users", "POST", newUser, verification);
+		creationDialog.close();
 	});
 }
-async function createUser(newUser: { username: string; email: string; password: string; admin: boolean }, password: string) {
-	const body = JSON.stringify({ ...newUser, auth_password: password });
-	await authenticatedFetch(
-		`/api/users`,
-		{
-			method: "POST",
-			body: await encryptToServer(body),
-		},
-		undefined,
-		"application/octet-stream",
-	);
-	creationDialog.close();
-}
-async function deleteUser(id: string, password: string) {
-	await authenticatedFetch(`/api/users/${id}`, { method: "DELETE", body: await encryptToServer(JSON.stringify({ password })) }, undefined, "application/octet-stream");
+async function deleteUser(id: string, verification: StepUpVerification) {
+	await stepUpFetch(`/api/users/${id}`, "DELETE", {}, verification);
 	dialog.close();
 }
-async function setAdmin(id: string, admin: boolean, password: string) {
-	await authenticatedFetch(`/api/users/${id}`, { method: "PATCH", body: await encryptToServer(JSON.stringify({ admin, password })) }, undefined, "application/octet-stream");
+async function setAdmin(id: string, admin: boolean, verification: StepUpVerification) {
+	await stepUpFetch(`/api/users/${id}`, "PATCH", { admin }, verification);
 }
 </script>
 
@@ -179,7 +143,7 @@ async function setAdmin(id: string, admin: boolean, password: string) {
 								class="btn btn-sm"
 								onclick={() => {
 									const { id, admin } = selectedUser;
-									confirmPassword((password) => setAdmin(id, !admin, password));
+									confirmation.confirm((verification: StepUpVerification) => setAdmin(id, !admin, verification));
 								}}
 							>
 								Toggle Admin
@@ -213,7 +177,7 @@ async function setAdmin(id: string, admin: boolean, password: string) {
 					class="btn"
 					onclick={() => {
 						const { id } = selectedUser;
-						confirmPassword((password) => deleteUser(id, password));
+						confirmation.confirm((verification: StepUpVerification) => deleteUser(id, verification));
 					}}
 				>
 					<Trash />
@@ -271,29 +235,4 @@ async function setAdmin(id: string, admin: boolean, password: string) {
 		</form>
 	</div>
 </dialog>
-<dialog
-	bind:this={confirmationDialog}
-	class="modal"
-	onclose={() => {
-		confirmationAction = null;
-		confirmationPassword = "";
-	}}
->
-	<form class="modal-backdrop" method="dialog">
-		<button type="submit">Close</button>
-	</form>
-	<div class="modal-box">
-		<h2 class="text-xl text-center">Confirm Password</h2>
-		<form
-			onsubmit={async (e) => {
-				e.preventDefault();
-				await submitConfirmation();
-			}}
-		>
-			<fieldset class="fieldset" disabled={confirmationPending}>
-				<input id="confirmationPassword" type="password" placeholder="Password" class="input w-full" required autocomplete="current-password" bind:value={confirmationPassword}>
-				<button type="submit" class="btn btn-primary">Confirm</button>
-			</fieldset>
-		</form>
-	</div>
-</dialog>
+<StepUpDialog bind:this={confirmation} />

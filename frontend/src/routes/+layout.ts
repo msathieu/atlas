@@ -40,5 +40,6 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
 	const userInfo = await userInfoRes.json();
 	user.username = userInfo.username;
 	user.admin = userInfo.admin;
+	user.password_enabled = userInfo.password_enabled;
 	return { client_error: false, connected: true, info };
 };

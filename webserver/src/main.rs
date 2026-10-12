@@ -15,6 +15,7 @@ use crate::{
     info::{assetlinks, server_info},
     passkey::{delete_passkey, finish_passkey_authentication, finish_passkey_registration, passkeys_list, start_passkey_authentication, start_passkey_registration},
     settings::{get_settings, restart_system, update_setting},
+    step_up::start_passkey_step_up,
     stream::{stream, stream_auth},
     user::{change_password, get_user_info, update_user_info},
     user_setting::{get_user_settings, update_user_setting},
@@ -51,6 +52,7 @@ mod devices;
 mod info;
 mod passkey;
 mod settings;
+mod step_up;
 mod stream;
 mod user;
 mod user_setting;
@@ -119,6 +121,7 @@ async fn main() {
         .route("/api/passkeys/finish_registration", post(finish_passkey_registration))
         .route("/api/passkeys/start_authentication", post(start_passkey_authentication))
         .route("/api/passkeys/finish_authentication", post(finish_passkey_authentication))
+        .route("/api/passkeys/start_step_up", post(start_passkey_step_up))
         .route("/api/passkeys", get(passkeys_list))
         .route("/api/passkeys/{id}", delete(delete_passkey))
         .route("/.well-known/assetlinks.json", get(assetlinks))

@@ -1,5 +1,13 @@
+import { type GetPasskeyResult, Passkeys } from "@capawesome/capacitor-passkeys";
 import { API_HOST, bufferToBase64, signRequest, verifySignature } from "./util.ts";
 
+export type PasskeyVerification = { flow_id: string; credential: GetPasskeyResult };
+
+export async function getPasskeyVerification(response: Response): Promise<PasskeyVerification> {
+	const { challenge, flow_id } = await response.json();
+	const credential = await Passkeys.getPasskey(challenge.publicKey);
+	return { flow_id, credential };
+}
 export async function verifyResponseSignature(response: Response, requestSignature: string): Promise<void> {
 	const encoder = new TextEncoder();
 	const responseHash = await crypto.subtle.digest("SHA-512", encoder.encode(await response.clone().text()));

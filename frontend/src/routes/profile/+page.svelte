@@ -3,100 +3,42 @@ import { Passkeys } from "@capawesome/capacitor-passkeys";
 import { Check, Trash } from "@lucide/svelte";
 import { toast } from "svelte-sonner";
 import { authenticatedFetch } from "#lib/auth.ts";
-import { encryptToServer, formatTime } from "#lib/util.ts";
+import StepUpDialog from "#lib/StepUpDialog.svelte";
+import { type StepUpVerification, stepUpFetch } from "#lib/step_up.ts";
+import { formatTime } from "#lib/util.ts";
 
 let { data } = $props();
 let passwordDialog: any = $state();
-let confirmationDialog: any = $state();
-let confirmationPassword = $state("");
-let confirmationAction = $state<((password: string) => Promise<void>) | null>();
-let confirmationPending = $state(false);
-let oldPassword = $state("");
+let confirmation: any = $state();
 let newPassword = $state("");
 let passwordConfirmation = $state("");
 let passwordEnabled = $derived(data.user.password_enabled);
 let email = $derived(data.user.email);
 
-function confirmPassword(action: (password: string) => Promise<void>) {
-	if (confirmationPending) {
-		return;
-	}
-	confirmationAction = action;
-	confirmationDialog.showModal();
-}
-async function submitConfirmation() {
-	if (confirmationPending || !confirmationAction) {
-		return;
-	}
-	confirmationPending = true;
-	try {
-		await confirmationAction(confirmationPassword);
-	} catch (_) {
-		toast.error("Request Failed");
-	} finally {
-		confirmationDialog.close();
-		confirmationPending = false;
-	}
-}
-async function changePassword() {
+function requestPasswordChange() {
 	if (newPassword !== passwordConfirmation) {
 		alert("New password fields don't match");
 		return;
 	}
-	const body = JSON.stringify({
-		old_password: oldPassword,
-		new_password: newPassword,
-	});
-	const response = await authenticatedFetch(
-		`/api/user/update_password`,
-		{
-			method: "POST",
-			body: await encryptToServer(body),
-		},
-		undefined,
-		"application/octet-stream",
-	);
-	if (response.ok) {
-		passwordDialog.close();
-		toast.success("Changed Password");
-		localStorage.removeItem("jwt");
-		location.reload();
-	} else {
-		toast.error("Request Denied");
-	}
+	const intendedPassword = newPassword;
+	confirmation.confirm((verification: StepUpVerification) => changePassword(verification, intendedPassword));
 }
-async function setPasswordEnabled(password: string, enabled: boolean) {
-	const body = JSON.stringify({ password, password_state: enabled });
-	const encryptedBody = await encryptToServer(body);
-	await authenticatedFetch(
-		`/api/user/info`,
-		{
-			method: "PATCH",
-			body: encryptedBody,
-		},
-		undefined,
-		"application/octet-stream",
-	);
+async function changePassword(verification: StepUpVerification, newPassword: string) {
+	await stepUpFetch("/api/user/update_password", "POST", { new_password: newPassword }, verification);
+	passwordDialog.close();
+	localStorage.removeItem("jwt");
+	location.reload();
+}
+async function setPasswordEnabled(verification: StepUpVerification, enabled: boolean) {
+	await stepUpFetch("/api/user/info", "PATCH", { password_state: enabled }, verification);
 	toast.success("Changed Password State");
 }
-async function updateEmail(password: string, newEmail: string) {
-	const body = JSON.stringify({ password, email: newEmail });
-	const encryptedBody = await encryptToServer(body);
-	await authenticatedFetch(
-		`/api/user/info`,
-		{
-			method: "PATCH",
-			body: encryptedBody,
-		},
-		undefined,
-		"application/octet-stream",
-	);
+async function updateEmail(verification: StepUpVerification, newEmail: string) {
+	await stepUpFetch("/api/user/info", "PATCH", { email: newEmail }, verification);
 	toast.success("Changed Email");
 }
-async function registerPasskey(password: string) {
-	const body = JSON.stringify({ password });
-	const encryptedBody = await encryptToServer(body);
-	const startRes = await authenticatedFetch(`/api/passkeys/start_registration`, { method: "POST", body: encryptedBody }, undefined, "application/octet-stream");
+async function registerPasskey(verification: StepUpVerification) {
+	const startRes = await stepUpFetch("/api/passkeys/start_registration", "POST", {}, verification);
 	const startData = await startRes.json();
 	const credential = await Passkeys.createPasskey(startData.publicKey);
 	await authenticatedFetch(`/api/passkeys/finish_registration`, {
@@ -127,7 +69,6 @@ async function deletePasskey(id: string) {
 	bind:this={passwordDialog}
 	class="modal"
 	onclose={() => {
-		oldPassword = "";
 		newPassword = "";
 		passwordConfirmation = "";
 	}}
@@ -138,16 +79,12 @@ async function deletePasskey(id: string) {
 	<div class="modal-box max-w-200">
 		<h1>Change Password</h1>
 		<form
-			onsubmit={async (e) => {
+			onsubmit={(e) => {
 				e.preventDefault();
-				await changePassword();
+				requestPasswordChange();
 			}}
 		>
 			<fieldset class="fieldset">
-				<div>
-					<label for="oldPassword">Old Password</label>
-					<input id="oldPassword" type="password" placeholder="Old password" class="input" required autocomplete="current-password" bind:value={oldPassword}>
-				</div>
 				<div>
 					<label for="newPassword">New Password</label>
 					<input id="newPassword" type="password" placeholder="New password" class="input" required autocomplete="new-password" bind:value={newPassword}>
@@ -161,39 +98,13 @@ async function deletePasskey(id: string) {
 		</form>
 	</div>
 </dialog>
-<dialog
-	bind:this={confirmationDialog}
-	class="modal"
-	onclose={() => {
-		confirmationAction = null;
-		confirmationPassword = "";
-	}}
->
-	<form class="modal-backdrop" method="dialog">
-		<button type="submit">Close</button>
-	</form>
-	<div class="modal-box">
-		<h2 class="text-xl text-center">Confirm Password</h2>
-		<br>
-		<form
-			onsubmit={async (e) => {
-				e.preventDefault();
-				await submitConfirmation();
-			}}
-		>
-			<fieldset class="fieldset" disabled={confirmationPending}>
-				<input id="confirmationPassword" placeholder="Password" type="password" class="input w-full" required autocomplete="current-password" bind:value={confirmationPassword}>
-				<button type="submit" class="btn btn-primary">Confirm</button>
-			</fieldset>
-		</form>
-	</div>
-</dialog>
+<StepUpDialog bind:this={confirmation} />
 <br>
 <button
 	type="button"
 	class="btn"
 	onclick={() => {
-		confirmPassword(registerPasskey);
+		confirmation.confirm(registerPasskey);
 	}}
 >
 	Register Passkey
@@ -202,7 +113,7 @@ async function deletePasskey(id: string) {
 	onsubmit={(e) => {
 		e.preventDefault();
 		const intendedEnabled = passwordEnabled;
-		confirmPassword((password) => setPasswordEnabled(password, intendedEnabled));
+		confirmation.confirm((verification: StepUpVerification) => setPasswordEnabled(verification, intendedEnabled));
 	}}
 >
 	<label for="passwordEnabled">Allow Password Login:</label>
@@ -213,7 +124,7 @@ async function deletePasskey(id: string) {
 	onsubmit={(e) => {
 		e.preventDefault();
 		const intendedEmail = email;
-		confirmPassword((password) => updateEmail(password, intendedEmail));
+		confirmation.confirm((verification: StepUpVerification) => updateEmail(verification, intendedEmail));
 	}}
 >
 	<label for="email">Email:</label>

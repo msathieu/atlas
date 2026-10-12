@@ -1,7 +1,6 @@
 <script lang="ts">
-import { Passkeys } from "@capawesome/capacitor-passkeys";
 import { toast } from "svelte-sonner";
-import { verifyResponseSignature } from "#lib/auth.ts";
+import { getPasskeyVerification, verifyResponseSignature } from "#lib/auth.ts";
 import { API_HOST, bufferToBase64, encryptToServer, getDatabase } from "#lib/util.ts";
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
@@ -58,11 +57,10 @@ async function passkeyLogin() {
 	const encoder = new TextEncoder();
 	const startHash = await crypto.subtle.digest("SHA-512", encoder.encode(startBody));
 	await verifyResponseSignature(startRes, `passkey_start-${bufferToBase64(startHash)}`);
-	const startData = await startRes.json();
-	const credential = await Passkeys.getPasskey(startData.challenge.publicKey);
+	const verification = await getPasskeyVerification(startRes);
 	const keyPair = await crypto.subtle.generateKey("Ed25519", false, ["sign", "verify"]);
 	const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
-	const encryptedBody = await encryptToServer(JSON.stringify({ flow_id: startData.flow_id, credential, pubkey }));
+	const encryptedBody = await encryptToServer(JSON.stringify({ ...verification, pubkey }));
 	const finishRes = await fetch(`${API_HOST}/api/passkeys/finish_authentication`, {
 		method: "POST",
 		body: encryptedBody,
@@ -111,8 +109,8 @@ async function finishAuth(username: string, jwt: string, keyPair: CryptoKeyPair)
 					<label for="password">Password</label>
 					<input id="password" type="password" placeholder="Password" class="input" autocomplete="current-password" bind:value={password}>
 				</div>
-				<button type="submit" class="btn btn-primary">Login</button>
-				<div class="divider"></div>
+				<button type="submit" class="btn btn-primary">Login With Password</button>
+				<div class="divider">or</div>
 				<button type="button" class="btn btn-primary" onclick={async () => await runLogin(passkeyLogin)}>Login With Passkey</button>
 			</fieldset>
 		</form>
