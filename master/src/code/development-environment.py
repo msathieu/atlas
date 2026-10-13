@@ -10,6 +10,20 @@ def run_command(cmd: str | list[str], user: str | None = None, shell: bool = Tru
     _ = subprocess.run(cmd, shell=shell, check=True, user=user, group=user, extra_groups=[], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def get_nix_command():
+    if not os.path.exists("/state/project/flake.lock"):
+        return ""
+    result = subprocess.run(
+        ["su", "ide", "-c", "nix develop /state/project -c true"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode != 0:
+        return ""
+    return "nix develop /state/project -c"
+
+
 os.makedirs("/state/project", exist_ok=True)
 os.makedirs("/state/ide", exist_ok=True)
 os.makedirs("/state/misc", exist_ok=True)
@@ -30,9 +44,7 @@ if os.getenv("DEVELOPMENT_ENVIRONMENT_REPO") and not os.path.exists("/state/proj
         run_command(["git", "clone", os.getenv("DEVELOPMENT_ENVIRONMENT_REPO") or "", "-b", os.getenv("DEVELOPMENT_ENVIRONMENT_BRANCH") or "", "/state/project"], "ide", False)
     else:
         run_command(["git", "clone", os.getenv("DEVELOPMENT_ENVIRONMENT_REPO") or "", "/state/project"], "ide", False)
-nix_command = ""
-if os.path.exists("/state/project/flake.lock"):
-    nix_command = "nix develop /state/project -c"
+nix_command = get_nix_command()
 run_command(
     f'su ide -c "SSH_AUTH_SOCK=/run/ssh.sock {nix_command} code-server --user-data-dir /state/ide --bind-addr 0.0.0.0:9000 --disable-telemetry --proxy-domain localhost /state/project" > /var/log/code-server.log 2>&1 &'
 )
