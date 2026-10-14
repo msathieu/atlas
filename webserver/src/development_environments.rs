@@ -1,7 +1,7 @@
 use crate::{
     auth::{authenticate, generate_jwt},
     get_db,
-    util::{convert_timestamp, sign_response, validate_signature},
+    util::{convert_timestamp, decrypt_body, sign_response, validate_signature},
 };
 use axum::{
     Json,
@@ -124,7 +124,7 @@ pub async fn development_environments_list(headers: HeaderMap, uri: OriginalUri,
 pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateDevelopmentEnvironmentResponse>), StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: CreateDevelopmentEnvironmentRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: CreateDevelopmentEnvironmentRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
     if request.name.is_empty()
         || !request.name.chars().all(|c| c.is_ascii_alphanumeric())
         || !request.repo.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ':' || c == '/' || c == '.')
@@ -182,7 +182,7 @@ pub async fn create_development_environment(headers: HeaderMap, uri: OriginalUri
 pub async fn rotate_ssh_key(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: RotateSSHKeyRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: RotateSSHKeyRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
     let uid = user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
     let mut db = get_db().await?;
     containers::table
@@ -341,7 +341,7 @@ pub async fn get_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid>, u
 pub async fn approve_ssh_forward_request(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: ApproveSSHForwardRequestRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: ApproveSSHForwardRequestRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db().await?;
     let mut valkey_client = get_valkey_client().await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.0;
     let development_environment_id: String = valkey_client

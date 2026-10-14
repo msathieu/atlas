@@ -4,7 +4,7 @@ import DOMPurify from "dompurify";
 import hljs from "highlight.js";
 import { authenticatedFetch } from "#lib/auth.js";
 import { user } from "#lib/state.svelte.ts";
-import { formatTime, getHostnameForDevice } from "#lib/util.ts";
+import { encryptedFetch, formatTime, getHostnameForDevice } from "#lib/util.ts";
 import "highlight.js/styles/github-dark.css";
 
 let { data } = $props();
@@ -23,7 +23,7 @@ $effect(() => {
 });
 
 async function createCommand() {
-	await authenticatedFetch(`/api/commands`, {
+	await encryptedFetch(`/api/commands`, {
 		method: "POST",
 		body: JSON.stringify({ device: newDevice, code: newCode }),
 	});

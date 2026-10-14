@@ -93,7 +93,7 @@ pub async fn agents_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> R
 pub async fn create_agent(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateAgentResponse>), StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: CreateAgentRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: CreateAgentRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
     if request.name.is_empty() || !request.name.chars().all(|c| c.is_ascii_alphanumeric()) {
         return Err(StatusCode::BAD_REQUEST);
     }

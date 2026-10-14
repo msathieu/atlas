@@ -5,7 +5,7 @@ import { toast } from "svelte-sonner";
 import { authenticatedFetch } from "#lib/auth.ts";
 import StepUpDialog from "#lib/StepUpDialog.svelte";
 import { type StepUpVerification, stepUpFetch } from "#lib/step_up.ts";
-import { formatTime } from "#lib/util.ts";
+import { encryptedFetch, formatTime } from "#lib/util.ts";
 
 let { data } = $props();
 let passwordDialog: any = $state();
@@ -41,7 +41,7 @@ async function registerPasskey(verification: StepUpVerification) {
 	const startRes = await stepUpFetch("/api/passkeys/start_registration", "POST", {}, verification);
 	const startData = await startRes.json();
 	const credential = await Passkeys.createPasskey(startData.publicKey);
-	await authenticatedFetch(`/api/passkeys/finish_registration`, {
+	await encryptedFetch(`/api/passkeys/finish_registration`, {
 		method: "POST",
 		body: JSON.stringify({
 			credential,

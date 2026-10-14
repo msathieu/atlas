@@ -1,4 +1,4 @@
-import { authenticatedFetch } from "./auth.ts";
+import { encryptedFetch } from "./util.ts";
 
 export async function updateContainer(id: string, memory_limit: number, storage_size: number) {
 	const data: { memory_limit?: number; storage_size?: number } = {};
@@ -8,7 +8,7 @@ export async function updateContainer(id: string, memory_limit: number, storage_
 	if (storage_size > 0) {
 		data.storage_size = storage_size;
 	}
-	await authenticatedFetch(`/api/containers/${id}`, {
+	await encryptedFetch(`/api/containers/${id}`, {
 		method: "PATCH",
 		body: JSON.stringify(data),
 	});

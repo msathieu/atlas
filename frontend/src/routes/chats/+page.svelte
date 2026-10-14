@@ -1,13 +1,13 @@
 <script lang="ts">
 import { Bot, MessageCircle, Plus, Trash } from "@lucide/svelte";
 import { authenticatedFetch } from "#lib/auth.ts";
-import { formatTime } from "#lib/util.ts";
+import { encryptedFetch, formatTime } from "#lib/util.ts";
 import { goto } from "$app/navigation";
 
 let { data } = $props();
 
 async function createChat(chat_type: string) {
-	await authenticatedFetch(`/api/chats`, {
+	await encryptedFetch(`/api/chats`, {
 		method: "POST",
 		body: JSON.stringify({ chat_type }),
 	});

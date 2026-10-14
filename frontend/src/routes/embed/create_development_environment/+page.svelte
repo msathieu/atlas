@@ -1,6 +1,6 @@
 <script lang="ts">
-import { authenticatedFetch } from "#lib/auth.ts";
 import { user } from "#lib/state.svelte.ts";
+import { encryptedFetch } from "#lib/util.ts";
 
 let { data } = $props();
 
@@ -9,7 +9,7 @@ let nestedContainers = $state(false);
 let cryptoBackend = $state("tpm");
 
 async function createEnvironment() {
-	const response = await authenticatedFetch(`/api/development_environments`, {
+	const response = await encryptedFetch(`/api/development_environments`, {
 		method: "POST",
 		body: JSON.stringify({
 			name: name,

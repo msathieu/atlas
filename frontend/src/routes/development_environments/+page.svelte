@@ -3,7 +3,7 @@ import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, Ref
 import { authenticatedFetch } from "#lib/auth.js";
 import { updateContainer } from "#lib/container.ts";
 import { user } from "#lib/state.svelte.js";
-import { formatTime } from "#lib/util.ts";
+import { encryptedFetch, formatTime } from "#lib/util.ts";
 
 let { data } = $props();
 let selectedEnvironmentId = $state();
@@ -25,14 +25,14 @@ $effect(() => {
 });
 
 async function rotateSSHKey() {
-	await authenticatedFetch(`/api/development_environments/${selectedEnvironment.id}/rotate_ssh_key`, {
+	await encryptedFetch(`/api/development_environments/${selectedEnvironment.id}/rotate_ssh_key`, {
 		method: "POST",
 		body: JSON.stringify({ ssh_key_backend: rotationBackend }),
 	});
 }
 
 async function createEnvironment() {
-	await authenticatedFetch(`/api/development_environments`, {
+	await encryptedFetch(`/api/development_environments`, {
 		method: "POST",
 		body: JSON.stringify({
 			name: newName,

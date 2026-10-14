@@ -31,7 +31,7 @@ async function updateAgentForge(name: string, value: string) {
 	});
 }
 async function createAgent() {
-	await authenticatedFetch(`/api/agents`, {
+	await encryptedFetch(`/api/agents`, {
 		method: "POST",
 		body: JSON.stringify({ name: newName }),
 	});

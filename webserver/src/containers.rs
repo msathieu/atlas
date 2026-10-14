@@ -1,4 +1,7 @@
-use crate::{auth::authenticate, util::validate_signature};
+use crate::{
+    auth::authenticate,
+    util::{decrypt_body, validate_signature},
+};
 use crate::{get_db, util::sign_response};
 use axum::{
     body::Bytes,
@@ -21,7 +24,7 @@ pub struct UpdateContainerRequest {
 pub async fn update_container(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "PATCH").await?;
-    let request: UpdateContainerRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: UpdateContainerRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db().await?;
     if let Some(memory_limit) = request.memory_limit {
         if memory_limit <= 0 || memory_limit > 32 {

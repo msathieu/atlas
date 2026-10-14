@@ -1,6 +1,6 @@
 <script lang="ts">
 import { toast } from "svelte-sonner";
-import { getPasskeyVerification, verifyResponseSignature } from "#lib/auth.ts";
+import { getPasskeyVerification } from "#lib/auth.ts";
 import { API_HOST, bufferToBase64, encryptedFetch, getDatabase } from "#lib/util.ts";
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
@@ -42,14 +42,11 @@ async function login() {
 }
 async function passkeyLogin() {
 	const startBody = JSON.stringify({ username });
-	const startRes = await fetch(`${API_HOST}/api/passkeys/start_authentication`, { method: "POST", body: startBody });
+	const startRes = await encryptedFetch(`${API_HOST}/api/passkeys/start_authentication`, { method: "POST", body: startBody }, fetch, "passkey_start");
 	if (!startRes.ok) {
 		toast.error("Invalid Credentials");
 		return;
 	}
-	const encoder = new TextEncoder();
-	const startHash = await crypto.subtle.digest("SHA-512", encoder.encode(startBody));
-	await verifyResponseSignature(startRes, `passkey_start-${bufferToBase64(startHash)}`);
 	const verification = await getPasskeyVerification(startRes);
 	const keyPair = await crypto.subtle.generateKey("Ed25519", false, ["sign", "verify"]);
 	const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));

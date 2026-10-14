@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "agent"
-version = "2026.10.12"
+version = "2026.10.14"
 dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
@@ -182,7 +182,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "apiserver"
-version = "2026.10.12"
+version = "2026.10.14"
 dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
@@ -2829,7 +2829,7 @@ dependencies = [
 
 [[package]]
 name = "master"
-version = "2026.10.12"
+version = "2026.10.14"
 dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
@@ -4091,7 +4091,7 @@ dependencies = [
 
 [[package]]
 name = "proxy"
-version = "2026.10.12"
+version = "2026.10.14"
 dependencies = [
  "async-trait",
  "bytes",
@@ -5151,7 +5151,7 @@ dependencies = [
 
 [[package]]
 name = "shared-api"
-version = "2026.10.12"
+version = "2026.10.14"
 dependencies = [
  "num_enum",
  "prost",
@@ -5164,7 +5164,7 @@ dependencies = [
 
 [[package]]
 name = "shared-server"
-version = "2026.10.12"
+version = "2026.10.14"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -6513,7 +6513,7 @@ dependencies = [
 
 [[package]]
 name = "webserver"
-version = "2026.10.12"
+version = "2026.10.14"
 dependencies = [
  "aws-lc-rs",
  "axum",

@@ -3,13 +3,13 @@ import { BadgeCheck, BadgeX, Bot, CircleUser, SendHorizontal, Trash } from "@luc
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { authenticatedFetch } from "#lib/auth.ts";
-import { formatTime } from "#lib/util.ts";
+import { encryptedFetch, formatTime } from "#lib/util.ts";
 
 let { data } = $props();
 let content = $state("");
 
 async function sendMessage() {
-	await authenticatedFetch(`/api/chats/${data.id}`, {
+	await encryptedFetch(`/api/chats/${data.id}`, {
 		method: "POST",
 		body: JSON.stringify({ content }),
 	});
@@ -32,7 +32,7 @@ async function manageToolCallConsent(seq: number, callId: string, approved: bool
 	if (!approved) {
 		rejection_reason = prompt("Reason") || "no reason supplied";
 	}
-	await authenticatedFetch(`/api/chats/${data.id}/${seq}/${callId}/consent`, {
+	await encryptedFetch(`/api/chats/${data.id}/${seq}/${callId}/consent`, {
 		method: "POST",
 		body: JSON.stringify({ approved, rejection_reason }),
 	});

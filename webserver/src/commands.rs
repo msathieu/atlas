@@ -1,7 +1,7 @@
 use crate::{
     auth::{authenticate, require_admin},
     get_db,
-    util::{convert_timestamp, sign_response, validate_signature},
+    util::{convert_timestamp, decrypt_body, sign_response, validate_signature},
 };
 use axum::{
     Json,
@@ -88,7 +88,7 @@ pub async fn commands_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
 pub async fn create_command(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateCommandResponse>), StatusCode> {
     let user = require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: CreateCommandRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: CreateCommandRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db().await?;
     let mut cmd = Command {
         id: None,
