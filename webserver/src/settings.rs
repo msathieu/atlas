@@ -45,7 +45,7 @@ pub async fn get_settings(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> 
 pub async fn update_setting(headers: HeaderMap, Path(name): Path<String>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "PUT").await?;
-    let request: UpdateSettingRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: UpdateSettingRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db().await?;
     let allowed_settings = [
         "allow_new_devices",

@@ -43,7 +43,11 @@ pub async fn update_user_setting(headers: HeaderMap, Path(name): Path<String>, u
     let user = authenticate(&headers).await?.0;
     let uid = user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
     let signature = validate_signature(&headers, uri.0, &body, "PUT").await?;
-    let body = if name == "development_environment_settings" { body.to_vec() } else { decrypt_body(body)? };
+    let body = if name == "development_environment_settings" {
+        body.to_vec()
+    } else {
+        decrypt_body(&headers, body)?
+    };
     let request: UpdateUserSettingRequest = serde_json::from_slice(&body).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db().await?;
     let allowed_settings = [

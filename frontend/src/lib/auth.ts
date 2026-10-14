@@ -17,17 +17,9 @@ export async function verifyResponseSignature(response: Response, requestSignatu
 		throw new Error("Invalid response signature");
 	}
 }
-export async function authenticatedFetch(
-	input: RequestInfo | URL,
-	init?: RequestInit,
-	fn?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
-	contentType?: string,
-): Promise<Response> {
+export async function authenticatedFetch(input: RequestInfo | URL, init?: RequestInit, fn?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>): Promise<Response> {
 	if (!init) {
 		init = {};
-	}
-	if (!contentType) {
-		contentType = "application/json";
 	}
 	if (!fn) {
 		fn = fetch;
@@ -37,10 +29,11 @@ export async function authenticatedFetch(
 		throw new Error("Unauthorized");
 	}
 	const url = API_HOST + input;
-	init.headers = new Headers({
-		Authorization: `Bearer ${jwt}`,
-		"Content-Type": contentType,
-	});
+	init.headers = new Headers(init.headers);
+	init.headers.set("Authorization", `Bearer ${jwt}`);
+	if (!init.headers.has("Content-Type")) {
+		init.headers.set("Content-Type", "application/json");
+	}
 	const encoder = new TextEncoder();
 	let body = init.body;
 	if (!body) {

@@ -40,7 +40,7 @@ pub struct UpdateUserInfoRequest {
 pub async fn change_password(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: ChangePasswordRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: ChangePasswordRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
     if request.new_password.is_empty() || request.new_password.len() < MIN_PASSWORD_LENGTH {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -69,7 +69,7 @@ pub async fn get_user_info(headers: HeaderMap, uri: OriginalUri, body: Bytes) ->
 pub async fn update_user_info(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "PATCH").await?;
-    let request: UpdateUserInfoRequest = serde_json::from_slice(&decrypt_body(body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: UpdateUserInfoRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
     verify_step_up(&headers, &user, request.verification).await?;
     let mut db = get_db().await?;
     if let Some(email) = request.email {

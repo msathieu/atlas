@@ -1,7 +1,7 @@
 <script lang="ts">
 import { toast } from "svelte-sonner";
 import { getPasskeyVerification, verifyResponseSignature } from "#lib/auth.ts";
-import { API_HOST, bufferToBase64, encryptToServer, getDatabase } from "#lib/util.ts";
+import { API_HOST, bufferToBase64, encryptedFetch, getDatabase } from "#lib/util.ts";
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
 
@@ -32,18 +32,11 @@ async function login() {
 		pubkey,
 		timestamp: Math.floor(Date.now() / 1000),
 	});
-	const encryptedBody = await encryptToServer(body);
-	const response = await fetch(`${API_HOST}/api/login`, {
-		method: "POST",
-		body: encryptedBody,
-		headers: { "Content-Type": "application/octet-stream" },
-	});
+	const response = await encryptedFetch(`${API_HOST}/api/login`, { method: "POST", body }, fetch, "login");
 	if (!response.ok) {
 		toast.error("Invalid Credentials");
 		return;
 	}
-	const bodyHash = await crypto.subtle.digest("SHA-512", encryptedBody);
-	await verifyResponseSignature(response, `login-${bufferToBase64(bodyHash)}`);
 	const json = await response.json();
 	await finishAuth(username, json.jwt, keyPair);
 }
@@ -60,18 +53,11 @@ async function passkeyLogin() {
 	const verification = await getPasskeyVerification(startRes);
 	const keyPair = await crypto.subtle.generateKey("Ed25519", false, ["sign", "verify"]);
 	const pubkey = bufferToBase64(await crypto.subtle.exportKey("raw", keyPair.publicKey));
-	const encryptedBody = await encryptToServer(JSON.stringify({ ...verification, pubkey }));
-	const finishRes = await fetch(`${API_HOST}/api/passkeys/finish_authentication`, {
-		method: "POST",
-		body: encryptedBody,
-		headers: { "Content-Type": "application/octet-stream" },
-	});
+	const finishRes = await encryptedFetch(`${API_HOST}/api/passkeys/finish_authentication`, { method: "POST", body: JSON.stringify({ ...verification, pubkey }) }, fetch, "passkey_finish");
 	if (!finishRes.ok) {
 		toast.error("Invalid Credentials");
 		return;
 	}
-	const finishHash = await crypto.subtle.digest("SHA-512", encryptedBody);
-	await verifyResponseSignature(finishRes, `passkey_finish-${bufferToBase64(finishHash)}`);
 	const json = await finishRes.json();
 	await finishAuth(username, json.jwt, keyPair);
 }

@@ -1,6 +1,6 @@
 import { toast } from "svelte-sonner";
 import { authenticatedFetch } from "./auth.ts";
-import { encryptToServer } from "./util.ts";
+import { encryptedFetch } from "./util.ts";
 
 export async function updateSetting(name: string, value: string, global: boolean) {
 	const body = JSON.stringify({ value });
@@ -12,15 +12,10 @@ export async function updateSetting(name: string, value: string, global: boolean
 		});
 	} else {
 		const url = global ? `/api/settings/${name}` : `/api/user/settings/${name}`;
-		response = await authenticatedFetch(
-			url,
-			{
-				method: "PUT",
-				body: await encryptToServer(body),
-			},
-			undefined,
-			"application/octet-stream",
-		);
+		response = await encryptedFetch(url, {
+			method: "PUT",
+			body,
+		});
 	}
 	if (response.ok) {
 		toast.success("Updated Setting");

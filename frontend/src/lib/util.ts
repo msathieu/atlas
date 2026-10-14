@@ -1,7 +1,7 @@
 import { formatRelative } from "date-fns";
 import Dexie from "dexie";
 import { PUBLIC_API_ENCRYPTION_PUBKEY, PUBLIC_API_HOST, PUBLIC_API_SIGNING_PUBKEY } from "$app/env/public";
-import { verifyResponseSignature } from "./auth.ts";
+import { authenticatedFetch, verifyResponseSignature } from "./auth.ts";
 
 export const API_HOST = PUBLIC_API_HOST ? `https://${PUBLIC_API_HOST}` : "";
 export const API_ENCRYPTION_PUBKEY = PUBLIC_API_ENCRYPTION_PUBKEY;
@@ -36,15 +36,37 @@ export function bufferToBase64(buf: ArrayBuffer): string {
 export function base64ToBuffer(encoded: string): ArrayBuffer {
 	return Uint8Array.fromBase64(encoded).buffer;
 }
-export async function encryptToServer(data: string): Promise<ArrayBuffer> {
+export async function encryptedFetch(
+	input: RequestInfo | URL,
+	init: RequestInit,
+	fn: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> = authenticatedFetch,
+	requestSignaturePrefix?: string,
+): Promise<Response> {
 	if (!encryptionPubkey) {
 		const infoRes = await fetchInfo();
 		const info = await infoRes.json();
 		encryptionPubkey = info.encryption_pubkey as string;
 	}
 	const serverPubKey = await crypto.subtle.importKey("spki", base64ToBuffer(encryptionPubkey), { name: "RSA-OAEP", hash: "SHA-512" }, false, ["encrypt"]);
-	const encoder = new TextEncoder();
-	return await crypto.subtle.encrypt({ name: "RSA-OAEP" }, serverPubKey, encoder.encode(data));
+	const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt"]);
+	const encryptedKey = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, serverPubKey, await crypto.subtle.exportKey("raw", key));
+	const iv = crypto.getRandomValues(new Uint8Array(12));
+	const plaintext = await new Response(init.body).arrayBuffer();
+	const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
+	const headers = new Headers(init.headers);
+	headers.set("Content-Type", "application/octet-stream");
+	headers.set("X-Encryption-Key", bufferToBase64(encryptedKey));
+	headers.set("X-Encryption-Nonce", bufferToBase64(iv.buffer));
+	const response = await fn(input, {
+		...init,
+		body: ciphertext,
+		headers,
+	});
+	if (requestSignaturePrefix && response.ok) {
+		const bodyHash = await crypto.subtle.digest("SHA-512", ciphertext);
+		await verifyResponseSignature(response, `${requestSignaturePrefix}-${bufferToBase64(bodyHash)}`);
+	}
+	return response;
 }
 export async function signRequest(data: string): Promise<string> {
 	const db = getDatabase();

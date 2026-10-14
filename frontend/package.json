@@ -10,7 +10,7 @@
 		"build": "svelte-kit sync && vite build",
 		"sync": "svelte-kit sync",
 		"check": "svelte-check",
-		"dev": "vite dev",
+		"dev": "vite dev --host",
 		"lint": "biome ci",
 		"format": "biome format --write"
 	},

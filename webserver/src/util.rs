@@ -1,5 +1,6 @@
 use crate::{ENCRYPTION_KEY, SIGNING_KEY, auth::authenticate};
 use aws_lc_rs::{
+    aead::{AES_256_GCM, Aad, LessSafeKey, Nonce, UnboundKey},
     rsa::{OAEP_SHA512_MGF1SHA512, OaepPrivateDecryptingKey, PrivateDecryptingKey},
     signature::Ed25519KeyPair,
 };
@@ -49,12 +50,20 @@ pub fn get_signing_key() -> Result<Ed25519KeyPair, StatusCode> {
     let key = Ed25519KeyPair::from_pkcs8(SIGNING_KEY.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(key)
 }
-pub fn decrypt_body(body: Bytes) -> Result<Vec<u8>, StatusCode> {
+pub fn decrypt_body(headers: &HeaderMap, body: Bytes) -> Result<Vec<u8>, StatusCode> {
+    let encrypted_key = headers.get("X-Encryption-Key").ok_or(StatusCode::BAD_REQUEST)?;
+    let encrypted_key = BASE64_STANDARD.decode(encrypted_key).or(Err(StatusCode::BAD_REQUEST))?;
+    let nonce = headers.get("X-Encryption-Nonce").ok_or(StatusCode::BAD_REQUEST)?;
+    let nonce = BASE64_STANDARD.decode(nonce).or(Err(StatusCode::BAD_REQUEST))?;
+    let nonce = Nonce::try_assume_unique_for_key(&nonce).or(Err(StatusCode::BAD_REQUEST))?;
     let key = get_encryption_key()?;
     let key = OaepPrivateDecryptingKey::new(key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let mut decrypted = vec![0; key.min_output_size()];
-    let decrypted = key.decrypt(&OAEP_SHA512_MGF1SHA512, &body, &mut decrypted, None).or(Err(StatusCode::BAD_REQUEST))?;
-    Ok(decrypted.to_vec())
+    let decrypted = key.decrypt(&OAEP_SHA512_MGF1SHA512, &encrypted_key, &mut decrypted, None).or(Err(StatusCode::BAD_REQUEST))?;
+    let key = LessSafeKey::new(UnboundKey::new(&AES_256_GCM, decrypted).or(Err(StatusCode::BAD_REQUEST))?);
+    let mut ciphertext = body.to_vec();
+    let plaintext = key.open_in_place(nonce, Aad::empty(), &mut ciphertext).or(Err(StatusCode::BAD_REQUEST))?;
+    Ok(plaintext.to_vec())
 }
 pub async fn validate_signature(headers: &HeaderMap, uri: Uri, body: &Bytes, method: &str) -> Result<String, StatusCode> {
     let signature = headers.get("X-Request-Signature").ok_or(StatusCode::UNAUTHORIZED)?;

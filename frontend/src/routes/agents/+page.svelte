@@ -2,7 +2,7 @@
 import { CircleQuestionMark, ExternalLink, Loader, Pause, Play, Plus, Power, SquarePen, Trash } from "@lucide/svelte";
 import { authenticatedFetch } from "#lib/auth.ts";
 import { updateContainer } from "#lib/container.ts";
-import { encryptToServer, formatTime } from "#lib/util.ts";
+import { encryptedFetch, formatTime } from "#lib/util.ts";
 
 let { data } = $props();
 let selectedAgentId = $state();
@@ -25,15 +25,10 @@ function resetForgeInputs() {
 	forgeWebhookSecret = "";
 }
 async function updateAgentForge(name: string, value: string) {
-	await authenticatedFetch(
-		`/api/agents/${selectedAgent.id}/forge`,
-		{
-			method: "PATCH",
-			body: await encryptToServer(JSON.stringify({ [name]: value })),
-		},
-		undefined,
-		"application/octet-stream",
-	);
+	await encryptedFetch(`/api/agents/${selectedAgent.id}/forge`, {
+		method: "PATCH",
+		body: JSON.stringify({ [name]: value }),
+	});
 }
 async function createAgent() {
 	await authenticatedFetch(`/api/agents`, {
