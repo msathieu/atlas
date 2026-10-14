@@ -169,6 +169,24 @@ pub async fn create_settings(db: &mut AsyncPgConnection) -> Result<(), Box<dyn E
             .execute(db)
             .await?;
     }
+    if !does_setting_exist(db, "web_encryption_key_old").await? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "web_encryption_key_old".to_owned(),
+                value: "".to_string(),
+            })
+            .execute(db)
+            .await?;
+    }
+    if !does_setting_exist(db, "web_encryption_key_rotated_at").await? {
+        diesel::insert_into(settings::table)
+            .values(Setting {
+                name: "web_encryption_key_rotated_at".to_owned(),
+                value: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().to_string(),
+            })
+            .execute(db)
+            .await?;
+    }
     if !does_setting_exist(db, "web_signing_key").await? {
         let web_signing_key = Ed25519KeyPair::generate()?.to_pkcs8()?;
         diesel::insert_into(settings::table)

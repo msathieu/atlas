@@ -122,7 +122,7 @@ pub async fn chats_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Re
 pub async fn create_chat(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateChatResponse>), StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: CreateChatRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: CreateChatRequest = serde_json::from_slice(&decrypt_body(&headers, body).await?).or(Err(StatusCode::BAD_REQUEST))?;
     let chat_type = match request.chat_type.as_str() {
         "interactive" => ChatType::Interactive,
         "noninteractive" => ChatType::NonInteractive,
@@ -235,7 +235,7 @@ pub async fn get_chat(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri
 pub async fn send_message(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: SendMessageRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: SendMessageRequest = serde_json::from_slice(&decrypt_body(&headers, body).await?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db().await?;
     let chat: Chat = chats::table
         .filter(chats::id.eq(id).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))
@@ -295,7 +295,7 @@ pub async fn send_message(headers: HeaderMap, Path(id): Path<Uuid>, uri: Origina
 pub async fn manage_tool_call_consent(headers: HeaderMap, Path((chat_id, seq, call_id)): Path<(Uuid, i32, String)>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = authenticate(&headers).await?.0;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: ManageToolCallConsentRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: ManageToolCallConsentRequest = serde_json::from_slice(&decrypt_body(&headers, body).await?).or(Err(StatusCode::BAD_REQUEST))?;
     let mut db = get_db().await?;
     let _chat: Chat = chats::table
         .filter(chats::id.eq(chat_id).and(chats::uid.eq(user.id.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?)))

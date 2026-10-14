@@ -1,4 +1,4 @@
-use crate::{ENCRYPTION_KEY, SIGNING_KEY, auth::authenticate};
+use crate::{SIGNING_KEY, auth::authenticate, get_db};
 use aws_lc_rs::{
     aead::{AES_256_GCM, Aad, LessSafeKey, Nonce, UnboundKey},
     rsa::{OAEP_SHA512_MGF1SHA512, OaepPrivateDecryptingKey, PrivateDecryptingKey},
@@ -9,10 +9,12 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode, Uri},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
+use diesel::prelude::*;
+use diesel_async::RunQueryDsl;
 use redis::{AsyncTypedCommands, ExistenceCheck, SetExpiry, SetOptions};
 use serde::Serialize;
 use sha2::{Digest, Sha512};
-use shared_server::{get_valkey_client, parse_pubkey};
+use shared_server::{get_valkey_client, models::Setting, parse_pubkey, schema::settings};
 use std::{
     sync::OnceLock,
     time::{SystemTime, UNIX_EPOCH},
@@ -42,25 +44,56 @@ async fn validate_nonce(nonce: Uuid) -> Result<(), StatusCode> {
 pub fn convert_timestamp(time: SystemTime) -> Result<u64, StatusCode> {
     Ok(time.duration_since(UNIX_EPOCH).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?.as_secs())
 }
-pub fn get_encryption_key() -> Result<PrivateDecryptingKey, StatusCode> {
-    let key = PrivateDecryptingKey::from_pkcs8(ENCRYPTION_KEY.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+pub async fn get_encryption_key() -> Result<PrivateDecryptingKey, StatusCode> {
+    let mut db = get_db().await?;
+    let key: Setting = settings::table.find("web_encryption_key").first(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    parse_encryption_key(&key.value)
+}
+fn parse_encryption_key(key: &str) -> Result<PrivateDecryptingKey, StatusCode> {
+    let key = BASE64_STANDARD.decode(key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let key = PrivateDecryptingKey::from_pkcs8(&key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(key)
 }
 pub fn get_signing_key() -> Result<Ed25519KeyPair, StatusCode> {
     let key = Ed25519KeyPair::from_pkcs8(SIGNING_KEY.get().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     Ok(key)
 }
-pub fn decrypt_body(headers: &HeaderMap, body: Bytes) -> Result<Vec<u8>, StatusCode> {
+pub async fn decrypt_body(headers: &HeaderMap, body: Bytes) -> Result<Vec<u8>, StatusCode> {
+    let mut db = get_db().await?;
+    let keys: Vec<Setting> = settings::table
+        .filter(settings::name.eq_any(["web_encryption_key", "web_encryption_key_old"]))
+        .load(&mut db)
+        .await
+        .or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let mut current = String::new();
+    let mut old = None;
+    for i in keys {
+        if i.name == "web_encryption_key" {
+            current = i.value.clone();
+        } else if i.name == "web_encryption_key_old" && !i.value.is_empty() {
+            old = Some(i.value);
+        }
+    }
+    decrypt_body_with_keys(headers, body, &current, old)
+}
+fn decrypt_symmetric_key(key: &str, encrypted_key: &[u8]) -> Result<Vec<u8>, StatusCode> {
+    let key = OaepPrivateDecryptingKey::new(parse_encryption_key(key)?).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+    let mut decrypted = vec![0; key.min_output_size()];
+    let decrypted = key.decrypt(&OAEP_SHA512_MGF1SHA512, encrypted_key, &mut decrypted, None).or(Err(StatusCode::BAD_REQUEST))?;
+    Ok(decrypted.to_vec())
+}
+fn decrypt_body_with_keys(headers: &HeaderMap, body: Bytes, current: &str, old: Option<String>) -> Result<Vec<u8>, StatusCode> {
     let encrypted_key = headers.get("X-Encryption-Key").ok_or(StatusCode::BAD_REQUEST)?;
     let encrypted_key = BASE64_STANDARD.decode(encrypted_key).or(Err(StatusCode::BAD_REQUEST))?;
     let nonce = headers.get("X-Encryption-Nonce").ok_or(StatusCode::BAD_REQUEST)?;
     let nonce = BASE64_STANDARD.decode(nonce).or(Err(StatusCode::BAD_REQUEST))?;
     let nonce = Nonce::try_assume_unique_for_key(&nonce).or(Err(StatusCode::BAD_REQUEST))?;
-    let key = get_encryption_key()?;
-    let key = OaepPrivateDecryptingKey::new(key).or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-    let mut decrypted = vec![0; key.min_output_size()];
-    let decrypted = key.decrypt(&OAEP_SHA512_MGF1SHA512, &encrypted_key, &mut decrypted, None).or(Err(StatusCode::BAD_REQUEST))?;
-    let key = LessSafeKey::new(UnboundKey::new(&AES_256_GCM, decrypted).or(Err(StatusCode::BAD_REQUEST))?);
+    let decrypted = match decrypt_symmetric_key(current, &encrypted_key) {
+        Ok(key) => key,
+        Err(StatusCode::BAD_REQUEST) => decrypt_symmetric_key(&old.ok_or(StatusCode::BAD_REQUEST)?, &encrypted_key)?,
+        Err(error) => return Err(error),
+    };
+    let key = LessSafeKey::new(UnboundKey::new(&AES_256_GCM, &decrypted).or(Err(StatusCode::BAD_REQUEST))?);
     let mut ciphertext = body.to_vec();
     let plaintext = key.open_in_place(nonce, Aad::empty(), &mut ciphertext).or(Err(StatusCode::BAD_REQUEST))?;
     Ok(plaintext.to_vec())

@@ -34,7 +34,7 @@ pub struct APIServerInfo {
 }
 
 pub async fn server_info(Query(request): Query<ServerInfoRequest>) -> Result<(HeaderMap, Json<APIServerInfo>), StatusCode> {
-    let encryption_key = get_encryption_key()?;
+    let encryption_key = get_encryption_key().await?;
     let encryption_pubkey = encryption_key.public_key().as_der().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let signing_key = get_signing_key()?;
     let signing_pubkey = signing_key.public_key().as_der().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;

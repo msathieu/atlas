@@ -79,7 +79,7 @@ async fn main() {
     tokio::spawn(async { tasks_loop_wrapper(device_pool, "MASTER:DEVICES", process_devices, Duration::from_secs(300)).await });
     tokio::spawn(async { tasks_loop_wrapper(llm_pool, "MASTER:LLM", process_chats, Duration::from_secs(300)).await });
     tokio::spawn(async { tasks_loop_wrapper(tool_pool, "MASTER:TOOLS", process_tool_calls, Duration::from_secs(300)).await });
-    tokio::spawn(async { tasks_loop_wrapper(timers_pool, "MASTER:TIMERS", process_timers, Duration::from_secs(300)).await });
+    tokio::spawn(async { tasks_loop_wrapper(timers_pool, "MASTER:TIMERS", process_timers, Duration::from_secs(600)).await });
     tokio::spawn(async { tasks_loop_wrapper(container_pool, "MASTER:CONTAINERS", process_containers, Duration::from_secs(10)).await });
     tokio::spawn(async { tasks_loop_wrapper(forge_pool, "MASTER:FORGE", process_forge_actions, Duration::from_secs(60)).await });
     tokio::spawn(async { tasks_loop_wrapper(hsm_pool, "MASTER:HSM", process_hsm_requests, Duration::from_secs(10)).await });

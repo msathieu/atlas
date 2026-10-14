@@ -7,6 +7,7 @@ export const API_HOST = PUBLIC_API_HOST ? `https://${PUBLIC_API_HOST}` : "";
 export const API_SIGNING_PUBKEY = PUBLIC_API_SIGNING_PUBKEY;
 
 let encryptionPubkey = "";
+let encryptionPubkeyFetchedAt = 0;
 let signingPubkey = API_SIGNING_PUBKEY;
 
 export async function fetchInfo(fn?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>): Promise<Response> {
@@ -42,10 +43,11 @@ export async function encryptedFetch(
 	fn: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> = authenticatedFetch,
 	requestSignaturePrefix?: string,
 ): Promise<Response> {
-	if (!encryptionPubkey) {
+	if (!encryptionPubkey || Date.now() - encryptionPubkeyFetchedAt >= 24 * 60 * 60 * 1000) {
 		const infoRes = await fetchInfo();
 		const info = await infoRes.json();
 		encryptionPubkey = info.encryption_pubkey as string;
+		encryptionPubkeyFetchedAt = Date.now();
 	}
 	const serverPubKey = await crypto.subtle.importKey("spki", base64ToBuffer(encryptionPubkey), { name: "RSA-OAEP", hash: "SHA-512" }, false, ["encrypt"]);
 	const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt"]);

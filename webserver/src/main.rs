@@ -59,7 +59,6 @@ mod user_setting;
 mod users;
 mod util;
 
-static ENCRYPTION_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 static SIGNING_KEY: OnceLock<Vec<u8>> = OnceLock::new();
 static DB_POOL: OnceLock<Pool<AsyncPgConnection>> = OnceLock::new();
 
@@ -76,9 +75,6 @@ async fn main() {
     DB_POOL.set(get_db_pool().await.unwrap()).ok();
     {
         let mut db = DB_POOL.get().unwrap().get().await.unwrap();
-        let encryption_key = schema::settings::table.find("web_encryption_key").first::<Setting>(&mut db).await.unwrap().value;
-        let encryption_key = BASE64_STANDARD.decode(encryption_key).unwrap();
-        ENCRYPTION_KEY.set(encryption_key).unwrap();
         let signing_key = schema::settings::table.find("web_signing_key").first::<Setting>(&mut db).await.unwrap().value;
         let signing_key = BASE64_STANDARD.decode(signing_key).unwrap();
         SIGNING_KEY.set(signing_key).unwrap();

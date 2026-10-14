@@ -72,7 +72,7 @@ pub async fn users_list(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Re
 pub async fn delete_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "DELETE").await?;
-    let request: DeleteUserRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: DeleteUserRequest = serde_json::from_slice(&decrypt_body(&headers, body).await?).or(Err(StatusCode::BAD_REQUEST))?;
     verify_step_up(&headers, &user, request.verification).await?;
     let mut db = get_db().await?;
     diesel::delete(users::table.find(id)).execute(&mut db).await.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
@@ -82,7 +82,7 @@ pub async fn delete_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: Original
 pub async fn update_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: OriginalUri, body: Bytes) -> Result<HeaderMap, StatusCode> {
     let user = require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "PATCH").await?;
-    let request: UpdateUserRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: UpdateUserRequest = serde_json::from_slice(&decrypt_body(&headers, body).await?).or(Err(StatusCode::BAD_REQUEST))?;
     verify_step_up(&headers, &user, request.verification).await?;
     let mut db = get_db().await?;
     diesel::update(users::table.find(id))
@@ -96,7 +96,7 @@ pub async fn update_user(headers: HeaderMap, Path(id): Path<Uuid>, uri: Original
 pub async fn create_user(headers: HeaderMap, uri: OriginalUri, body: Bytes) -> Result<(HeaderMap, Json<CreateUserResponse>), StatusCode> {
     let user = require_admin(&headers).await?;
     let signature = validate_signature(&headers, uri.0, &body, "POST").await?;
-    let request: CreateUserRequest = serde_json::from_slice(&decrypt_body(&headers, body)?).or(Err(StatusCode::BAD_REQUEST))?;
+    let request: CreateUserRequest = serde_json::from_slice(&decrypt_body(&headers, body).await?).or(Err(StatusCode::BAD_REQUEST))?;
     verify_step_up(&headers, &user, request.verification).await?;
     if request.username.is_empty()
         || !request.username.chars().all(|c| c.is_ascii_alphanumeric())
