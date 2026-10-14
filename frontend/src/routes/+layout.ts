@@ -1,7 +1,7 @@
 import { redirect } from "@sveltejs/kit";
 import { authenticatedFetch } from "#lib/auth.ts";
 import { connectWS, user } from "#lib/state.svelte.ts";
-import { API_ENCRYPTION_PUBKEY, API_SIGNING_PUBKEY, fetchInfo } from "#lib/util.ts";
+import { API_SIGNING_PUBKEY, fetchInfo } from "#lib/util.ts";
 import type { LayoutLoad } from "./$types.ts";
 
 export const prerender = true;
@@ -20,12 +20,7 @@ export const load: LayoutLoad = async ({ fetch, url }) => {
 		};
 	}
 	const info = await infoRes.json();
-	if (
-		info.magic !== "13609285118649036194" ||
-		info.api_version !== 1 ||
-		(API_ENCRYPTION_PUBKEY && info.encryption_pubkey !== API_ENCRYPTION_PUBKEY) ||
-		(API_SIGNING_PUBKEY && info.signing_pubkey !== API_SIGNING_PUBKEY)
-	) {
+	if (info.magic !== "13609285118649036194" || info.api_version !== 1 || (API_SIGNING_PUBKEY && info.signing_pubkey !== API_SIGNING_PUBKEY)) {
 		return {
 			client_error: true,
 			connected: false,

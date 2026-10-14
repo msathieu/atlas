@@ -5,17 +5,23 @@ use crate::{
 use aws_lc_rs::{encoding::AsDer, signature::KeyPair};
 use axum::{
     Json,
+    extract::Query,
     http::{HeaderMap, StatusCode},
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use gethostname::gethostname;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use shared_api::{API_VERSION, MAGIC};
 use shared_server::{models::Setting, schema::settings};
+use uuid::Uuid;
 
+#[derive(Deserialize)]
+pub struct ServerInfoRequest {
+    nonce: Option<Uuid>,
+}
 #[derive(Serialize)]
 pub struct APIServerInfo {
     magic: String,
@@ -27,7 +33,7 @@ pub struct APIServerInfo {
     environment: String,
 }
 
-pub async fn server_info() -> Result<(HeaderMap, Json<APIServerInfo>), StatusCode> {
+pub async fn server_info(Query(request): Query<ServerInfoRequest>) -> Result<(HeaderMap, Json<APIServerInfo>), StatusCode> {
     let encryption_key = get_encryption_key()?;
     let encryption_pubkey = encryption_key.public_key().as_der().or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
     let signing_key = get_signing_key()?;
@@ -42,7 +48,11 @@ pub async fn server_info() -> Result<(HeaderMap, Json<APIServerInfo>), StatusCod
         signing_pubkey: BASE64_STANDARD.encode(signing_pubkey.as_ref()),
         environment: environment.to_string(),
     };
-    Ok((sign_response("info".to_string(), Some(&info))?, Json(info)))
+    let signature_context = match request.nonce {
+        Some(nonce) => format!("info-{nonce}"),
+        None => "info".to_string(),
+    };
+    Ok((sign_response(signature_context, Some(&info))?, Json(info)))
 }
 pub async fn assetlinks() -> Result<Json<serde_json::Value>, StatusCode> {
     let mut db = get_db().await?;

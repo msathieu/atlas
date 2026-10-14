@@ -1,21 +1,21 @@
 import { formatRelative } from "date-fns";
 import Dexie from "dexie";
-import { PUBLIC_API_ENCRYPTION_PUBKEY, PUBLIC_API_HOST, PUBLIC_API_SIGNING_PUBKEY } from "$app/env/public";
+import { PUBLIC_API_HOST, PUBLIC_API_SIGNING_PUBKEY } from "$app/env/public";
 import { authenticatedFetch, verifyResponseSignature } from "./auth.ts";
 
 export const API_HOST = PUBLIC_API_HOST ? `https://${PUBLIC_API_HOST}` : "";
-export const API_ENCRYPTION_PUBKEY = PUBLIC_API_ENCRYPTION_PUBKEY;
 export const API_SIGNING_PUBKEY = PUBLIC_API_SIGNING_PUBKEY;
 
-let encryptionPubkey = API_ENCRYPTION_PUBKEY;
+let encryptionPubkey = "";
 let signingPubkey = API_SIGNING_PUBKEY;
 
 export async function fetchInfo(fn?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>): Promise<Response> {
 	if (!fn) {
 		fn = fetch;
 	}
-	const infoRes = await fn(`${API_HOST}/api/info`);
-	await verifyResponseSignature(infoRes, "info");
+	const nonce = crypto.randomUUID();
+	const infoRes = await fn(`${API_HOST}/api/info?nonce=${nonce}`);
+	await verifyResponseSignature(infoRes, `info-${nonce}`);
 	return infoRes;
 }
 export function formatTime(timestamp: number): string {
